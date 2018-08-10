@@ -380,9 +380,9 @@ trait FastSyncService { _: SyncService =>
           log.debug("There are no available peers, waiting for ProcessSyncingTick or working peers done")
         }
       } else {
-        val blockchainOnlys = blockchainOnlyPeers.values.toSet
 
         if (syncState.pendingNonMptNodes.nonEmpty || syncState.pendingMptNodes.nonEmpty) {
+          val blockchainOnlys = blockchainOnlyPeers.values.toSet
           val nodeWorks = (unassignedPeers -- blockchainOnlys)
             .take(maxConcurrentRequests - workingPeers.size)
             .toSeq.sortBy(_.id)
@@ -409,7 +409,7 @@ trait FastSyncService { _: SyncService =>
         }
 
         if (syncState.pendingReceipts.nonEmpty) {
-          val receiptWorks = unassignedPeers.intersect(blockchainOnlys)
+          val receiptWorks = unassignedPeers
             .take(maxConcurrentRequests - workingPeers.size)
             .toSeq.sortBy(_.id)
             .foldLeft(Vector[(Peer, List[Hash])]()) {
@@ -432,7 +432,7 @@ trait FastSyncService { _: SyncService =>
         }
 
         if (syncState.pendingBlockBodies.nonEmpty) {
-          val bodyWorks = unassignedPeers.intersect(blockchainOnlys)
+          val bodyWorks = unassignedPeers
             .take(maxConcurrentRequests - workingPeers.size)
             .toSeq.sortBy(_.id)
             .foldLeft(Vector[(Peer, List[Hash])]()) {
@@ -455,7 +455,7 @@ trait FastSyncService { _: SyncService =>
         }
 
         if (isThereHeaderToDownload && headerWorkingPeer.isEmpty) {
-          val headerWorks = unassignedPeers.intersect(blockchainOnlys)
+          val headerWorks = unassignedPeers
             .take(maxConcurrentRequests - workingPeers.size)
             .toSeq.sortBy(_.id)
             .headOption flatMap { peer =>
