@@ -127,7 +127,7 @@ trait RegularSyncService { _: SyncService =>
 
         log.debug(s"Request block headers beginning at $nextBlockNumber via best peer $peer")
 
-        requestingHeaders(peer, Left(nextBlockNumber), blockHeadersPerRequest, skip = 0, reverse = false)(syncRequestTimeout) map {
+        requestingHeaders(peer, None, Left(nextBlockNumber), blockHeadersPerRequest, skip = 0, reverse = false)(syncRequestTimeout) map {
           case Some(sync.BlockHeadersResponse(peerId, headers, true)) =>
             log.debug(s"Got block headers from $peer")
             if (lookbackFromBlock.isDefined) {
@@ -196,7 +196,7 @@ trait RegularSyncService { _: SyncService =>
           } else {
             log.info(s"[sync] Received branch block ${headers.head.number} from ${peer.id}, resolving fork ...")
 
-            requestingHeaders(peer, Right(headers.head.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) map {
+            requestingHeaders(peer, None, Right(headers.head.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) map {
               case Some(sync.BlockHeadersResponse(peerId, headers, true)) =>
                 self ! ProcessBlockHeaders(peer, headers)
 

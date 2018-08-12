@@ -179,14 +179,14 @@ package object sync {
   }
 
   final case class BlockHeadersResponse(peerId: String, headers: List[BlockHeader], isConsistent: Boolean) extends PeerResponse
-  final case class BlockHeadersRequest(peerId: String, message: PV62.GetBlockHeaders) extends RequestToPeer[PV62.BlockHeaders, BlockHeadersResponse] {
+  final case class BlockHeadersRequest(peerId: String, parentHeader: Option[BlockHeader], message: PV62.GetBlockHeaders) extends RequestToPeer[PV62.BlockHeaders, BlockHeadersResponse] {
     def messageToSend = message
 
     def processResponse(blockHeaders: PV62.BlockHeaders) = {
       val headers = (if (message.reverse) blockHeaders.headers.reverse else blockHeaders.headers).toList
 
       if (headers.nonEmpty) {
-        if (isHeadersConsistent(headers)) {
+        if (parentHeader.fold(true) { prevHeader => headers.head.parentHash == prevHeader.hash } && isHeadersConsistent(headers)) {
           Some(BlockHeadersResponse(peerId, headers, true))
         } else {
           Some(BlockHeadersResponse(peerId, List(), false))
