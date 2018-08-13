@@ -18,6 +18,7 @@ import khipu.Hash
 import khipu.Stop
 import khipu.crypto
 import khipu.domain.Block
+import khipu.domain.BlockHeader
 import khipu.network.p2p.Message
 import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.PV63
@@ -142,9 +143,9 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
     case Stop => context stop self
   }
 
-  protected def requestingHeaders(peer: Peer, blockNumberOrHash: Either[Long, Hash], maxHeaders: Long, skip: Long, reverse: Boolean)(implicit timeout: FiniteDuration) = {
+  protected def requestingHeaders(peer: Peer, parentHeader: Option[BlockHeader], blockNumberOrHash: Either[Long, Hash], maxHeaders: Long, skip: Long, reverse: Boolean)(implicit timeout: FiniteDuration) = {
     isRequesting = true
-    val request = BlockHeadersRequest(peer.id, PV62.GetBlockHeaders(blockNumberOrHash, maxHeaders, skip, reverse))
+    val request = BlockHeadersRequest(peer.id, parentHeader, PV62.GetBlockHeaders(blockNumberOrHash, maxHeaders, skip, reverse))
     (peer.entity ? request)(timeout).mapTo[Option[BlockHeadersResponse]] andThen {
       case _ => isRequesting = false
     }
