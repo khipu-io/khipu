@@ -5,6 +5,7 @@ package khipu.vm
  */
 sealed trait ProgramError
 case object OutOfGas extends ProgramError
+case object PrecompiledContractFailed extends ProgramError
 final case class InvalidOpCode(code: Byte) extends ProgramError {
   override def toString: String =
     f"InvalidOpCode(0x${code.toInt & 0xff}%02x)"

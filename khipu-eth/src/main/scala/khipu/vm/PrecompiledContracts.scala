@@ -48,14 +48,17 @@ object PrecompiledContracts {
   }
 
   sealed trait PrecompiledContract {
-    protected def exec(inputData: ByteString): ByteString
     protected def gas(inputData: ByteString): Long
+    protected def exec(inputData: ByteString): (Boolean, ByteString)
 
     def run[W <: WorldState[W, S], S <: Storage[S]](context: ProgramContext[W, S]): ProgramResult[W, S] = {
-      val g = gas(context.env.inputData)
+      val requiredGas = gas(context.env.inputData)
 
-      val (returnData, error, gasRemaining) = if (g <= context.startGas) {
-        (exec(context.env.inputData), None, context.startGas - g)
+      val (returnData, error, gasRemaining) = if (requiredGas <= context.startGas) {
+        exec(context.env.inputData) match {
+          case (true, res)  => (res, None, context.startGas - requiredGas)
+          case (false, res) => (res, Some(PrecompiledContractFailed), 0L)
+        }
       } else {
         (ByteString(), Some(OutOfGas), 0L)
       }
@@ -79,7 +82,7 @@ object PrecompiledContracts {
   object ECRecovery extends PrecompiledContract {
     def gas(inputData: ByteString): Long = 3000
 
-    def exec(inputData: ByteString): ByteString = {
+    def exec(inputData: ByteString): (Boolean, ByteString) = {
       val bytes = inputData.toArray
       val data = Array.fill[Byte](128)(0)
       System.arraycopy(bytes, 0, data, 0, math.min(bytes.length, data.length))
@@ -94,46 +97,69 @@ object PrecompiledContracts {
       System.arraycopy(data, 96, s, 0, s.length)
 
       val recovered = Try { ECDSASignature.recoverPublicKey(ECDSASignature(r, s, v), h) } getOrElse None
-      recovered.map { bytes =>
+      (true, recovered.map { bytes =>
         val hash = ByteString(crypto.kec256(bytes).slice(12, 32))
         BytesUtil.padLeft(hash, 32, 0.toByte)
-      }.getOrElse(ByteString())
+      }.getOrElse(ByteString()))
     }
 
   }
 
   object Sha256 extends PrecompiledContract {
-    def gas(inputData: ByteString): Long = 60 + 12 * UInt256.wordsForBytes(inputData.size)
+    def gas(inputData: ByteString): Long = {
+      if (inputData == null) {
+        60
+      } else {
+        60 + 12 * UInt256.wordsForBytes(inputData.size)
+      }
+    }
 
-    def exec(inputData: ByteString): ByteString = crypto.sha256(inputData)
+    def exec(_inputData: ByteString): (Boolean, ByteString) = {
+      val inputData = if (_inputData == null) ByteString() else _inputData
+      (true, crypto.sha256(inputData))
+    }
   }
 
   object Ripemp160 extends PrecompiledContract {
-    def gas(inputData: ByteString): Long = 600 + 120 * UInt256.wordsForBytes(inputData.size)
+    def gas(inputData: ByteString): Long = {
+      if (inputData == null) {
+        600
+      } else {
+        600 + 120 * UInt256.wordsForBytes(inputData.size)
+      }
+    }
 
-    def exec(inputData: ByteString): ByteString =
-      BytesUtil.padLeft(crypto.ripemd160(inputData), 32, 0.toByte)
-
+    def exec(_inputData: ByteString): (Boolean, ByteString) = {
+      val inputData = if (_inputData == null) ByteString() else _inputData
+      (true, BytesUtil.padLeft(crypto.ripemd160(inputData), 32, 0.toByte))
+    }
   }
 
   object Identity extends PrecompiledContract {
-    def exec(inputData: ByteString): ByteString = inputData
+    def gas(inputData: ByteString): Long = {
+      if (inputData == null) {
+        15
+      } else {
+        15 + 3 * UInt256.wordsForBytes(inputData.size)
+      }
+    }
 
-    def gas(inputData: ByteString): Long = 15 + 3 * UInt256.wordsForBytes(inputData.size)
+    def exec(inputData: ByteString): (Boolean, ByteString) =
+      (true, inputData)
   }
 
   object ModExp extends PrecompiledContract {
     private val GQUAD_DIVISOR = BigInteger.valueOf(20)
     private val ARGS_OFFSET = 32 * 3 // addresses length part
 
-    def gas(data: ByteString): Long = {
-      if (data == null) return 0
+    def gas(_inputData: ByteString): Long = {
+      val inputData = if (_inputData == null) ByteString() else _inputData
 
-      val baseLen = parseLen(data, 0)
-      val expLen = parseLen(data, 1)
-      val modLen = parseLen(data, 2)
+      val baseLen = parseLen(inputData, 0)
+      val expLen = parseLen(inputData, 1)
+      val modLen = parseLen(inputData, 2)
 
-      val expHighBytes = BytesUtil.parseBytes(data, BigIntUtil.addSafely(ARGS_OFFSET, baseLen), math.min(expLen, 32))
+      val expHighBytes = BytesUtil.parseBytes(inputData, BigIntUtil.addSafely(ARGS_OFFSET, baseLen), math.min(expLen, 32))
 
       val multComplexity = getMultComplexity(math.max(baseLen, modLen))
       val adjExpLen = getAdjustedExponentLength(expHighBytes, expLen)
@@ -146,21 +172,20 @@ object PrecompiledContracts {
       if (BigIntUtil.isLessThan(gas, BigInteger.valueOf(Long.MaxValue))) gas.longValue else Long.MaxValue
     }
 
-    def exec(data: ByteString): ByteString = {
-      if (data == null)
-        return ByteString()
+    def exec(_inputData: ByteString): (Boolean, ByteString) = {
+      val inputData = if (_inputData == null) ByteString() else _inputData
 
-      val baseLen = parseLen(data, 0)
-      val expLen = parseLen(data, 1)
-      val modLen = parseLen(data, 2)
+      val baseLen = parseLen(inputData, 0)
+      val expLen = parseLen(inputData, 1)
+      val modLen = parseLen(inputData, 2)
 
-      val base = parseArg(data, ARGS_OFFSET, baseLen)
-      val exp = parseArg(data, BigIntUtil.addSafely(ARGS_OFFSET, baseLen), expLen)
-      val mod = parseArg(data, BigIntUtil.addSafely(BigIntUtil.addSafely(ARGS_OFFSET, baseLen), expLen), modLen)
+      val base = parseArg(inputData, ARGS_OFFSET, baseLen)
+      val exp = parseArg(inputData, BigIntUtil.addSafely(ARGS_OFFSET, baseLen), expLen)
+      val mod = parseArg(inputData, BigIntUtil.addSafely(BigIntUtil.addSafely(ARGS_OFFSET, baseLen), expLen), modLen)
 
       // check if modulus is zero
       if (BigIntUtil.isZero(mod))
-        return ByteString()
+        return (true, ByteString())
 
       val res = BytesUtil.stripLeadingZeroes(base.modPow(exp, mod).toByteArray)
 
@@ -168,9 +193,9 @@ object PrecompiledContracts {
       if (res.length < modLen) {
         val adjRes = Array.ofDim[Byte](modLen)
         System.arraycopy(res, 0, adjRes, modLen - res.length, res.length)
-        ByteString(adjRes)
+        (true, ByteString(adjRes))
       } else {
-        ByteString(res)
+        (true, ByteString(res))
       }
     }
 
@@ -225,32 +250,30 @@ object PrecompiledContracts {
    *
    */
   object BN128Add extends PrecompiledContract {
-    def gas(data: ByteString): Long = {
-      if (data == null) return 0
+    def gas(inputData: ByteString): Long = {
       500
     }
 
-    def exec(data: ByteString): ByteString = {
-      if (data == null)
-        return ByteString()
+    def exec(_inputData: ByteString): (Boolean, ByteString) = {
+      val inputData = if (_inputData == null) ByteString() else _inputData
 
-      val x1 = BytesUtil.parseWord(data, 0)
-      val y1 = BytesUtil.parseWord(data, 1)
+      val x1 = BytesUtil.parseWord(inputData, 0)
+      val y1 = BytesUtil.parseWord(inputData, 1)
 
-      val x2 = BytesUtil.parseWord(data, 2)
-      val y2 = BytesUtil.parseWord(data, 3)
+      val x2 = BytesUtil.parseWord(inputData, 2)
+      val y2 = BytesUtil.parseWord(inputData, 3)
 
       val p1 = BN128Fp.create(x1, y1)
       if (p1 == null)
-        return ByteString()
+        return (false, ByteString())
 
       val p2 = BN128Fp.create(x2, y2)
       if (p2 == null)
-        return ByteString()
+        return (false, ByteString())
 
       val res = p1.add(p2).toEthNotation()
 
-      encodeRes(res.x.bytes, res.y.bytes)
+      (true, encodeRes(res.x.bytes, res.y.bytes))
     }
   }
 
@@ -269,27 +292,25 @@ object PrecompiledContracts {
    *
    */
   object BN128Mul extends PrecompiledContract {
-    def gas(data: ByteString): Long = {
-      if (data == null) return 0
+    def gas(inputData: ByteString): Long = {
       40000
     }
 
-    def exec(data: ByteString): ByteString = {
-      if (data == null)
-        return ByteString()
+    def exec(_inputData: ByteString): (Boolean, ByteString) = {
+      val inputData = if (_inputData == null) ByteString() else _inputData
 
-      val x = BytesUtil.parseWord(data, 0)
-      val y = BytesUtil.parseWord(data, 1)
+      val x = BytesUtil.parseWord(inputData, 0)
+      val y = BytesUtil.parseWord(inputData, 1)
 
-      val s = BytesUtil.parseWord(data, 2)
+      val s = BytesUtil.parseWord(inputData, 2)
 
       val p = BN128Fp.create(x, y)
       if (p == null)
-        return ByteString()
+        return (false, ByteString())
 
       val res = p.mul(BigIntUtil.toBI(s)).toEthNotation()
 
-      encodeRes(res.x.bytes, res.y.bytes)
+      (true, encodeRes(res.x.bytes, res.y.bytes))
     }
   }
 
@@ -315,29 +336,31 @@ object PrecompiledContracts {
   object BN128Pairing extends PrecompiledContract {
     private val PAIR_SIZE = 192
 
-    def gas(data: ByteString): Long = {
-      if (data == null) return 0
-      80000 * (data.length / PAIR_SIZE) + 100000
+    def gas(inputData: ByteString): Long = {
+      if (inputData == null) {
+        100000
+      } else {
+        100000 + 80000 * (inputData.length / PAIR_SIZE)
+      }
     }
 
-    def exec(data: ByteString): ByteString = {
-      if (data == null)
-        return ByteString()
+    def exec(_inputData: ByteString): (Boolean, ByteString) = {
+      val inputData = if (_inputData == null) ByteString() else _inputData
 
       // fail if input len is not a multiple of PAIR_SIZE
-      if (data.length % PAIR_SIZE > 0)
-        return ByteString()
+      if (inputData.length % PAIR_SIZE > 0)
+        return (false, ByteString())
 
       val check = PairingCheck.create()
 
       // iterating over all pairs
       var offset = 0
-      while (offset < data.length) {
-        val pair = decodePair(data, offset)
+      while (offset < inputData.length) {
+        val pair = decodePair(inputData, offset)
 
         // fail if decoding has failed
         if (pair == null)
-          return ByteString()
+          return (false, ByteString())
 
         check.addPair(pair._1, pair._2)
         offset += PAIR_SIZE
@@ -346,7 +369,7 @@ object PrecompiledContracts {
       check.run()
       val result = check.result()
 
-      ByteString(UInt256(result).bytes)
+      (true, ByteString(UInt256(result).bytes))
     }
 
     private def decodePair(in: ByteString, offset: Int): (BN128G1, BN128G2) = {

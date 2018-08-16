@@ -409,8 +409,8 @@ trait RegularSyncService { _: SyncService =>
     }
 
     if (peersToUse.nonEmpty) {
-      val candicates = peersToUse.toList.sortBy { case (_, td) => td.negate }.take(3).toArray
-      Some(candicates(nextCandicate(0, candicates.length))._1)
+      val candicates = peersToUse.toList.sortBy { case (_, td) => td.negate }.take(3).map(_._1).toArray
+      Some(nextCandicate(candicates))
     } else {
       None
     }
@@ -423,14 +423,15 @@ trait RegularSyncService { _: SyncService =>
     } -- nodeErrorPeers
 
     if (peersToUse.nonEmpty) {
-      val candicates = peersToUse.toList.sortBy { case (_, td) => td.negate }.take(3).toArray
-      Some(candicates(nextCandicate(0, candicates.length))._1)
+      val candicates = peersToUse.toList.sortBy { case (_, td) => td.negate }.take(3).map(_._1).toArray
+      Some(nextCandicate(candicates))
     } else {
       None
     }
   }
 
-  private def nextCandicate(low: Int, high: Int) = { // >= low and < high
+  private def nextCandicate(candicates: Array[Peer]) = candicates(nextCandicateIndex(0, candicates.length))
+  private def nextCandicateIndex(low: Int, high: Int) = { // >= low and < high
     val rnd = ThreadLocalRandom.current()
     rnd.nextInt(high - low) + low
   }

@@ -1186,6 +1186,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
           if (sizeCap >= 0) {
             val output = result.returnData.take(sizeCap)
             state.memory.store(outOffset.intValueSafe, output)
+            // use outSize here instead of output.size or sizeCap, you know, we've paid the gas for outSize. An example is tx 0xb1c7fb7383cb9cdb86a26b24d68c02c8c424bfdf1749fa20eb0f1969f113c643
             state.memory.expand(outOffset.intValueSafe, outSize.intValueSafe)
           }
 
@@ -1244,21 +1245,19 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
 
   final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256, UInt256, UInt256, UInt256)): Long = {
     val (gas, target, callValue, inOffset, inSize, outOffset, outSize) = params
-    if (gas < 0) {
-      gas.toULong // TODO error and halt ?
-    } else {
-      val endowment = callValue
 
-      val gMemIn = state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
-      val gMemOut = state.config.calcMemCost(state.memory.size, outOffset.longValueSafe, outSize.longValueSafe)
-      val gMem = math.max(gMemIn, gMemOut)
+    // TODO how about gas < 0? return a Long.MaxValue?
+    val endowment = callValue
 
-      // FIXME: these are calculated twice (for gas and exec), especially account existence. Can we do better? [EC-243]
-      val gExtra = gasExtra(state, endowment, Address(target))
+    val gMemIn = state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
+    val gMemOut = state.config.calcMemCost(state.memory.size, outOffset.longValueSafe, outSize.longValueSafe)
+    val gMem = math.max(gMemIn, gMemOut)
 
-      val gAdjust = gasAdjust(state, gas.longValueSafe, gExtra + gMem)
-      gExtra + gMem + gAdjust
-    }
+    // FIXME: these are calculated twice (for gas and exec), especially account existence. Can we do better? [EC-243]
+    val gExtra = gasExtra(state, endowment, Address(target))
+
+    val gAdjust = gasAdjust(state, gas.longValueSafe, gExtra + gMem)
+    gExtra + gMem + gAdjust
   }
 
   private def gasAdjust[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], gRequest: Long, gConsumed: Long): Long = {
