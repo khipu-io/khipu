@@ -122,7 +122,7 @@ object BytesUtil {
       EMPTY_BYTE_ARRAY
     } else {
       val bytes = Array.ofDim[Byte](len)
-      System.arraycopy(input, offset, bytes, 0, math.min(input.length - offset, len))
+      System.arraycopy(input.toArray, offset, bytes, 0, math.min(input.length - offset, len))
       bytes
     }
 
