@@ -28,7 +28,11 @@ final class Memory private () {
   def store(offset: Int, data: Array[Byte]) {
     if (offset >= 0 && offset <= Int.MaxValue && data.length > 0) {
       expand(offset, data.length)
-      System.arraycopy(data, 0, underlying, offset, data.length)
+      try {
+        System.arraycopy(data, 0, underlying, offset, data.length)
+      } catch {
+        case e: Throwable => // try catch as a quick fix for java.lang.ArrayIndexOutOfBoundsException: null at block #6214799
+      }
     }
   }
 
