@@ -26,13 +26,9 @@ final class Memory private () {
    * hence an OOM error may be thrown.
    */
   def store(offset: Int, data: Array[Byte]) {
-    if (offset >= 0 && offset <= Int.MaxValue && data.length > 0) {
+    if (data.length > 0 && offset >= 0 && offset.toLong + data.length.toLong <= Int.MaxValue) {
       expand(offset, data.length)
-      try {
-        System.arraycopy(data, 0, underlying, offset, data.length)
-      } catch {
-        case e: Throwable => // try catch as a quick fix for java.lang.ArrayIndexOutOfBoundsException: null at block #6214799
-      }
+      System.arraycopy(data, 0, underlying, offset, data.length)
     }
   }
 
@@ -45,7 +41,7 @@ final class Memory private () {
    * hence an OOM error may be thrown.
    */
   private def doLoad(offset: Int, size: Int): Array[Byte] = {
-    if (offset >= 0 && offset <= Int.MaxValue && size > 0) {
+    if (size > 0 && offset >= 0 && offset.toLong + size.toLong <= Int.MaxValue) {
       expand(offset, size)
       val data = Array.ofDim[Byte](size)
       System.arraycopy(underlying, offset, data, 0, size)
@@ -62,7 +58,7 @@ final class Memory private () {
    * This is required to satisfy memory expansion semantics for *CALL* opcodes.
    */
   def expand(offset: Int, size: Int) {
-    if (offset >= 0 && offset <= Int.MaxValue && size > 0) {
+    if (size > 0 && offset >= 0 && offset.toLong + size.toLong <= Int.MaxValue) {
       val end = offset + size
       if (end > underlying.length) {
         val extended = Array.ofDim[Byte](end) // will be auto filled with 0
