@@ -1123,6 +1123,14 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
         if (endowment.isZero) gAdjust else gAdjust + state.config.feeSchedule.G_callstipend
       }
 
+      // expand memory according to max in/out offset + in/out size, you know, we've paid gas for it 
+      // e.g, tx 0xd31250c86050cb571c548315c0018626989f2fb2385455ec301bd4cdd21ee1c7 should use inOffset + inSize
+      if (inOffset.longValueSafe + inSize.longValueSafe > outOffset.longValueSafe + outSize.longValueSafe) {
+        state.memory.expand(inOffset.intValueSafe, inSize.intValueSafe)
+      } else {
+        state.memory.expand(outOffset.intValueSafe, outSize.intValueSafe)
+      }
+
       val isValidCall = state.env.callDepth < EvmConfig.MaxCallDepth && endowment <= state.ownBalance
 
       if (isValidCall) {
@@ -1186,8 +1194,6 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
           if (sizeCap >= 0) {
             val output = result.returnData.take(sizeCap)
             state.memory.store(outOffset.intValueSafe, output)
-            // use outSize here instead of output.size or sizeCap, you know, we've paid the gas for outSize. An example is tx 0xb1c7fb7383cb9cdb86a26b24d68c02c8c424bfdf1749fa20eb0f1969f113c643
-            state.memory.expand(outOffset.intValueSafe, outSize.intValueSafe)
           }
 
           state

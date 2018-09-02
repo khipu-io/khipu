@@ -540,8 +540,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val refund = UInt256(totalGasToRefund) * gasPrice
 
     // print trace
-    //log.info(s"\nTx 0x${stx.hash} executing ${result.trace.mkString("\n", "\n", "\n")}")
-    //log.info(s"0x${stx.hash} gasLimit: ${stx.tx.gasLimit} gasUsed $gasUsed, isRevert: ${result.isRevert}, error: ${result.error}")
+    //log.info(s"\nTx 0x${stx.hash} executing ${result.trace.mkString("\n", "\n", "\n")}\n0x${stx.hash} gasLimit: ${stx.tx.gasLimit} gasUsed $gasUsed, isRevert: ${result.isRevert}, error: ${result.error}")
 
     val worldRefundGasPaid = result.world.pay(stx.sender, refund)
     val worldDeletedAccounts = deleteAccounts(result.addressesToDelete)(worldRefundGasPaid)
