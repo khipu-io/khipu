@@ -27,10 +27,12 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Failure
+import scala.util.control.ControlThrowable
 
 object RegularSyncService {
   private case object ResumeRegularSyncTask
   private case object ResumeRegularSyncTick
+  private case class ExecuteAndInsertBlocksAborted(parentTotalDifficulty: BigInteger, newBlocks: Vector[NewBlock], errors: Vector[BlockExecutionError]) extends ControlThrowable {}
 }
 trait RegularSyncService { _: SyncService =>
   import context.dispatcher
@@ -266,7 +268,9 @@ trait RegularSyncService { _: SyncService =>
           }
 
           val start = System.currentTimeMillis
-          executeAndInsertBlocks(preValidatedBlocks, parentTd, preValidatedBlocks.size > 1) flatMap {
+          executeAndInsertBlocks(preValidatedBlocks, parentTd, preValidatedBlocks.size > 1) recover {
+            case ExecuteAndInsertBlocksAborted(parentTotalDifficulty, newBlocks, errors) => (parentTotalDifficulty, newBlocks, errors)
+          } flatMap {
             case (_, newBlocks, errors) =>
               val elapsed = (System.currentTimeMillis - start) / 1000.0
 
@@ -352,17 +356,19 @@ trait RegularSyncService { _: SyncService =>
     blocks.foldLeft(Future.successful(parentTd, Vector[NewBlock](), Vector[BlockExecutionError]())) {
       case (prevFuture, block) =>
         prevFuture flatMap {
-          case (parentTotalDifficulty, newBlocks, errors) =>
+          case (parentTotalDifficulty, newBlocks, Vector()) =>
             executeAndInsertBlock(block, parentTotalDifficulty, isBatch) map {
               case Right(newBlock) =>
                 // check blockHashToDelete
                 blockchain.getBlockHeaderByNumber(block.header.number).map(_.hash).filter(_ != block.header.hash) foreach blockchain.removeBlock
 
-                (newBlock.totalDifficulty, newBlocks :+ newBlock, errors)
+                (newBlock.totalDifficulty, newBlocks :+ newBlock, Vector())
 
               case Left(error) =>
-                (parentTotalDifficulty, newBlocks, errors :+ error)
+                (parentTotalDifficulty, newBlocks, Vector(error))
             }
+
+          case (parentTotalDifficulty, newBlocks, errors) => Future.failed(ExecuteAndInsertBlocksAborted(parentTotalDifficulty, newBlocks, errors))
         }
     }
   }
