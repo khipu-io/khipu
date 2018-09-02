@@ -21,21 +21,21 @@ import khipu.network.rlpx.PeerEntity
 import khipu.store.datasource.KesqueDataSource
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
+import khipu.util
 import scala.annotation.tailrec
+import scala.concurrent.Await
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Failure
 
 object RegularSyncService {
   private case object ResumeRegularSyncTask
   private case object ResumeRegularSyncTick
-
-  private case class ProcessBlockHeaders(peer: Peer, headers: Seq[BlockHeader])
-  private case class ProcessBlockBodies(peer: Peer, bodies: Seq[PV62.BlockBody])
 }
 trait RegularSyncService { _: SyncService =>
   import context.dispatcher
   import RegularSyncService._
-  import khipu.util.Config.Sync._
+  import util.Config.Sync._
 
   private def tf(n: Int) = "%1$4d".format(n) // tx
   private def xf(n: Double) = "%1$5.1f".format(n) // tps
@@ -45,64 +45,42 @@ trait RegularSyncService { _: SyncService =>
   private def lf(n: Int) = "%1$5d".format(n) // payload
 
   // Should keep newer block to be at the front
-  private var workingHeaders: Seq[BlockHeader] = Vector[BlockHeader]()
+  private var workingHeaders = List[BlockHeader]()
 
   def startRegularSync() {
     log.info("Starting regular block synchronization")
     appStateStorage.fastSyncDone()
     context become (handleRegularSync orElse peerUpdateBehavior orElse ommersBehavior orElse stopBehavior)
-    requestHeaders()
+    resumeRegularSync()
   }
 
   def handleRegularSync: Receive = {
     case ResumeRegularSyncTick =>
-      workingHeaders = Vector()
+      workingHeaders = Nil
       requestHeaders()
-
-    case ProcessBlockHeaders(peer, headers) =>
-      if (workingHeaders.isEmpty) {
-        if (headers.nonEmpty) {
-          workingHeaders = headers
-          processBlockHeaders(peer, headers)
-        } else {
-          // no new headers to process, schedule to ask again in future, we are at the top of chain
-          scheduleResume()
-        }
-      } else {
-        // TODO limit max branch depth? [EC-248]
-        if (headers.nonEmpty && headers.last.hash == workingHeaders.head.parentHash) {
-          // should insert before pendingHeaders
-          workingHeaders = headers ++ workingHeaders
-          processBlockHeaders(peer, workingHeaders)
-        } else {
-          blockPeerAndResumeWithAnotherOne(peer, "Did not get previous blocks, there is no way to resolve, blacklist peer and continue download")
-        }
-      }
-
-    case ProcessBlockBodies(peer, blockBodies) =>
-      processBlockBodies(peer, blockBodies)
 
     case SyncService.ReceivedMessage(peerId, message) =>
       log.debug(s"Received ${message.getClass.getName} from $peerId")
 
-    //todo improve mined block handling - add info that block was not included because of syncing [EC-250]
-    //we allow inclusion of mined block only if we are not syncing / reorganising chain
+    // TODO improve mined block handling - add info that block was not included because of syncing [EC-250]
+    // we allow inclusion of mined block only if we are not syncing / reorganising chain
     case SyncService.MinedBlock(block) =>
       if (workingHeaders.isEmpty && !isRequesting) {
-        //we are at the top of chain we can insert new block
+        // we are at the top of chain we can insert new block
         blockchain.getBlockHeaderByHash(block.header.parentHash).flatMap { b =>
           blockchain.getTotalDifficultyByHash(b.hash)
         } match {
           case Some(parentTd) if block.header.number > appStateStorage.getBestBlockNumber =>
             // just insert block and let resolve it with regular download
-            executeAndInsertBlock(block, parentTd, isBatch = false) match {
+            val f = executeAndInsertBlock(block, parentTd, isBatch = false) map {
               case Right(newBlock) =>
                 // broadcast new block
-                handshakedPeers.foreach {
+                handshakedPeers foreach {
                   case (peerId, (peer, peerInfo)) => peer.entity ! PeerEntity.MessageToPeer(peerId, newBlock)
                 }
               case Left(error) =>
             }
+            Await.result(f, Duration.Inf)
           case _ =>
             log.error("Failed to add mined block")
         }
@@ -114,9 +92,22 @@ trait RegularSyncService { _: SyncService =>
       log.debug(s"Block: ${appStateStorage.getBestBlockNumber()}. Peers(in/out): ${handshakedPeers.size}(${incomingPeers.size}/${outgoingPeers.size}) black: ${blacklistPeers.size}")
   }
 
+  private def scheduleResume() {
+    timers.startSingleTimer(ResumeRegularSyncTask, ResumeRegularSyncTick, checkForNewBlockInterval)
+  }
+
+  private def resumeRegularSync() {
+    self ! ResumeRegularSyncTick
+  }
+
+  private def blockPeerAndResumeWithAnotherOne(currPeer: Peer, reason: String) {
+    self ! BlacklistPeer(currPeer.id, reason)
+    self ! ResumeRegularSyncTick
+  }
+
   private var lookbackFromBlock: Option[Long] = if (reimportFromBlockNumber > 0) Some(reimportFromBlockNumber) else None // for debugging/reimporting a specified block
   private var isLookbacked = false
-  private def requestHeaders() = {
+  private def requestHeaders(): Future[Unit] = {
     bestPeer match {
       case Some(peer) =>
         val nextBlockNumber = lookbackFromBlock match {
@@ -127,33 +118,55 @@ trait RegularSyncService { _: SyncService =>
 
         log.debug(s"Request block headers beginning at $nextBlockNumber via best peer $peer")
 
-        requestingHeaders(peer, None, Left(nextBlockNumber), blockHeadersPerRequest, skip = 0, reverse = false)(syncRequestTimeout) map {
-          case Some(sync.BlockHeadersResponse(peerId, headers, true)) =>
+        requestingHeaders(peer, None, Left(nextBlockNumber), blockHeadersPerRequest, skip = 0, reverse = false)(syncRequestTimeout) flatMap {
+          case Some(BlockHeadersResponse(peerId, headers, true)) =>
             log.debug(s"Got block headers from $peer")
             if (lookbackFromBlock.isDefined) {
               isLookbacked = true
             }
             lookbackFromBlock = None
-            self ! ProcessBlockHeaders(peer, headers)
+            processBlockHeaders(peer, headers)
 
-          case Some(sync.BlockHeadersResponse(peerId, _, false)) =>
-            blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: $nextBlockNumber")
+          case Some(BlockHeadersResponse(peerId, _, false)) =>
+            Future.successful(blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: $nextBlockNumber"))
 
           case None =>
-            scheduleResume()
+            Future.successful(scheduleResume())
 
         } andThen {
           case Failure(e: AskTimeoutException) => blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
           case Failure(e)                      => blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
           case _                               =>
         }
+
       case None =>
         log.debug("No peers to download from")
-        scheduleResume()
+        Future.successful(scheduleResume())
     }
   }
 
-  private def processBlockHeaders(peer: Peer, headers: Seq[BlockHeader]) {
+  private def processBlockHeaders(peer: Peer, headers: List[BlockHeader]): Future[Unit] = {
+    if (workingHeaders.isEmpty) {
+      if (headers.nonEmpty) {
+        workingHeaders = headers
+        doProcessBlockHeaders(peer, headers)
+      } else {
+        // no new headers to process, schedule to ask again in future, we are at the top of chain
+        Future.successful(scheduleResume())
+      }
+    } else {
+      // TODO limit max branch depth? [EC-248]
+      if (headers.nonEmpty && headers.last.hash == workingHeaders.head.parentHash) {
+        // should insert before pendingHeaders
+        workingHeaders = headers ++ workingHeaders
+        doProcessBlockHeaders(peer, workingHeaders)
+      } else {
+        Future.successful(blockPeerAndResumeWithAnotherOne(peer, "Did not get previous blocks, there is no way to resolve, blacklist peer and continue download"))
+      }
+    }
+  }
+
+  private def doProcessBlockHeaders(peer: Peer, headers: List[BlockHeader]): Future[Unit] = {
     if (checkHeaders(headers)) {
       blockchain.getBlockHeaderByNumber(headers.head.number - 1) match {
         case Some(parent) =>
@@ -171,40 +184,42 @@ trait RegularSyncService { _: SyncService =>
 
               log.debug(s"Request block bodies from $peer")
 
-              requestingBodies(peer, hashes)(syncRequestTimeout.plus((hashes.size * 100).millis)) map {
-                case Some(sync.BlockBodiesResponse(peerId, bodies)) =>
+              requestingBodies(peer, hashes)(syncRequestTimeout.plus((hashes.size * 100).millis)) flatMap {
+                case Some(BlockBodiesResponse(peerId, bodies)) =>
                   log.debug(s"Got block bodies from $peer")
-                  self ! ProcessBlockBodies(peer, bodies)
+                  processBlockBodies(peer, bodies)
 
                 case None =>
-                  blockPeerAndResumeWithAnotherOne(peer, s"Got empty block bodies response for known hashes: ${hashes.map(_.hexString)}")
+                  Future.successful(blockPeerAndResumeWithAnotherOne(peer, s"Got empty block bodies response for known hashes: ${hashes.map(_.hexString)}"))
 
               } andThen {
                 case Failure(e: AskTimeoutException) => blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
                 case Failure(e)                      => blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
                 case _                               =>
+              } andThen {
+                case _ =>
+                  // add first block from branch as ommer
+                  oldBranch.headOption foreach { block => ommersPool ! OmmersPool.AddOmmers(List(block.header)) }
               }
 
-              // add first block from branch as ommer
-              oldBranch.headOption.foreach { block => ommersPool ! OmmersPool.AddOmmers(List(block.header)) }
             } else {
               // add first block from branch as ommer
-              headers.headOption.foreach { header => ommersPool ! OmmersPool.AddOmmers(List(header)) }
-              scheduleResume()
+              headers.headOption foreach { header => ommersPool ! OmmersPool.AddOmmers(List(header)) }
+              Future.successful(scheduleResume())
             }
 
           } else {
             log.info(s"[sync] Received branch block ${headers.head.number} from ${peer.id}, resolving fork ...")
 
-            requestingHeaders(peer, None, Right(headers.head.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) map {
-              case Some(sync.BlockHeadersResponse(peerId, headers, true)) =>
-                self ! ProcessBlockHeaders(peer, headers)
+            requestingHeaders(peer, None, Right(headers.head.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) flatMap {
+              case Some(BlockHeadersResponse(peerId, headers, true)) =>
+                processBlockHeaders(peer, headers)
 
-              case Some(sync.BlockHeadersResponse(peerId, headers, false)) =>
-                blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: ${headers.head.parentHash}")
+              case Some(BlockHeadersResponse(peerId, headers, false)) =>
+                Future.successful(blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: ${headers.head.parentHash}"))
 
               case None =>
-                scheduleResume()
+                Future.successful(scheduleResume())
 
             } andThen {
               case Failure(e: AskTimeoutException) => blockPeerAndResumeWithAnotherOne(peer, s"timeout, ${e.getMessage}")
@@ -216,36 +231,43 @@ trait RegularSyncService { _: SyncService =>
         case None =>
           log.info(s"[warn] Received block header ${headers.head.number} without parent from ${peer.id}, trying to lookback to ${headers.head.number - 1}")
           lookbackFromBlock = Some(headers.head.number - 1)
-          blockPeerAndResumeWithAnotherOne(peer, s"Got block header ${headers.head.number} that does not have parent")
+          Future.successful(blockPeerAndResumeWithAnotherOne(peer, s"Got block header ${headers.head.number} that does not have parent"))
       }
     } else {
-      blockPeerAndResumeWithAnotherOne(peer, s"Got block headers begin at ${headers.head.number} to ${headers.last.number} that are not consistent")
+      Future.successful(blockPeerAndResumeWithAnotherOne(peer, s"Got block headers begin at ${headers.head.number} to ${headers.last.number} that are not consistent"))
     }
   }
 
-  private def getPrevBlocks(headers: Seq[BlockHeader]) = getPrevBlocks_recurse(headers, Vector())
-  @tailrec private def getPrevBlocks_recurse(headers: Seq[BlockHeader], blocks: Vector[Block]): Vector[Block] = headers match {
-    case Seq(h, tail @ _*) =>
-      blockchain.getBlockByNumber(h.number) match {
-        case Some(block) => getPrevBlocks_recurse(tail, blocks :+ block)
-        case None        => blocks
-      }
-    case Seq() => blocks
+  private def getPrevBlocks(headers: List[BlockHeader]) = getPrevBlocks_recurse(headers, Vector())
+  @tailrec private def getPrevBlocks_recurse(headers: List[BlockHeader], blocks: Vector[Block]): Vector[Block] = {
+    headers match {
+      case Nil => blocks
+      case block :: tail =>
+        blockchain.getBlockByNumber(block.number) match {
+          case Some(block) => getPrevBlocks_recurse(tail, blocks :+ block)
+          case None        => blocks
+        }
+    }
   }
 
-  private def processBlockBodies(peer: Peer, bodies: Seq[PV62.BlockBody]) {
+  private def processBlockBodies(peer: Peer, bodies: Seq[PV62.BlockBody]): Future[Unit] = {
+    doProcessBlockBodies(peer, bodies)
+  }
+
+  private def doProcessBlockBodies(peer: Peer, bodies: Seq[PV62.BlockBody]): Future[Unit] = {
     if (bodies.nonEmpty && workingHeaders.nonEmpty) {
       val blocks = workingHeaders.zip(bodies).map { case (header, body) => Block(header, body) }
 
-      ledger.validateBlocksBeforeExecution(blocks, validators) match {
+      ledger.validateBlocksBeforeExecution(blocks, validators) flatMap {
         case (preValidatedBlocks, None) =>
-          log.debug(s"preValidatedBlocks.head.header.parentHash: ${preValidatedBlocks.head.header.parentHash}")
-          blockchain.getBlockHeaderByHash(preValidatedBlocks.head.header.parentHash).flatMap {
-            parentHeader => blockchain.getTotalDifficultyByHash(parentHeader.hash)
-          } match {
-            case Some(blockParentTd) =>
-              val start = System.currentTimeMillis
-              val (newBlocks, errors) = executeAndInsertBlocks(preValidatedBlocks, blockParentTd, preValidatedBlocks.size > 1)
+          val parentTd = blockchain.getTotalDifficultyByHash(preValidatedBlocks.head.header.parentHash) getOrElse {
+            // TODO: Investigate if we can recover from this error (EC-165)
+            throw new IllegalStateException(s"No total difficulty for the latest block with number ${blocks.head.header.number - 1} (and hash ${blocks.head.header.parentHash.hexString})")
+          }
+
+          val start = System.currentTimeMillis
+          executeAndInsertBlocks(preValidatedBlocks, parentTd, preValidatedBlocks.size > 1) flatMap {
+            case (_, newBlocks, errors) =>
               val elapsed = (System.currentTimeMillis - start) / 1000.0
 
               if (newBlocks.nonEmpty) {
@@ -266,61 +288,53 @@ trait RegularSyncService { _: SyncService =>
                   workingHeaders = workingHeaders.drop(blocks.length)
                   if (workingHeaders.nonEmpty) {
                     val hashes = workingHeaders.take(blockBodiesPerRequest).map(_.hash)
-                    requestingBodies(peer, hashes)(syncRequestTimeout.plus((hashes.size * 100).millis)) map {
-                      case Some(sync.BlockBodiesResponse(peerId, bodies)) =>
-                        self ! ProcessBlockBodies(peer, bodies)
+                    requestingBodies(peer, hashes)(syncRequestTimeout.plus((hashes.size * 100).millis)) flatMap {
+                      case Some(BlockBodiesResponse(peerId, bodies)) =>
+                        processBlockBodies(peer, bodies)
                       case None =>
-                        blockPeerAndResumeWithAnotherOne(peer, s"Got empty block bodies response for known hashes: ${hashes.map(_.hexString)}")
+                        Future.successful(blockPeerAndResumeWithAnotherOne(peer, s"Got empty block bodies response for known hashes: ${hashes.map(_.hexString)}"))
                     } andThen {
                       case Failure(e: AskTimeoutException) => blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
                       case Failure(e)                      => blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
                       case _                               =>
                     }
                   } else {
-                    scheduleResume()
+                    Future.successful(scheduleResume())
                   }
 
                 case Vector(error @ MissingNodeExecptionError(number, hash, table), _*) =>
                   log.info(s"[warn] Execution error $error, in block ${error.blockNumber}, try to fetch from ${peer.id}")
-                  val future = requestingNodeData(nodeOkPeer.getOrElse(peer), hash)(3.seconds) map {
-                    case Some(sync.NodeDataResponse(peerId, value)) =>
+                  requestingNodeData(nodeOkPeer.getOrElse(peer), hash)(3.seconds) map {
+                    case Some(NodeDataResponse(peerId, value)) =>
                       table match {
                         case KesqueDataSource.account => accountNodeStorage.put(hash, value.toArray)
                         case KesqueDataSource.storage => storageNodeStorage.put(hash, value.toArray)
                       }
-
+                      ()
                     case None =>
+                      ()
                   } andThen {
                     case Failure(e) => nodeErrorPeers += peer
                     case _          =>
                   } andThen {
-                    case _ => self ! ResumeRegularSyncTick
-                  }
-                  try {
-                    scala.concurrent.Await.ready(future, 10.seconds)
-                  } catch {
-                    case e: Throwable => // Await.ready will throw timeout if future timeout
+                    case _ => resumeRegularSync()
                   }
 
                 case Vector(error, _*) =>
                   val numberBlockFailed = blocks.head.header.number + newBlocks.length
                   log.error(s"[sync] Execution error $error, in block ${error.blockNumber}")
-                  blockPeerAndResumeWithAnotherOne(peer, s"Block execution error: $error, in block ${error.blockNumber} from ${peer.id}, will sync from another peer")
+                  Future.successful(blockPeerAndResumeWithAnotherOne(peer, s"Block execution error: $error, in block ${error.blockNumber} from ${peer.id}, will sync from another peer"))
               }
-
-            case None =>
-              // TODO: Investigate if we can recover from this error (EC-165)
-              throw new IllegalStateException(s"No total difficulty for the latest block with number ${blocks.head.header.number - 1} (and hash ${blocks.head.header.parentHash.hexString})")
           }
 
         case (_, Some(error)) =>
           log.info(s"[warn] Before execution validate error: $error, in block ${error.blockNumber} from ${peer.id}, will sync from another peer")
           lookbackFromBlock = Some(error.blockNumber - 1)
-          blockPeerAndResumeWithAnotherOne(peer, s"Validate blocks before execution error: $error, in block ${error.blockNumber}")
+          Future.successful(blockPeerAndResumeWithAnotherOne(peer, s"Validate blocks before execution error: $error, in block ${error.blockNumber}"))
       }
 
     } else {
-      blockPeerAndResumeWithAnotherOne(peer, "Got empty response for bodies from peer but we got block headers earlier")
+      Future.successful(blockPeerAndResumeWithAnotherOne(peer, "Got empty response for bodies from peer but we got block headers earlier"))
     }
   }
 
@@ -334,29 +348,29 @@ trait RegularSyncService { _: SyncService =>
    * @param newBlocks which, after adding the corresponding NewBlock msg for blocks, will be broadcasted
    * @return list of NewBlocks to broadcast (one per block successfully executed) and  errors if happened during execution
    */
-  private def executeAndInsertBlocks(blocks: Seq[Block], blockParentTd: BigInteger, isBatch: Boolean) = executeAndInsertBlocks_recurse(blocks, blockParentTd, isBatch, Vector(), Vector())
-  @tailrec private def executeAndInsertBlocks_recurse(blocks: Seq[Block], blockParentTd: BigInteger, isBatch: Boolean, newBlocks: Vector[NewBlock], errors: Vector[BlockExecutionError]): (Vector[NewBlock], Vector[BlockExecutionError]) = {
-    blocks match {
-      case Seq(block, tail @ _*) =>
-        executeAndInsertBlock(block, blockParentTd, isBatch) match {
-          case Right(newBlock) =>
-            // check blockHashToDelete
-            blockchain.getBlockHeaderByNumber(block.header.number).map(_.hash).filter(_ != block.header.hash) foreach blockchain.removeBlock
+  private def executeAndInsertBlocks(blocks: Vector[Block], parentTd: BigInteger, isBatch: Boolean): Future[(BigInteger, Vector[NewBlock], Vector[BlockExecutionError])] = {
+    blocks.foldLeft(Future.successful(parentTd, Vector[NewBlock](), Vector[BlockExecutionError]())) {
+      case (prevFuture, block) =>
+        prevFuture flatMap {
+          case (parentTotalDifficulty, newBlocks, errors) =>
+            executeAndInsertBlock(block, parentTotalDifficulty, isBatch) map {
+              case Right(newBlock) =>
+                // check blockHashToDelete
+                blockchain.getBlockHeaderByNumber(block.header.number).map(_.hash).filter(_ != block.header.hash) foreach blockchain.removeBlock
 
-            executeAndInsertBlocks_recurse(tail, newBlock.totalDifficulty, isBatch, newBlocks :+ newBlock, errors)
+                (newBlock.totalDifficulty, newBlocks :+ newBlock, errors)
 
-          case Left(error) =>
-            (newBlocks, errors :+ error)
+              case Left(error) =>
+                (parentTotalDifficulty, newBlocks, errors :+ error)
+            }
         }
-
-      case Seq() => newBlocks -> errors
     }
   }
 
-  private def executeAndInsertBlock(block: Block, parentTd: BigInteger, isBatch: Boolean): Either[BlockExecutionError, NewBlock] = {
+  private def executeAndInsertBlock(block: Block, parentTd: BigInteger, isBatch: Boolean): Future[Either[BlockExecutionError, NewBlock]] = {
     try {
       val start = System.currentTimeMillis
-      ledger.executeBlock(block, validators) match {
+      ledger.executeBlock(block, validators) map {
         case Right(BlockResult(world, _, receipts, parallelCount, dbTimePercent)) =>
           val newTd = parentTd add block.header.difficulty
 
@@ -383,20 +397,12 @@ trait RegularSyncService { _: SyncService =>
           log.warning(s"Failed to execute mined block because of $err")
           Left(err)
       }
+
     } catch { // TODO need detailed here
       case ex: Throwable =>
         log.error(ex, s"Failed to execute mined block because of exception: ${ex.getMessage}")
-        Left(ValidationBeforeExecError(block.header.number, ex.getMessage))
+        Future.successful(Left(ValidationBeforeExecError(block.header.number, ex.getMessage)))
     }
-  }
-
-  private def scheduleResume() {
-    timers.startSingleTimer(ResumeRegularSyncTask, ResumeRegularSyncTick, checkForNewBlockInterval)
-  }
-
-  private def blockPeerAndResumeWithAnotherOne(currPeer: Peer, reason: String) {
-    self ! BlacklistPeer(currPeer.id, reason)
-    self ! ResumeRegularSyncTick
   }
 
   private def checkHeaders(headers: Seq[BlockHeader]): Boolean = {

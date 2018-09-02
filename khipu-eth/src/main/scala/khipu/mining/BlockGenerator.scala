@@ -1,5 +1,6 @@
 package khipu.mining
 
+import akka.actor.ActorSystem
 import akka.util.ByteString
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -24,6 +25,8 @@ import khipu.util.{ BlockchainConfig, MiningConfig }
 import khipu.validators.MptListValidator
 import khipu.validators.OmmersValidator.OmmersError
 import khipu.validators.Validators
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 final class BlockGenerator(
     blockchain:             Blockchain,
@@ -32,7 +35,8 @@ final class BlockGenerator(
     ledger:                 Ledger.I,
     validators:             Validators,
     blockTimestampProvider: BlockTimestampProvider = DefaultBlockTimestampProvider
-) {
+)(implicit system: ActorSystem) {
+  import system.dispatcher
 
   val difficulty = new DifficultyCalculator(blockchainConfig)
 
@@ -49,12 +53,12 @@ final class BlockGenerator(
           val body = BlockBody(transactionsForBlock, ommers)
           val block = Block(header, body)
 
-          val prepared = ledger.prepareBlock(block, validators) match {
+          val prepared = ledger.prepareBlock(block, validators) map {
             case BlockPreparationResult(prepareBlock, BlockResult(_, gasUsed, receipts, parallel, _), stateRoot) =>
               val receiptsLogs: Seq[Array[Byte]] = BloomFilter.emptyBloomFilterBytes +: receipts.map(_.logsBloomFilter.toArray)
               val bloomFilter = ByteString(BytesUtil.or(receiptsLogs: _*))
 
-              PendingBlock(block.copy(
+              Right(PendingBlock(block.copy(
                 header = block.header.copy(
                   transactionsRoot = buildMpt(prepareBlock.body.transactionList, SignedTransaction.byteArraySerializable),
                   stateRoot = stateRoot,
@@ -63,10 +67,10 @@ final class BlockGenerator(
                   gasUsed = gasUsed
                 ),
                 body = prepareBlock.body
-              ), receipts)
+              ), receipts))
           }
 
-          Right(prepared)
+          Await.result(prepared, Duration.Inf)
       }
     }.getOrElse(Left(NoParent))
 

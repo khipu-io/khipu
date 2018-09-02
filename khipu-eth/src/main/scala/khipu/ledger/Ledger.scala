@@ -31,7 +31,7 @@ import khipu.vm.ProgramState
 import khipu.vm.VM
 import khipu.vm.UInt256
 import scala.annotation.tailrec
-import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Failure
@@ -44,10 +44,10 @@ import scala.util.Success
 object Ledger {
 
   trait I {
-    def executeBlock(block: Block, validators: Validators): Either[BlockExecutionError, BlockResult]
-    def prepareBlock(block: Block, validators: Validators): BlockPreparationResult
-    def simulateTransaction(stx: SignedTransaction, blockHeader: BlockHeader): TxResult
-    def validateBlocksBeforeExecution(blocks: Seq[Block], validators: Validators): (Vector[Block], Option[BlockExecutionError])
+    def validateBlocksBeforeExecution(blocks: Seq[Block], validators: Validators)(implicit executor: ExecutionContext): Future[(Vector[Block], Option[BlockExecutionError])]
+    def executeBlock(block: Block, validators: Validators)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]]
+    def prepareBlock(block: Block, validators: Validators)(implicit executor: ExecutionContext): Future[BlockPreparationResult]
+    def simulateTransaction(stx: SignedTransaction, blockHeader: BlockHeader)(implicit executor: ExecutionContext): TxResult
   }
 
   type PC = ProgramContext[BlockWorldState, TrieStorage]
@@ -92,7 +92,6 @@ object Ledger {
 }
 final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(implicit system: ActorSystem) extends Ledger.I {
   import Ledger._
-  import system.dispatcher
 
   private val log = Logging(system, this.getClass)
 
@@ -107,19 +106,19 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
   override def prepareBlock(
     block:      Block,
     validators: Validators
-  ): BlockPreparationResult = {
+  )(implicit executor: ExecutionContext): Future[BlockPreparationResult] = {
     val parentStateRoot = blockchain.getBlockHeaderByHash(block.header.parentHash).map(_.stateRoot)
     val initialWorld = blockchain.getReadOnlyWorldState(None, blockchainConfig.accountStartNonce, parentStateRoot)
 
-    val (execResult @ BlockResult(resultingWorldState, _, _, _, _), txExecuted) =
-      executePreparedTransactions(block.body.transactionList, initialWorld, block.header, validators.signedTransactionValidator) //match {
-
-    val worldRewardPaid = payBlockReward(block)(resultingWorldState)
-    val worldPersisted = worldRewardPaid.commit().persist()
-    BlockPreparationResult(block.copy(body = block.body.copy(transactionList = txExecuted)), execResult, worldPersisted.stateRootHash)
+    executePreparedTransactions(block.body.transactionList, initialWorld, block.header, validators.signedTransactionValidator) map {
+      case (execResult @ BlockResult(resultingWorldState, _, _, _, _), txExecuted) =>
+        val worldRewardPaid = payBlockReward(block)(resultingWorldState)
+        val worldPersisted = worldRewardPaid.commit().persist()
+        BlockPreparationResult(block.copy(body = block.body.copy(transactionList = txExecuted)), execResult, worldPersisted.stateRootHash)
+    }
   }
 
-  @tailrec
+  //@tailrec TODO
   private def executePreparedTransactions(
     signedTransactions:         Seq[SignedTransaction],
     world:                      BlockWorldState,
@@ -128,10 +127,11 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     accGas:                     Long                       = 0,
     accReceipts:                Vector[Receipt]            = Vector(),
     executed:                   Vector[SignedTransaction]  = Vector()
-  ): (BlockResult, Seq[SignedTransaction]) = {
+  )(implicit executor: ExecutionContext): Future[(BlockResult, Seq[SignedTransaction])] = {
     val evmCfg = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
 
-    executeTransactions_sequential(signedTransactions, blockHeader, signedTransactionValidator, evmCfg)(world) match {
+    executeTransactions_sequential(signedTransactions, blockHeader, signedTransactionValidator, evmCfg)(world) flatMap {
+      case Right(br) => Future.successful(br, executed ++ signedTransactions)
       case Left(TxsExecutionError(blockHeader.number, stx, StateBeforeFailure(blockHeader.number, worldState, gas, receipts), reason)) =>
         //log.debug(s"failure while preparing block because of $reason in transaction with hash ${stx.hashAsHexString}")
         val txIndex = signedTransactions.indexWhere(tx => tx.hash == stx.hash)
@@ -140,11 +140,10 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
           worldState, blockHeader, signedTransactionValidator, gas, receipts, executed ++ signedTransactions.take(txIndex)
         )
       //case Left(error) => // TODO
-      case Right(br) => (br, executed ++ signedTransactions)
     }
   }
 
-  override def simulateTransaction(stx: SignedTransaction, blockHeader: BlockHeader): TxResult = {
+  override def simulateTransaction(stx: SignedTransaction, blockHeader: BlockHeader)(implicit executor: ExecutionContext): TxResult = {
     val start = System.currentTimeMillis
 
     val gasLimit = stx.tx.gasLimit
@@ -168,17 +167,17 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     TxResult(stx, result.world, gasUsed, txFee, result.txLogs, result.addressesTouched, result.returnData, result.error, result.isRevert, result.parallelRaceConditions)
   }
 
-  def validateBlocksBeforeExecution(blocks: Seq[Block], validators: Validators): (Vector[Block], Option[BlockExecutionError]) = {
+  def validateBlocksBeforeExecution(blocks: Seq[Block], validators: Validators)(implicit executor: ExecutionContext): Future[(Vector[Block], Option[BlockExecutionError])] = {
     val start = System.currentTimeMillis
 
-    val validatingBlocks = blocks.map(block => block.header.hash -> block).toMap
+    val blocksToValidate = blocks.map(block => block.header.hash -> block).toMap
 
     val fs = blocks map { block =>
-      (txProcessor ? TxProcessor.PreValidateWork(block, validatingBlocks, validators))(txProcessTimeout).mapTo[Either[BlockExecutionError, Unit]] map (block -> _)
+      (txProcessor ? TxProcessor.PreValidateWork(block, blocksToValidate, validators))(txProcessTimeout).mapTo[Either[BlockExecutionError, Unit]] map (block -> _)
     }
 
-    val f = Future.sequence(fs) map { rs =>
-      var itr = rs.iterator
+    Future.sequence(fs) map { rs =>
+      val itr = rs.iterator
       var errorOpt: Option[BlockExecutionError] = None
       var validatedBlocks = Vector[Block]()
       while (itr.hasNext && errorOpt.isEmpty) {
@@ -191,7 +190,6 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       log.debug(s"pre-validated ${validatedBlocks.size} blocks in parallel in ${(System.currentTimeMillis - start)}ms ${errorOpt.fold("")(x => x.toString)}")
       (validatedBlocks, errorOpt)
     }
-    Await.result(f, Duration.Inf)
   }
 
   private[ledger] def validateBlockBeforeExecution(block: Block, validatingBlocks: Map[Hash, Block], validators: Validators): Either[BlockExecutionError, Unit] = {
@@ -206,40 +204,50 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
   /**
    * Execute and validate on minned block
    */
-  override def executeBlock(block: Block, validators: Validators): Either[BlockExecutionError, BlockResult] = {
-
+  override def executeBlock(block: Block, validators: Validators)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
     val start1 = System.currentTimeMillis
-    val parallelResult = for {
-      blockResult <- executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = true)
-      _ = log.debug(s"${block.header.number} parallel-executed in ${System.currentTimeMillis - start1}ms")
+    val parallelResult = executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = true) map {
+      case Right(blockResult) =>
+        log.debug(s"${block.header.number} parallel-executed in ${System.currentTimeMillis - start1}ms")
 
-      start2 = System.currentTimeMillis
-      worldRewardPaid = payBlockReward(block)(blockResult.world)
-      worldCommitted = worldRewardPaid.commit() // State root hash needs to be up-to-date for validateBlockAfterExecution
-      _ = log.debug(s"${block.header.number} committed in ${System.currentTimeMillis - start2}ms")
+        val start2 = System.currentTimeMillis
+        val worldRewardPaid = payBlockReward(block)(blockResult.world)
+        val worldCommitted = worldRewardPaid.commit() // State root hash needs to be up-to-date for validateBlockAfterExecution
+        log.debug(s"${block.header.number} committed in ${System.currentTimeMillis - start2}ms")
 
-      start3 = System.currentTimeMillis
-      _ <- validateBlockAfterExecution(block, worldCommitted.stateRootHash, blockResult.receipts, blockResult.gasUsed, validators.blockValidator)
-      _ = log.debug(s"${block.header.number} post-validated in ${System.currentTimeMillis - start3}ms")
-    } yield (blockResult, worldCommitted)
+        val start3 = System.currentTimeMillis
+        validateBlockAfterExecution(block, worldCommitted.stateRootHash, blockResult.receipts, blockResult.gasUsed, validators.blockValidator) match {
+          case Right(_) =>
+            log.debug(s"${block.header.number} post-validated in ${System.currentTimeMillis - start3}ms")
+            Right(blockResult, worldCommitted)
 
-    parallelResult match {
-      case Right((blockResult, worldCommitted)) =>
-        val start4 = System.currentTimeMillis
-        Right(blockResult)
+          case Left(error) => Left(error)
+        }
+
+      case Left(error) => Left(error)
+    }
+
+    parallelResult flatMap {
+      case Right((blockResult, worldCommitted)) => Future.successful(Right(blockResult))
 
       case left @ Left(error) =>
         log.debug(s"in parallel failed with error $error, try sequential ...")
+
         val start1 = System.currentTimeMillis
-        for {
-          blockResult <- executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = false)
-          _ = log.debug(s"${block.header.number} sequential-executed in ${System.currentTimeMillis - start1}ms")
+        executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = false) map {
+          case Right(blockResult) =>
+            log.debug(s"${block.header.number} sequential-executed in ${System.currentTimeMillis - start1}ms")
 
-          worldRewardPaid = payBlockReward(block)(blockResult.world)
-          worldCommitted = worldRewardPaid.commit() // State root hash needs to be up-to-date for validateBlockAfterExecution
+            val worldRewardPaid = payBlockReward(block)(blockResult.world)
+            val worldCommitted = worldRewardPaid.commit() // State root hash needs to be up-to-date for validateBlockAfterExecution
 
-          _ <- validateBlockAfterExecution(block, worldCommitted.stateRootHash, blockResult.receipts, blockResult.gasUsed, validators.blockValidator)
-        } yield blockResult
+            validateBlockAfterExecution(block, worldCommitted.stateRootHash, blockResult.receipts, blockResult.gasUsed, validators.blockValidator) match {
+              case Right(_)    => Right(blockResult)
+              case Left(error) => Left(error)
+            }
+
+          case Left(error) => Left(error)
+        }
     }
   }
 
@@ -254,17 +262,16 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     block:        Block,
     stxValidator: SignedTransactionValidator,
     isParallel:   Boolean
-  ): Either[BlockExecutionError, BlockResult] = {
+  )(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
     val parentStateRoot = blockchain.getBlockHeaderByHash(block.header.parentHash).map(_.stateRoot)
     val evmCfg = EvmConfig.forBlock(block.header.number, blockchainConfig)
 
-    def initialWorld = blockchain.getWorldState(block.header.number, blockchainConfig.accountStartNonce, parentStateRoot)
+    def initialWorld() = blockchain.getWorldState(block.header.number, blockchainConfig.accountStartNonce, parentStateRoot)
 
     if (isParallel) {
-      val f = executeTransactions_inparallel(block.body.transactionList, block.header, stxValidator, evmCfg)(initialWorld)
-      Await.result(f, Duration.Inf)
+      executeTransactions_inparallel(block.body.transactionList, block.header, stxValidator, evmCfg)(initialWorld)
     } else {
-      executeTransactions_sequential(block.body.transactionList, block.header, stxValidator, evmCfg)(initialWorld)
+      executeTransactions_sequential(block.body.transactionList, block.header, stxValidator, evmCfg)(initialWorld())
     }
   }
 
@@ -284,7 +291,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     blockHeader:        BlockHeader,
     stxValidator:       SignedTransactionValidator,
     evmCfg:             EvmConfig
-  )(initialWorld: BlockWorldState): Either[BlockExecutionError, BlockResult] = {
+  )(initialWorld: BlockWorldState): Future[Either[BlockExecutionError, BlockResult]] = {
     var currWorld = initialWorld
     var txError: Option[BlockExecutionError] = None
     var txResults = Vector[TxResult]()
@@ -302,8 +309,8 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     }
 
     txError match {
-      case Some(error) => Left(error)
-      case None        => Right(postExecuteTransactions(blockHeader, evmCfg, txResults, 0, 0.0)(currWorld.withTx(None)))
+      case Some(error) => Future.successful(Left(error))
+      case None        => Future.successful(Right(postExecuteTransactions(blockHeader, evmCfg, txResults, 0, 0.0)(currWorld.withTx(None))))
     }
   }
 
@@ -312,16 +319,16 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     blockHeader:        BlockHeader,
     stxValidator:       SignedTransactionValidator,
     evmCfg:             EvmConfig
-  )(initialWorldFun: => BlockWorldState): Future[Either[BlockExecutionError, BlockResult]] = {
-    val nTx = signedTransactions.size.toDouble
+  )(initialWorldFun: () => BlockWorldState)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
+    val nTx = signedTransactions.size
 
     val start = System.currentTimeMillis
     blockchain.storages.accountNodeDataSource.clock.start()
     blockchain.storages.storageNodeDataSource.clock.start()
 
-    val fs = signedTransactions.map(stx => stx -> initialWorldFun.withTx(Some(stx))) map {
-      case (stx, worldCopy) =>
-        (txProcessor ? TxProcessor.ExecuteWork(worldCopy, stx, blockHeader, stxValidator, evmCfg))(txProcessTimeout).mapTo[(Either[BlockExecutionError, TxResult], Long)] // recover { case ex => s"$ex.getMessage" }
+    val fs = signedTransactions.map(stx => stx -> initialWorldFun().withTx(Some(stx))) map {
+      case (stx, initialWorld) =>
+        (txProcessor ? TxProcessor.ExecuteWork(initialWorld, stx, blockHeader, stxValidator, evmCfg))(txProcessTimeout).mapTo[(Either[BlockExecutionError, TxResult], Long)] // recover { case ex => s"$ex.getMessage" }
     }
 
     Future.sequence(fs) map { rs =>
@@ -410,7 +417,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
       txError match {
         case Some(error) => Left(error)
-        case None        => Right(postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePercent)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun)))
+        case None        => Right(postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePercent)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun())))
       }
 
     } andThen {
