@@ -30,7 +30,6 @@ import khipu.vm.ProgramResult
 import khipu.vm.ProgramState
 import khipu.vm.VM
 import khipu.vm.UInt256
-import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -118,7 +117,22 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     }
   }
 
-  //@tailrec TODO
+  /**
+   * This method does not actually consume the stack in the way a typical recursive
+   * function would. This is because the "recursive" call will happen asynchronously,
+   * on some thread from the execution context. So it is very likely that this
+   * recursive call won't even reside on the same stack as the first call.
+   *
+   * The executeTransactions_xxxx method will create the future object which will
+   * eventually trigger the "recursive" call asynchronously. After that, it is
+   * immediately popped from the stack.
+   *
+   * So this isn't actually stack recursion and the stack doesn't grow proportional,
+   * it stays roughly at a constant size.
+   *
+   * This can be easily checked by throwing an exception at some point in the
+   * executeTransactions_xxxx method and inspecting the stack trace.
+   */
   private def executePreparedTransactions(
     signedTransactions:         Seq[SignedTransaction],
     world:                      BlockWorldState,
@@ -127,19 +141,22 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     accGas:                     Long                       = 0,
     accReceipts:                Vector[Receipt]            = Vector(),
     executed:                   Vector[SignedTransaction]  = Vector()
-  )(implicit executor: ExecutionContext): Future[(BlockResult, Seq[SignedTransaction])] = {
+  )(implicit executor: ExecutionContext): Future[(BlockResult, Vector[SignedTransaction])] = {
     val evmCfg = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
 
     executeTransactions_sequential(signedTransactions, blockHeader, signedTransactionValidator, evmCfg)(world) flatMap {
       case Right(br) => Future.successful(br, executed ++ signedTransactions)
+
       case Left(TxsExecutionError(blockHeader.number, stx, StateBeforeFailure(blockHeader.number, worldState, gas, receipts), reason)) =>
-        //log.debug(s"failure while preparing block because of $reason in transaction with hash ${stx.hashAsHexString}")
+        log.debug(s"failure while preparing block because of $reason in transaction with hash ${stx.hash}")
         val txIndex = signedTransactions.indexWhere(tx => tx.hash == stx.hash)
         executePreparedTransactions(
           signedTransactions.drop(txIndex + 1),
           worldState, blockHeader, signedTransactionValidator, gas, receipts, executed ++ signedTransactions.take(txIndex)
         )
-      //case Left(error) => // TODO
+
+      case Left(error) =>
+        throw new RuntimeException(s"Error during executePreparedTransactions: $error")
     }
   }
 
@@ -266,12 +283,12 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val parentStateRoot = blockchain.getBlockHeaderByHash(block.header.parentHash).map(_.stateRoot)
     val evmCfg = EvmConfig.forBlock(block.header.number, blockchainConfig)
 
-    def initialWorld() = blockchain.getWorldState(block.header.number, blockchainConfig.accountStartNonce, parentStateRoot)
+    def initialWorld = blockchain.getWorldState(block.header.number, blockchainConfig.accountStartNonce, parentStateRoot)
 
     if (isParallel) {
       executeTransactions_inparallel(block.body.transactionList, block.header, stxValidator, evmCfg)(initialWorld)
     } else {
-      executeTransactions_sequential(block.body.transactionList, block.header, stxValidator, evmCfg)(initialWorld())
+      executeTransactions_sequential(block.body.transactionList, block.header, stxValidator, evmCfg)(initialWorld)
     }
   }
 
@@ -319,14 +336,14 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     blockHeader:        BlockHeader,
     stxValidator:       SignedTransactionValidator,
     evmCfg:             EvmConfig
-  )(initialWorldFun: () => BlockWorldState)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
+  )(initialWorldFun: => BlockWorldState)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
     val nTx = signedTransactions.size
 
     val start = System.currentTimeMillis
     blockchain.storages.accountNodeDataSource.clock.start()
     blockchain.storages.storageNodeDataSource.clock.start()
 
-    val fs = signedTransactions.map(stx => stx -> initialWorldFun().withTx(Some(stx))) map {
+    val fs = signedTransactions.map(stx => stx -> initialWorldFun.withTx(Some(stx))) map {
       case (stx, initialWorld) =>
         (txProcessor ? TxProcessor.ExecuteWork(initialWorld, stx, blockHeader, stxValidator, evmCfg))(txProcessTimeout).mapTo[(Either[BlockExecutionError, TxResult], Long)] // recover { case ex => s"$ex.getMessage" }
     }
@@ -417,7 +434,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
       txError match {
         case Some(error) => Left(error)
-        case None        => Right(postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePercent)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun())))
+        case None        => Right(postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePercent)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun)))
       }
 
     } andThen {
