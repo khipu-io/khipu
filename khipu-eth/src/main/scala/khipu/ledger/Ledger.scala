@@ -196,16 +196,16 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     Future.sequence(fs) map { rs =>
       val itr = rs.iterator
       var errorOpt: Option[BlockExecutionError] = None
-      var validatedBlocks = Vector[Block]()
+      var validBlocks = Vector[Block]()
       while (itr.hasNext && errorOpt.isEmpty) {
         itr.next() match {
           case (block, Left(error)) => errorOpt = Some(error)
-          case (block, Right(_))    => validatedBlocks :+= block
+          case (block, Right(_))    => validBlocks :+= block
         }
       }
 
-      log.debug(s"pre-validated ${validatedBlocks.size} blocks in parallel in ${(System.currentTimeMillis - start)}ms ${errorOpt.fold("")(x => x.toString)}")
-      (validatedBlocks, errorOpt)
+      log.debug(s"pre-validated ${validBlocks.size} blocks in parallel in ${(System.currentTimeMillis - start)}ms ${errorOpt.fold("")(x => x.toString)}")
+      (validBlocks, errorOpt)
     }
   }
 
