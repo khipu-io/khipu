@@ -414,10 +414,10 @@ trait RegularSyncService { _: SyncService =>
 
           val start1 = System.currentTimeMillis
           world.persist()
-          blockchain.save(block)
-          blockchain.save(block.header.hash, receipts)
+          blockchain.saveBlock(block)
+          blockchain.saveReceipts(block.header.hash, receipts)
+          blockchain.saveTotalDifficulty(block.header.hash, newTd)
           appStateStorage.putBestBlockNumber(block.header.number)
-          blockchain.save(block.header.hash, newTd)
           log.debug(s"${block.header.number} persisted in ${System.currentTimeMillis - start1}ms")
 
           pendingTransactionsService ! PendingTransactionsService.RemoveTransactions(block.body.transactionList)

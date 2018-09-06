@@ -182,9 +182,9 @@ class GenesisDataLoader(
         // using empty namespace because ephemDataSource.storage already has the namespace-prefixed keys
         // TODO deal it with kesque, otherwise the regular sync from scrath won't work because of lack these initial nodes
         ephemDataSource.toSeq.grouped(dbConfig.batchSize).foreach(toStore => dataSource.update(Array(), Nil, toStore))
-        blockchain.save(Block(header, BlockBody(Nil, Nil)))
-        blockchain.save(header.hash, Nil)
-        blockchain.save(header.hash, header.difficulty)
+        blockchain.saveBlock(Block(header, BlockBody(Nil, Nil)))
+        blockchain.saveReceipts(header.hash, Nil)
+        blockchain.saveTotalDifficulty(header.hash, header.difficulty)
         Success(())
     }
   }

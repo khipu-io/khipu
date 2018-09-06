@@ -677,8 +677,8 @@ trait FastSyncService { _: SyncService =>
         blockchain.getTotalDifficultyByHash(header.parentHash) match {
           case Some(parentTotalDifficulty) =>
             // header is fetched and saved sequentially. TODO better logic
-            blockchain.save(header)
-            blockchain.save(header.hash, parentTotalDifficulty add header.difficulty)
+            blockchain.saveBlockHeader(header)
+            blockchain.saveTotalDifficulty(header.hash, parentTotalDifficulty add header.difficulty)
             true
           case None =>
             false
@@ -784,23 +784,23 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
   def receive: Receive = {
     case SaveDifficulties(kvs) =>
       val start = System.currentTimeMillis
-      kvs foreach { case (k, v) => blockchain.save(k, v) }
+      kvs foreach { case (k, v) => blockchain.saveTotalDifficulty(k, v) }
       log.debug(s"SaveDifficulties ${kvs.size} in ${System.currentTimeMillis - start} ms")
 
     case SaveHeaders(kvs) =>
       val start = System.currentTimeMillis
-      kvs foreach { case (k, v) => blockchain.save(v) }
+      kvs foreach { case (k, v) => blockchain.saveBlockHeader(v) }
       log.debug(s"SaveHeaders ${kvs.size} in ${System.currentTimeMillis - start} ms")
 
     case SaveBodies(kvs, receivedHashes) =>
       val start = System.currentTimeMillis
-      kvs foreach { case (k, v) => blockchain.save(k, v) }
+      kvs foreach { case (k, v) => blockchain.saveBlockBody(k, v) }
       log.debug(s"SaveBodies ${kvs.size} in ${System.currentTimeMillis - start} ms")
       sender() ! updateBestBlockIfNeeded(receivedHashes)
 
     case SaveReceipts(kvs, receivedHashes) =>
       val start = System.currentTimeMillis
-      kvs foreach { case (k, v) => blockchain.save(k, v) }
+      kvs foreach { case (k, v) => blockchain.saveReceipts(k, v) }
       log.debug(s"SaveReceipts ${kvs.size} in ${System.currentTimeMillis - start} ms")
       sender() ! updateBestBlockIfNeeded(receivedHashes)
 
@@ -817,7 +817,7 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
 
     case SaveEvmcodes(kvs) =>
       val start = System.currentTimeMillis
-      kvs foreach { case (k, v) => blockchain.save(k, v) }
+      kvs foreach { case (k, v) => blockchain.saveEvmcode(k, v) }
       log.debug(s"SaveEvmcodes ${kvs.size} in ${System.currentTimeMillis - start} ms")
   }
 

@@ -124,9 +124,9 @@ object Blockchain {
      *
      * @param block Block to be saved
      */
-    def save(block: Block): Unit = {
-      save(block.header)
-      save(block.header.hash, block.body)
+    def saveBlock(block: Block): Unit = {
+      saveBlockHeader(block.header)
+      saveBlockBody(block.header.hash, block.body)
     }
 
     def removeBlock(hash: Hash): Unit
@@ -136,11 +136,11 @@ object Blockchain {
      *
      * @param blockHeader Block to be saved
      */
-    def save(blockHeader: BlockHeader): Unit
-    def save(blockHash: Hash, blockBody: BlockBody): Unit
-    def save(blockHash: Hash, receipts: Seq[Receipt]): Unit
-    def save(hash: Hash, evmCode: ByteString): Unit
-    def save(blockhash: Hash, totalDifficulty: BigInteger): Unit
+    def saveBlockHeader(blockHeader: BlockHeader): Unit
+    def saveBlockBody(blockHash: Hash, blockBody: BlockBody): Unit
+    def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]): Unit
+    def saveEvmcode(hash: Hash, evmCode: ByteString): Unit
+    def saveTotalDifficulty(blockhash: Hash, totalDifficulty: BigInteger): Unit
 
     /**
      * Returns a block hash given a block number
@@ -190,25 +190,25 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getTotalDifficultyByHash(blockhash: Hash): Option[BigInteger] =
     totalDifficultyStorage.get(blockhash)
 
-  def save(blockHeader: BlockHeader) {
+  def saveBlockHeader(blockHeader: BlockHeader) {
     val hash = blockHeader.hash
     blockHeaderStorage.setWritingBlockNumber(blockHeader.number)
     blockHeaderStorage.put(hash, blockHeader)
     saveBlockNumberMapping(blockHeader.number, hash)
   }
 
-  def save(blockHash: Hash, blockBody: BlockBody) = {
+  def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {
     blockBodyStorage.put(blockHash, blockBody)
     saveTxsLocations(blockHash, blockBody)
   }
 
-  def save(blockHash: Hash, receipts: Seq[Receipt]) =
+  def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]) =
     receiptsStorage.put(blockHash, receipts)
 
-  def save(hash: Hash, evmCode: ByteString) =
+  def saveEvmcode(hash: Hash, evmCode: ByteString) =
     evmCodeStorage.put(hash, evmCode)
 
-  def save(blockhash: Hash, td: BigInteger): Unit =
+  def saveTotalDifficulty(blockhash: Hash, td: BigInteger): Unit =
     totalDifficultyStorage.put(blockhash, td)
 
   def getWorldState(blockNumber: Long, accountStartNonce: UInt256, stateRootHash: Option[Hash]): BlockWorldState =
