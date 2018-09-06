@@ -8,7 +8,7 @@ trait DataSources {
   //val blockHeadersDataSource: DataSource
   //val blockBodiesDataSource: DataSource
   //val receiptsDataSource: DataSource
-  val totalDifficultyDataSource: DataSource
+  //val totalDifficultyDataSource: DataSource
   val transactionMappingDataSource: DataSource
 
   val blockHeightsHashesDataSource: DataSource

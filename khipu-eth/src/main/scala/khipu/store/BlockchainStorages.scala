@@ -16,6 +16,7 @@ trait BlockchainStorages {
   def blockHeadersDataSource: KesqueDataSource
   def blockBodiesDataSource: KesqueDataSource
   def receiptsDataSource: KesqueDataSource
+  def totalDifficultiesDataSource: KesqueDataSource
 
   protected def nodeKeyValueCache: Cache[Hash, Array[Byte]]
   protected def blockHeadersCache: Cache[Hash, BlockHeader]

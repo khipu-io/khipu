@@ -91,6 +91,7 @@ object KesqueDataSource {
   val evmcode = "evmcode"
   val header = "header"
   val body = "body"
+  val td = "td" // total difficulty
   val receipts = "receipts"
 
   def kafkaProps(system: ActorSystem) = {

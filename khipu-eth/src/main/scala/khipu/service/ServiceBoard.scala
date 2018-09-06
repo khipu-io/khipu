@@ -118,12 +118,14 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
       Future(kesque.getTimedTable(Array(
         KesqueDataSource.header,
         KesqueDataSource.body,
+        KesqueDataSource.td,
         KesqueDataSource.receipts
       ), 1024000))
     ))
     private val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
     //private val headerTable = kesque.getTimedTable(Array(KesqueDataSource.header), 1024000)
     //private val bodyTable = kesque.getTable(Array(KesqueDataSource.body), 1024000)
+    //private val tdTable = kesque.getTable(Array(KesqueDataSource.td), 1024000)
     //private val receiptTable = kesque.getTable(Array(KesqueDataSource.receipts), 1024000)
 
     lazy val accountNodeDataSource = new KesqueDataSource(accountTable, KesqueDataSource.account)
@@ -132,6 +134,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
 
     lazy val blockHeadersDataSource = new KesqueDataSource(blockTable, KesqueDataSource.header)
     lazy val blockBodiesDataSource = new KesqueDataSource(blockTable, KesqueDataSource.body)
+    lazy val totalDifficultiesDataSource = new KesqueDataSource(blockTable, KesqueDataSource.td)
     lazy val receiptsDataSource = new KesqueDataSource(blockTable, KesqueDataSource.receipts)
 
     protected lazy val nodeKeyValueCache = {
