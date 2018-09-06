@@ -161,25 +161,25 @@ object Blockchain {
 }
 final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[TrieStorage, BlockWorldState] {
 
-  private val blockHeadersStorage = storages.blockHeadersStorage
-  private val blockBodiesStorage = storages.blockBodiesStorage
-  //private val blockNumberMappingStorage = storages.blockNumberMappingStorage
+  private val blockHeaderStorage = storages.blockHeaderStorage
+  private val blockBodyStorage = storages.blockBodyStorage
   private val receiptsStorage = storages.receiptsStorage
   private val accountNodeStorageFor = storages.accountNodeStorageFor
   private val storageNodeStorageFor = storages.storageNodeStorageFor
   private val totalDifficultyStorage = storages.totalDifficultyStorage
   private val transactionMappingStorage = storages.transactionMappingStorage
+  //private val blockNumberMappingStorage = storages.blockNumberMappingStorage
 
   val evmCodeStorage = storages.evmCodeStorage
 
   def getHashByBlockNumber(number: Long): Option[Hash] =
-    blockHeadersStorage.getBlockHash(number)
+    blockHeaderStorage.getBlockHash(number)
 
   def getBlockHeaderByHash(hash: Hash): Option[BlockHeader] =
-    blockHeadersStorage.get(hash)
+    blockHeaderStorage.get(hash)
 
   def getBlockBodyByHash(hash: Hash): Option[BlockBody] =
-    blockBodiesStorage.get(hash)
+    blockBodyStorage.get(hash)
 
   def getReceiptsByHash(blockhash: Hash): Option[Seq[Receipt]] =
     receiptsStorage.get(blockhash)
@@ -192,13 +192,13 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
 
   def save(blockHeader: BlockHeader) {
     val hash = blockHeader.hash
-    blockHeadersStorage.setWritingBlockNumber(blockHeader.number)
-    blockHeadersStorage.put(hash, blockHeader)
+    blockHeaderStorage.setWritingBlockNumber(blockHeader.number)
+    blockHeaderStorage.put(hash, blockHeader)
     saveBlockNumberMapping(blockHeader.number, hash)
   }
 
   def save(blockHash: Hash, blockBody: BlockBody) = {
-    blockBodiesStorage.put(blockHash, blockBody)
+    blockBodyStorage.put(blockHash, blockBody)
     saveTxsLocations(blockHash, blockBody)
   }
 
@@ -232,8 +232,8 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
 
   def removeBlock(blockHash: Hash) {
     val maybeTxList = getBlockBodyByHash(blockHash).map(_.transactionList)
-    blockHeadersStorage.remove(blockHash)
-    blockBodiesStorage.remove(blockHash)
+    blockHeaderStorage.remove(blockHash)
+    blockBodyStorage.remove(blockHash)
     totalDifficultyStorage.remove(blockHash)
     receiptsStorage.remove(blockHash)
     maybeTxList.foreach(removeTxsLocations)
@@ -269,7 +269,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     transactionMappingStorage.get(txHash)
 
   private def saveBlockNumberMapping(number: Long, hash: Hash): Unit =
-    blockHeadersStorage.putBlockHash(number, hash)
+    blockHeaderStorage.putBlockHash(number, hash)
 
   private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody): Unit =
     blockBody.transactionList.zipWithIndex.foreach {

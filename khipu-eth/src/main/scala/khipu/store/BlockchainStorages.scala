@@ -13,26 +13,26 @@ trait BlockchainStorages {
   def storageNodeDataSource: KesqueDataSource
   def evmCodeDataSource: KesqueDataSource
 
-  def blockHeadersDataSource: KesqueDataSource
-  def blockBodiesDataSource: KesqueDataSource
+  def blockHeaderDataSource: KesqueDataSource
+  def blockBodyDataSource: KesqueDataSource
   def receiptsDataSource: KesqueDataSource
-  def totalDifficultiesDataSource: KesqueDataSource
+  def totalDifficultyDataSource: KesqueDataSource
 
   protected def nodeKeyValueCache: Cache[Hash, Array[Byte]]
-  protected def blockHeadersCache: Cache[Hash, BlockHeader]
-  protected def blockBodiesCache: Cache[Hash, BlockBody]
+  protected def blockHeaderCache: Cache[Hash, BlockHeader]
+  protected def blockBodyCache: Cache[Hash, BlockBody]
   protected def blockNumberCache: Cache[Long, Hash]
 
   def cacheSize = nodeKeyValueCache.size
 
-  def totalDifficultyStorage: TotalDifficultyStorage
   def transactionMappingStorage: TransactionMappingStorage
+  def totalDifficultyStorage: TotalDifficultyStorage
 
   def accountNodeStorageFor: (Option[Long]) => NodeKeyValueStorage
   def storageNodeStorageFor: (Option[Long]) => NodeKeyValueStorage
   def evmCodeStorage: EvmCodeStorage
-  def blockHeadersStorage: BlockHeadersStorage
-  def blockBodiesStorage: BlockBodiesStorage
-  def blockNumberMappingStorage: BlockNumberMappingStorage
+  def blockHeaderStorage: BlockHeaderStorage
+  def blockBodyStorage: BlockBodyStorage
   def receiptsStorage: ReceiptsStorage
+  //def blockNumberMappingStorage: BlockNumberMappingStorage
 }

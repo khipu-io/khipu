@@ -6,7 +6,7 @@ trait DataSources {
   val pruningMode: PruningMode
 
   //val blockHeadersDataSource: DataSource
-  //val blockBodiesDataSource: DataSource
+  //val blockBodyDataSource: DataSource
   //val receiptsDataSource: DataSource
   //val totalDifficultyDataSource: DataSource
   val transactionMappingDataSource: DataSource

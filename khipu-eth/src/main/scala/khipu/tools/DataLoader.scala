@@ -1,8 +1,6 @@
 package khipu.tools
 
 import akka.actor.ActorSystem
-import kesque.Kesque
-import kesque.Record
 import khipu.Hash
 import khipu.domain.Account
 import khipu.domain.Blockchain
@@ -330,52 +328,52 @@ final class DataFinder()(implicit system: ActorSystem) {
   }
 }
 
-final class BlockDump(blockchain: Blockchain, db: Kesque)(implicit system: ActorSystem) {
-  private val numberMappingStorage = blockchain.storages.blockNumberMappingStorage
-  private val headersStorage = blockchain.storages.blockHeadersStorage
-  private val bodiesStorage = blockchain.storages.blockBodiesStorage
-
-  def dump() {
-    println("start dump blocks ...")
-
-    var start = System.currentTimeMillis
-    val blockTable = db.getTable(Array("header", "body"), 1024000)
-
-    //val headerTable = db.getTable("header")
-    //val bodyTable = db.getTable("body")
-
-    var blockNumber = 0L
-    var continue = true
-    while (continue) {
-      print(s"$blockNumber,")
-      continue = numberMappingStorage.get(blockNumber) match {
-        case Some(blockHash) =>
-          headersStorage.get(blockHash) match {
-            case Some(header) =>
-              import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
-              blockTable.write(List(Record(blockHash.bytes, header.toBytes, blockNumber)), "header")
-            case None =>
-          }
-          bodiesStorage.get(blockHash) match {
-            case Some(body) =>
-              import khipu.network.p2p.messages.PV62.BlockBody.BlockBodyDec
-              blockTable.write(List(Record(blockHash.bytes, body.toBytes, blockNumber)), "body")
-            case None =>
-          }
-          true
-        case None =>
-          println(s"none for block #$blockNumber")
-          false
-      }
-
-      if (blockNumber % 1000 == 0) {
-        println(s"\ndumped up to $blockNumber in ${(System.currentTimeMillis - start) / 1000.0}s")
-        start = System.currentTimeMillis
-      }
-
-      blockNumber += 1
-    }
-
-  }
-
-}
+//final class BlockDump(blockchain: Blockchain, db: Kesque)(implicit system: ActorSystem) {
+//  private val numberMappingStorage = blockchain.storages.blockNumberMappingStorage
+//  private val headerStorage = blockchain.storages.blockHeaderStorage
+//  private val bodyStorage = blockchain.storages.blockBodyStorage
+//
+//  def dump() {
+//    println("start dump blocks ...")
+//
+//    var start = System.currentTimeMillis
+//    val blockTable = db.getTable(Array("header", "body"), 1024000)
+//
+//    //val headerTable = db.getTable("header")
+//    //val bodyTable = db.getTable("body")
+//
+//    var blockNumber = 0L
+//    var continue = true
+//    while (continue) {
+//      print(s"$blockNumber,")
+//      continue = numberMappingStorage.get(blockNumber) match {
+//        case Some(blockHash) =>
+//          headerStorage.get(blockHash) match {
+//            case Some(header) =>
+//              import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
+//              blockTable.write(List(Record(blockHash.bytes, header.toBytes, blockNumber)), "header")
+//            case None =>
+//          }
+//          bodyStorage.get(blockHash) match {
+//            case Some(body) =>
+//              import khipu.network.p2p.messages.PV62.BlockBody.BlockBodyDec
+//              blockTable.write(List(Record(blockHash.bytes, body.toBytes, blockNumber)), "body")
+//            case None =>
+//          }
+//          true
+//        case None =>
+//          println(s"none for block #$blockNumber")
+//          false
+//      }
+//
+//      if (blockNumber % 1000 == 0) {
+//        println(s"\ndumped up to $blockNumber in ${(System.currentTimeMillis - start) / 1000.0}s")
+//        start = System.currentTimeMillis
+//      }
+//
+//      blockNumber += 1
+//    }
+//
+//  }
+//
+//}

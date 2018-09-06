@@ -118,8 +118,8 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
       Future(kesque.getTimedTable(Array(
         KesqueDataSource.header,
         KesqueDataSource.body,
-        KesqueDataSource.td,
-        KesqueDataSource.receipts
+        KesqueDataSource.receipts,
+        KesqueDataSource.td
       ), 1024000))
     ))
     private val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
@@ -132,10 +132,10 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     lazy val storageNodeDataSource = new KesqueDataSource(storageTable, KesqueDataSource.storage)
     lazy val evmCodeDataSource = new KesqueDataSource(evmcodeTable, KesqueDataSource.evmcode)
 
-    lazy val blockHeadersDataSource = new KesqueDataSource(blockTable, KesqueDataSource.header)
-    lazy val blockBodiesDataSource = new KesqueDataSource(blockTable, KesqueDataSource.body)
-    lazy val totalDifficultiesDataSource = new KesqueDataSource(blockTable, KesqueDataSource.td)
+    lazy val blockHeaderDataSource = new KesqueDataSource(blockTable, KesqueDataSource.header)
+    lazy val blockBodyDataSource = new KesqueDataSource(blockTable, KesqueDataSource.body)
     lazy val receiptsDataSource = new KesqueDataSource(blockTable, KesqueDataSource.receipts)
+    lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, KesqueDataSource.td)
 
     protected lazy val nodeKeyValueCache = {
       val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
@@ -145,7 +145,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
       LfuCache[Hash, Array[Byte]](cachingSettings)
     }
 
-    protected lazy val blockHeadersCache = {
+    protected lazy val blockHeaderCache = {
       val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
         .withInitialCapacity(2000)
         .withMaxCapacity(5000)
@@ -153,7 +153,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
       LfuCache[Hash, BlockHeader](cachingSettings)
     }
 
-    protected lazy val blockBodiesCache = {
+    protected lazy val blockBodyCache = {
       val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
         .withInitialCapacity(2000)
         .withMaxCapacity(5000)

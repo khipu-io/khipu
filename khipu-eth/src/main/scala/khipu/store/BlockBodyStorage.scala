@@ -12,7 +12,7 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockBody belong
  *   Value: the block body
  */
-final class BlockBodiesStorage(val source: KesqueDataSource) extends SimpleMap[Hash, BlockBody, BlockBodiesStorage] {
+final class BlockBodyStorage(val source: KesqueDataSource) extends SimpleMap[Hash, BlockBody, BlockBodyStorage] {
   import BlockBody.BlockBodyDec
 
   val namespace: Array[Byte] = Namespaces.BodyNamespace
@@ -24,7 +24,7 @@ final class BlockBodiesStorage(val source: KesqueDataSource) extends SimpleMap[H
     source.get(key).map(_.value.toBlockBody)
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockBody]): BlockBodiesStorage = {
+  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockBody]): BlockBodyStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
     toUpsert foreach { case (key, value) => source.put(key, TVal(value.toBytes, -1L)) }
@@ -34,5 +34,5 @@ final class BlockBodiesStorage(val source: KesqueDataSource) extends SimpleMap[H
 
   def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingBlockNumber(writingBlockNumber)
 
-  protected def apply(source: KesqueDataSource): BlockBodiesStorage = new BlockBodiesStorage(source)
+  protected def apply(source: KesqueDataSource): BlockBodyStorage = new BlockBodyStorage(source)
 }

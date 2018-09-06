@@ -13,7 +13,7 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockHeader belong
  *   Value: the block header
  */
-final class BlockHeadersStorage(val source: KesqueDataSource) extends SimpleMap[Hash, BlockHeader, BlockHeadersStorage] {
+final class BlockHeaderStorage(val source: KesqueDataSource) extends SimpleMap[Hash, BlockHeader, BlockHeaderStorage] {
   val namespace: Array[Byte] = Namespaces.HeaderNamespace
   def keySerializer: Hash => Array[Byte] = _.bytes
   def valueSerializer: BlockHeader => Array[Byte] = _.toBytes
@@ -23,7 +23,7 @@ final class BlockHeadersStorage(val source: KesqueDataSource) extends SimpleMap[
     source.get(key).map(_.value.toBlockHeader)
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockHeader]): BlockHeadersStorage = {
+  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockHeader]): BlockHeaderStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
     toUpsert foreach { case (key, value) => source.put(key, TVal(value.toBytes, -1L)) }
@@ -36,6 +36,6 @@ final class BlockHeadersStorage(val source: KesqueDataSource) extends SimpleMap[
   def getBlockHash(blockNumber: Long) = source.table.getKeyByTime(blockNumber).map(Hash(_))
   def putBlockHash(blockNumber: Long, key: Hash) = source.table.putTimeToKey(blockNumber, key.bytes)
 
-  protected def apply(source: KesqueDataSource): BlockHeadersStorage = new BlockHeadersStorage(source)
+  protected def apply(source: KesqueDataSource): BlockHeaderStorage = new BlockHeaderStorage(source)
 }
 
