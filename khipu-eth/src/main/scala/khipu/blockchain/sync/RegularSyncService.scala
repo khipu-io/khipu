@@ -96,13 +96,11 @@ trait RegularSyncService { _: SyncService =>
   }
 
   private var lookbackFromBlock: Option[Long] = if (reimportFromBlockNumber > 0) Some(reimportFromBlockNumber) else None // for debugging/reimporting a specified block
-  private var isLookbacked = false
   private def requestHeaders() {
     bestPeer match {
       case Some(peer) =>
         val nextBlockNumber = lookbackFromBlock match {
-          case None => appStateStorage.getBestBlockNumber + 1
-          case Some(reimportFromBlockNumber) if isLookbacked => appStateStorage.getBestBlockNumber + 1
+          case None                          => appStateStorage.getBestBlockNumber + 1
           case Some(reimportFromBlockNumber) => reimportFromBlockNumber
         }
 
@@ -111,9 +109,6 @@ trait RegularSyncService { _: SyncService =>
         requestingHeaders(peer, None, Left(nextBlockNumber), blockHeadersPerRequest, skip = 0, reverse = false)(syncRequestTimeout) andThen {
           case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
             log.debug(s"Got block headers from $peer")
-            if (lookbackFromBlock.isDefined) {
-              isLookbacked = true
-            }
             lookbackFromBlock = None
             self ! ProcessBlockHeaders(peer, headers)
 
