@@ -12,7 +12,7 @@ import khipu.util
 import scala.concurrent.duration.FiniteDuration
 
 object HandshakedPeersService {
-  final case class BlacklistPeer(peerId: String, reason: String)
+  final case class BlacklistPeer(peerId: String, reason: String, always: Boolean = false)
 
   private case class UnblacklistPeerTask(peerId: String)
   private case class UnblacklistPeerTick(peerId: String)
@@ -30,14 +30,15 @@ trait HandshakedPeersService { _: SyncService =>
   protected var blacklistCounts = Map[String, Int]()
 
   def peerUpdateBehavior: Receive = {
-    case PeerEntity.PeerHandshaked(peer, peerInfo: PeerInfo) =>
-      log.debug(s"[sync] added handshaked peer: $peer")
-      handshakedPeers += (peer.id -> (peer, peerInfo))
-      log.debug(s"[sync] handshaked peers: ${handshakedPeers.size}")
+    case PeerEntity.PeerHandshaked(peer, peerInfo) =>
+      if (peerInfo.forkAccepted) {
+        log.debug(s"[sync] added handshaked peer: $peer")
+        handshakedPeers += (peer.id -> (peer, peerInfo))
+        log.debug(s"[sync] handshaked peers: ${handshakedPeers.size}")
+      }
 
     case PeerEntity.PeerDisconnected(peerId) if handshakedPeers.contains(peerId) =>
       log.debug(s"[sync] peer $peerId disconnected")
-
       removePeer(peerId)
 
     case PeerEntity.PeerInfoUpdated(peerId, peerInfo) =>
@@ -57,11 +58,10 @@ trait HandshakedPeersService { _: SyncService =>
           } else {
             handshakedPeers += (peerId -> (peer, peerInfo))
           }
-
       }
 
-    case BlacklistPeer(peerId, reason) =>
-      blacklist(peerId, util.Config.Sync.blacklistDuration, reason)
+    case BlacklistPeer(peerId, reason, always) =>
+      blacklist(peerId, util.Config.Sync.blacklistDuration, reason, always)
 
     case UnblacklistPeerTick(peerId) =>
       timers.cancel(UnblacklistPeerTask(peerId))

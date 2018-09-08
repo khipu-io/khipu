@@ -33,11 +33,9 @@ object BloomFilter {
    * @return bloom filter associated with the logs
    */
   def create(logs: Seq[TxLogEntry]): ByteString = {
-    val bloomFilters = logs.map(createBloomFilterForLogEntry)
-    if (bloomFilters.isEmpty) {
-      emptyBloomFilter
-    } else {
-      ByteString(BytesUtil.or(bloomFilters: _*))
+    logs.map(createBloomFilterForLogEntry) match {
+      case Seq()        => emptyBloomFilter
+      case bloomFilters => ByteString(BytesUtil.or(bloomFilters: _*))
     }
   }
 

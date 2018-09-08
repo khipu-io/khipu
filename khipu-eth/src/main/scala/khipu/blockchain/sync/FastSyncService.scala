@@ -132,7 +132,7 @@ trait FastSyncService { _: SyncService =>
   private def startFastSyncFromScratch() = {
     log.info("Start fast synchronization from scratch")
 
-    val peersUsedToChooseTarget = peersToDownloadFrom.filter(_._2.forkAccepted)
+    val peersUsedToChooseTarget = peersToDownloadFrom
 
     if (peersUsedToChooseTarget.size >= minPeersToChooseTargetBlock) {
       log.debug(s"Asking ${peersUsedToChooseTarget.size} peers for block headers")
@@ -169,7 +169,7 @@ trait FastSyncService { _: SyncService =>
               None
           }
       }) map {
-        receivedHeaders => tryStartFastSync(receivedHeaders.flatten)
+        receivedHeaders => tryStartFastSync(receivedHeaders.flatten.toSeq)
       }
     } else {
       log.info(s"Fast synchronization did not start yet. Need at least ${minPeersToChooseTargetBlock} peers, but only ${peersUsedToChooseTarget.size} available at the moment. Retry in ${startRetryInterval.toSeconds} seconds")
@@ -178,7 +178,7 @@ trait FastSyncService { _: SyncService =>
     }
   }
 
-  private def tryStartFastSync(receivedHeaders: Iterable[(Peer, BlockHeader)]) {
+  private def tryStartFastSync(receivedHeaders: Seq[(Peer, BlockHeader)]) {
     log.debug(s"Trying to start fast sync. Received ${receivedHeaders.size} block headers")
 
     if (receivedHeaders.size >= minPeersToChooseTargetBlock) {
@@ -200,7 +200,7 @@ trait FastSyncService { _: SyncService =>
               headers.find(_.number == targetBlockNumber) match {
                 case Some(targetBlockHeader) =>
                   log.info(s"Pre start fast sync, got one target block ${targetBlockHeader} from ${peer.id}")
-                  Success(Some(targetBlockHeader))
+                  Success(Some(peer -> targetBlockHeader))
                 case None =>
                   self ! BlacklistPeer(peerId, s"did not respond with proper target block header")
                   Success(None)
@@ -226,10 +226,18 @@ trait FastSyncService { _: SyncService =>
         })
 
         fs map { headers =>
-          val bestHeader = headers.flatten.groupBy(_.stateRoot).maxBy(_._2.size)
+          val (stateRoot, peerToBlockHeader) = headers.flatten.groupBy(_._2.stateRoot).maxBy(_._2.size)
           val nSameHeadersRequired = math.min(minPeersToChooseTargetBlock, 3)
-          if (bestHeader._2.size >= nSameHeadersRequired) {
-            val targetBlockHeader = bestHeader._2.head
+          if (peerToBlockHeader.size >= nSameHeadersRequired) {
+            val (goodPeers, blockHeaders) = peerToBlockHeader.unzip
+
+            val peers = receivedHeaders.map(_._1)
+            val badPeers = peers filterNot goodPeers.contains
+            badPeers foreach { peer =>
+              self ! BlacklistPeer(peer.id, s"Got uncertain block header", always = true)
+            }
+
+            val targetBlockHeader = blockHeaders.head
             log.info(s"Got enough block headers that have the same stateRoot, starting block synchronization (fast mode). Target block ${targetBlockHeader}")
             val initialSyncState = SyncState(
               targetBlockHeader.number,
@@ -237,7 +245,7 @@ trait FastSyncService { _: SyncService =>
             )
             startFastSync(initialSyncState)
           } else {
-            log.info(s"Could not get enough block headers that have the same stateRoot, requires ${nSameHeadersRequired}, but only found ${bestHeader._2.size}")
+            log.info(s"Could not get enough block headers that have the same stateRoot, requires ${nSameHeadersRequired}, but only found ${peerToBlockHeader.size}")
             scheduleStartRetry(startRetryInterval)
             context become startingFastSync
           }
