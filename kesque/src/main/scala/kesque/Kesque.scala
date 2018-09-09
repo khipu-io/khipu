@@ -1,6 +1,6 @@
 package kesque
 
-import java.io.File
+import kafka.server.QuotaFactory.UnboundedQuota
 import java.nio.ByteBuffer
 import java.util.Properties
 import org.apache.kafka.common.TopicPartition
@@ -24,11 +24,6 @@ import scala.collection.mutable
  * # stress -m 1 --vm-bytes 25G --vm-keep
  */
 final class Kesque(props: Properties) {
-  private var quota = new kafka.server.ReplicaQuota {
-    def isThrottled(topicPartition: TopicPartition) = false
-    def isQuotaExceeded() = false
-  }
-
   private val kafkaServer = KafkaServer.start(props)
   private val readerWriter = kafkaServer.readerWriter
 
@@ -53,7 +48,7 @@ final class Kesque(props: Properties) {
       fetchMaxBytes = fetchMaxBytes,
       hardMaxBytesLimit = true,
       readPartitionInfo = List((partition, partitionData)),
-      quota = quota,
+      quota = UnboundedQuota,
       isolationLevel = org.apache.kafka.common.requests.IsolationLevel.READ_COMMITTED
     )
   }

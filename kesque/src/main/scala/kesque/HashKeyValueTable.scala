@@ -198,12 +198,13 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
       }
 
       val indexRecords = db.write(topic, records).foldLeft(Vector[Vector[SimpleRecord]]()) {
-        case (indexRecords, (topicPartition, LogAppendResult(appendInfo, Some(ex)))) =>
+        case (indexRecords, (topicPartition, LogAppendResult(info, Some(ex)))) =>
           error(ex.getMessage, ex) // TODO
           indexRecords
 
-        case (indexRecords, (topicPartition, LogAppendResult(appendInfo, None))) =>
-          val (lastOffset, parIdxRecords) = kvs.foldLeft(appendInfo.firstOffset, Vector[SimpleRecord]()) {
+        case (indexRecords, (topicPartition, LogAppendResult(info, None))) =>
+          val firstOffert = info.firstOffset.getOrElse(0L)
+          val (lastOffset, parIdxRecords) = kvs.foldLeft(firstOffert, Vector[SimpleRecord]()) {
             case ((offset, parIdxRecords), Record(k, v, t)) =>
               val hash = Hash(k)
               val hashCode = hash.hashCode
@@ -219,8 +220,8 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
               (offset + 1, parIdxRecords :+ indexRecord)
           }
           if (kvs.nonEmpty) {
-            assert(appendInfo.lastOffset == lastOffset - 1, s"lastOffset(${appendInfo.lastOffset}) != ${lastOffset - 1}, firstOffset is ${appendInfo.firstOffset}")
-            val count = appendInfo.lastOffset - appendInfo.firstOffset + 1
+            assert(info.lastOffset == lastOffset - 1, s"lastOffset(${info.lastOffset}) != ${lastOffset - 1}, firstOffset is ${info.firstOffset}")
+            val count = info.lastOffset - firstOffert + 1
           }
 
           indexRecords :+ parIdxRecords
@@ -262,7 +263,8 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
           indexRecords
 
         case (indexRecords, (topicPartition, LogAppendResult(info, None))) =>
-          val (lastOffset, parIdxRecords) = keys.foldLeft(info.firstOffset, Vector[SimpleRecord]()) {
+          val firstOffert = info.firstOffset.getOrElse(0L)
+          val (lastOffset, parIdxRecords) = keys.foldLeft(firstOffert, Vector[SimpleRecord]()) {
             case ((offset, parIdxRecords), k) =>
               val hash = Hash(k)
               val hashCode = hash.hashCode
@@ -275,7 +277,7 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
           }
           if (keys.nonEmpty) {
             assert(info.lastOffset == lastOffset - 1, s"lastOffset ${info.lastOffset} != ${lastOffset - 1} ")
-            val count = info.lastOffset - info.firstOffset + 1
+            val count = info.lastOffset - firstOffert + 1
           }
 
           indexRecords :+ parIdxRecords

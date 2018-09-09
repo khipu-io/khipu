@@ -36,7 +36,7 @@ During fast sync, sometimes the syncing looks like stopped with no more state no
 ### Minimum requirements to run Khipu
 
   - 16G RAM, 250G disk space (SSD is preferred, although HDD is okay)
-  - Under regular sync mode, if you restart Khipu, it may take 2~5 minutes (SSD), or 8~15 minutes (HDD) to load the storage indexes
+  - Under regular sync mode, if you restart Khipu, it may take 2 to 5 minutes (SSD), or 8 to 15 minutes (HDD) to load the storage indexes
 
 ### Installation and Running, Building
 

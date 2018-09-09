@@ -103,8 +103,8 @@ object Dependencies {
   )
 
   val kafka = Seq(
-    "org.apache.kafka" % "kafka-clients" % "1.0.0",
-    "org.apache.kafka" %% "kafka" % "1.0.0"
+    "org.apache.kafka" % "kafka-clients" % "2.0.0",
+    "org.apache.kafka" %% "kafka" % "2.0.0"
   )
 
   val spongycastle = Seq("com.madgag.spongycastle" % "core" % "1.56.0.0")

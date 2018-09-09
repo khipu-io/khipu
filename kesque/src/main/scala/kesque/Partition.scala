@@ -26,6 +26,7 @@ import scala.collection.JavaConverters._
 
 /**
  * Data structure that represents a topic partition. The leader maintains the AR, ISR, CUR, RAR
+ * @see kafka.cluster.Partition
  */
 class Partition(
     val topic:       String,
@@ -136,7 +137,7 @@ class Partition(
   def getOrCreateReplica(replicaId: Int = localBrokerId, isNew: Boolean = false): Replica = {
     assignedReplicaMap.getAndMaybePut(replicaId, {
       if (isReplicaLocal(replicaId)) {
-        val config = LogConfig.fromProps(logManager.defaultConfig.originals, new Properties())
+        val config = LogConfig.fromProps(logManager.currentDefaultConfig.originals, new Properties())
         //AdminUtils.fetchEntityConfig(zkUtils, ConfigType.Topic, topic))
         val log = logManager.getOrCreateLog(topicPartition, config, isNew)
         val checkpoint = replicaManager.highWatermarkCheckpoints(log.dir.getParent)
@@ -549,9 +550,10 @@ class Partition(
     inReadLock(leaderIsrUpdateLock) {
       leaderReplicaIfLocal match {
         case Some(leaderReplica) =>
-          new EpochEndOffset(NONE, leaderReplica.epochs.get.endOffsetFor(leaderEpoch))
+          val (epoch, offset) = leaderReplica.epochs.get.endOffsetFor(leaderEpoch)
+          new EpochEndOffset(NONE, epoch, offset)
         case None =>
-          new EpochEndOffset(NOT_LEADER_FOR_PARTITION, UNDEFINED_EPOCH_OFFSET)
+          new EpochEndOffset(NOT_LEADER_FOR_PARTITION, UNDEFINED_EPOCH, UNDEFINED_EPOCH_OFFSET)
       }
     }
   }
