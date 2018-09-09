@@ -28,7 +28,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
-import scala.util.control.ControlThrowable
+import scala.util.control.NoStackTrace
 
 object RegularSyncService {
   private case object ResumeRegularSyncTask
@@ -37,7 +37,7 @@ object RegularSyncService {
   private case class ProcessBlockHeaders(peer: Peer, headers: List[BlockHeader])
   private case class ProcessBlockBodies(peer: Peer, bodies: List[PV62.BlockBody])
 
-  private case class ExecuteAndInsertBlocksAborted(parentTotalDifficulty: BigInteger, newBlocks: Vector[NewBlock], errors: Vector[BlockExecutionError]) extends ControlThrowable {}
+  private case class ExecuteAndInsertBlocksAborted(parentTotalDifficulty: BigInteger, newBlocks: Vector[NewBlock], errors: Vector[BlockExecutionError]) extends Throwable with NoStackTrace
 }
 trait RegularSyncService { _: SyncService =>
   import context.dispatcher
@@ -109,7 +109,6 @@ trait RegularSyncService { _: SyncService =>
         requestingHeaders(peer, None, Left(nextBlockNumber), blockHeadersPerRequest, skip = 0, reverse = false)(syncRequestTimeout) andThen {
           case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
             log.debug(s"Got block headers from $peer")
-            lookbackFromBlock = None
             self ! ProcessBlockHeaders(peer, headers)
 
           case Success(Some(BlockHeadersResponse(peerId, _, false))) =>
@@ -280,9 +279,7 @@ trait RegularSyncService { _: SyncService =>
           }
 
           val start = System.currentTimeMillis
-          executeAndInsertBlocks(preValidBlocks, parentTd, preValidBlocks.size > 1) recover {
-            case ExecuteAndInsertBlocksAborted(parentTotalDifficulty, newBlocks, errors) => (parentTotalDifficulty, newBlocks, errors)
-          } andThen {
+          executeAndInsertBlocks(preValidBlocks, parentTd, preValidBlocks.size > 1) andThen {
             case Success((_, newBlocks, errors)) =>
               val elapsed = (System.currentTimeMillis - start) / 1000.0
 
@@ -386,17 +383,23 @@ trait RegularSyncService { _: SyncService =>
           case (parentTotalDifficulty, newBlocks, Vector()) =>
             executeAndInsertBlock(block, parentTotalDifficulty, isBatch) map {
               case Right(newBlock) =>
+                // reset lookbackFromBlock only when executeAndInsertBlock success
+                lookbackFromBlock = None
+
                 // check blockHashToDelete
                 blockchain.getBlockHeaderByNumber(block.header.number).map(_.hash).filter(_ != block.header.hash) foreach blockchain.removeBlock
 
                 (newBlock.totalDifficulty, newBlocks :+ newBlock, Vector())
-
               case Left(error) =>
                 (parentTotalDifficulty, newBlocks, Vector(error))
             }
 
-          case (parentTotalDifficulty, newBlocks, errors) => Future.failed(ExecuteAndInsertBlocksAborted(parentTotalDifficulty, newBlocks, errors))
+          case (parentTotalDifficulty, newBlocks, errors) =>
+            Future.failed(ExecuteAndInsertBlocksAborted(parentTotalDifficulty, newBlocks, errors))
         }
+    } recover {
+      case ExecuteAndInsertBlocksAborted(parentTotalDifficulty, newBlocks, errors) =>
+        (parentTotalDifficulty, newBlocks, errors)
     }
   }
 

@@ -327,7 +327,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
     txError match {
       case Some(error) => Future.successful(Left(error))
-      case None        => Future.successful(Right(postExecuteTransactions(blockHeader, evmCfg, txResults, 0, 0.0)(currWorld.withTx(None))))
+      case None        => Future.successful(postExecuteTransactions(blockHeader, evmCfg, txResults, 0, 0.0)(currWorld.withTx(None)))
     }
   }
 
@@ -434,12 +434,11 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
       txError match {
         case Some(error) => Left(error)
-        case None        => Right(postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePercent)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun)))
+        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePercent)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
       }
-
     } andThen {
-      case Success(_)  =>
-      case Failure(ex) => log.error(ex.getMessage, ex)
+      case Success(_) =>
+      case Failure(e) => log.error(e, s"Error on block ${blockHeader.number}: ${e.getMessage}")
     }
   }
 
@@ -449,44 +448,49 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     txResults:     Vector[TxResult],
     parallelCount: Int,
     dbTimePercent: Double
-  )(world: BlockWorldState): BlockResult = {
-    val (accGas, accTxFee, accTouchedAddresses, accReceipts) = txResults.foldLeft(0L, UInt256.Zero, Set[Address](), Vector[Receipt]()) {
-      case ((accGas, accTxFee, accTouchedAddresses, accReceipts), TxResult(stx, worldAfterTx, gasUsed, txFee, logs, touchedAddresses, _, error, isRevert, _)) =>
+  )(world: BlockWorldState): Either[BlockExecutionError, BlockResult] = {
+    try {
+      val (accGas, accTxFee, accTouchedAddresses, accReceipts) = txResults.foldLeft(0L, UInt256.Zero, Set[Address](), Vector[Receipt]()) {
+        case ((accGas, accTxFee, accTouchedAddresses, accReceipts), TxResult(stx, worldAfterTx, gasUsed, txFee, logs, touchedAddresses, _, error, isRevert, _)) =>
 
-        val postTxState = if (evmCfg.eip658) {
-          if (error.isDefined || isRevert) Receipt.Failure else Receipt.Success
-        } else {
-          worldAfterTx.stateRootHash
-          //worldAfterTx.commit().stateRootHash // TODO here if get stateRootHash, should commit first, but then how about parallel running? how about sending a lazy evaulate function instead of value?
-        }
+          val postTxState = if (evmCfg.eip658) {
+            if (error.isDefined || isRevert) Receipt.Failure else Receipt.Success
+          } else {
+            worldAfterTx.stateRootHash
+            //worldAfterTx.commit().stateRootHash // TODO here if get stateRootHash, should commit first, but then how about parallel running? how about sending a lazy evaulate function instead of value?
+          }
 
-        log.debug(s"Tx ${stx.hash} gasLimit: ${stx.tx.gasLimit}, gasUsed: $gasUsed, cumGasUsed: ${accGas + gasUsed}")
+          log.debug(s"Tx ${stx.hash} gasLimit: ${stx.tx.gasLimit}, gasUsed: $gasUsed, cumGasUsed: ${accGas + gasUsed}")
 
-        val receipt = Receipt(
-          postTxState = postTxState,
-          cumulativeGasUsed = accGas + gasUsed,
-          logsBloomFilter = BloomFilter.create(logs),
-          logs = logs
-        )
+          val receipt = Receipt(
+            postTxState = postTxState,
+            cumulativeGasUsed = accGas + gasUsed,
+            logsBloomFilter = BloomFilter.create(logs),
+            logs = logs
+          )
 
-        (accGas + gasUsed, accTxFee + txFee, accTouchedAddresses ++ touchedAddresses, accReceipts :+ receipt)
+          (accGas + gasUsed, accTxFee + txFee, accTouchedAddresses ++ touchedAddresses, accReceipts :+ receipt)
+      }
+
+      val minerAddress = Address(blockHeader.beneficiary)
+      val worldPayMinerForGas = world.pay(minerAddress, accTxFee)
+
+      // find empty touched accounts to be deleted
+      val deadAccounts = if (evmCfg.eip161) {
+        (accTouchedAddresses + minerAddress) filter (worldPayMinerForGas.isAccountDead)
+      } else {
+        Set[Address]()
+      }
+      //log.debug(s"touched accounts: ${result.addressesTouched}, miner: $minerAddress")
+      log.debug(s"dead accounts accounts: $deadAccounts")
+      val worldDeletedDeadAccounts = deleteAccounts(deadAccounts)(worldPayMinerForGas)
+
+      log.debug(s"$blockHeader, accGas $accGas, receipts = $accReceipts")
+      Right(BlockResult(worldDeletedDeadAccounts, accGas, accReceipts, parallelCount, dbTimePercent))
+    } catch {
+      case MPTNodeMissingException(_, hash, table) => Left(MissingNodeExecptionError(blockHeader.number, hash, table))
+      case e: Throwable                            => throw e
     }
-
-    val minerAddress = Address(blockHeader.beneficiary)
-    val worldPayMinerForGas = world.pay(minerAddress, accTxFee)
-
-    // find empty touched accounts to be deleted
-    val deadAccounts = if (evmCfg.eip161) {
-      (accTouchedAddresses + minerAddress) filter (worldPayMinerForGas.isAccountDead)
-    } else {
-      Set[Address]()
-    }
-    //log.debug(s"touched accounts: ${result.addressesTouched}, miner: $minerAddress")
-    log.debug(s"dead accounts accounts: $deadAccounts")
-    val worldDeletedDeadAccounts = deleteAccounts(deadAccounts)(worldPayMinerForGas)
-
-    log.debug(s"$blockHeader, accGas $accGas, receipts = $accReceipts")
-    BlockResult(worldDeletedDeadAccounts, accGas, accReceipts, parallelCount, dbTimePercent)
   }
 
   // TODO see TODO at lines
@@ -497,7 +501,6 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     evmCfg:       EvmConfig
   )(world: BlockWorldState): Either[BlockExecutionError, TxResult] = {
     try {
-
       val (senderAccount, worldForTx) = world.getAccount(stx.sender) match {
         case Some(account) => (account, world)
         case None =>
