@@ -1,6 +1,7 @@
 package kesque
 
 import kafka.server.QuotaFactory.UnboundedQuota
+import java.io.File
 import java.nio.ByteBuffer
 import java.util.Properties
 import org.apache.kafka.common.TopicPartition
@@ -23,9 +24,46 @@ import scala.collection.mutable
  * Fill memory:
  * # stress -m 1 --vm-bytes 25G --vm-keep
  */
+object Kesque {
+
+  // --- simple test
+  def main(args: Array[String]) {
+    val khipuPath = new File(classOf[Kesque].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
+    val configDir = new File(khipuPath, "../src/main/resources")
+
+    val configFile = new File(configDir, "kafka.server.properties")
+    val props = org.apache.kafka.common.utils.Utils.loadProps(configFile.getAbsolutePath)
+    val kesque = new Kesque(props)
+    val topic = "kesque-test"
+    val table = kesque.getTable(Array(topic))
+
+    kesque.deleteTable(topic)
+    testWrite(table, topic)
+    testRead(table, topic)
+
+    System.exit(0)
+  }
+
+  def testWrite(table: HashKeyValueTable, topic: String) = {
+    val kvs = List(
+      Record("a".getBytes, "valuea".getBytes),
+      Record("b".getBytes, "valueb".getBytes),
+      Record("c".getBytes, "valuec".getBytes)
+    )
+    table.write(kvs, topic)
+  }
+
+  def testRead(table: HashKeyValueTable, topic: String) {
+    val keys = List("a", "b", "c")
+    keys foreach { key =>
+      val value = table.read(key.getBytes, topic) map (v => new String(v.value))
+      println(value)
+    }
+  }
+}
 final class Kesque(props: Properties) {
   private val kafkaServer = KafkaServer.start(props)
-  private val readerWriter = kafkaServer.readerWriter
+  private val replicaManager = kafkaServer.replicaManager
 
   private val topicToTable = mutable.Map[String, HashKeyValueTable]()
 
@@ -41,7 +79,7 @@ final class Kesque(props: Properties) {
     val partition = new TopicPartition(topic, 0)
     val partitionData = new PartitionData(fetchOffset, 0L, fetchMaxBytes)
 
-    readerWriter.readFromLocalLog(
+    replicaManager.readFromLocalLog(
       replicaId = 0,
       fetchOnlyFromLeader = true,
       readOnlyCommitted = false,
@@ -61,10 +99,10 @@ final class Kesque(props: Properties) {
     //val initialOffset = readerWriter.getLogEndOffset(partition) + 1 // TODO check -1L
     val initialOffset = 0L // TODO is this useful?
 
-    val memoryRecords = KafkaReaderWriter.buildRecords(initialOffset, records: _*)
+    val memoryRecords = ReplicaManager.buildRecords(initialOffset, records: _*)
     val entriesPerPartition = Map(partition -> memoryRecords)
 
-    readerWriter.appendToLocalLog(
+    replicaManager.appendToLocalLog(
       internalTopicsAllowed = false,
       isFromClient = false,
       entriesPerPartition = entriesPerPartition,
@@ -74,7 +112,7 @@ final class Kesque(props: Properties) {
 
   def deleteTable(topic: String) = {
     val partition = new TopicPartition(topic, 0)
-    readerWriter.stopReplica(partition, deletePartition = true)
+    replicaManager.stopReplica(partition, deletePartition = true)
     topicToTable -= topic
   }
 

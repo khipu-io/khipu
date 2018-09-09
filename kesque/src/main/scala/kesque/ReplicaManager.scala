@@ -61,7 +61,7 @@ import org.apache.kafka.common.record.AbstractRecords
 /**
  * from kafka.server.ReplicaManager.scala
  */
-object KafkaReaderWriter {
+object ReplicaManager {
   val HighWatermarkFilename = "replication-offset-checkpoint"
   val IsrChangePropagationBlackOut = 5000L
   val IsrChangePropagationInterval = 60000L
@@ -101,7 +101,7 @@ object KafkaReaderWriter {
     builder.build()
   }
 }
-class KafkaReaderWriter(
+class ReplicaManager(
     val config:                        KafkaConfig,
     time:                              Time,
     val logManager:                    LogManager,
@@ -145,7 +145,7 @@ class KafkaReaderWriter(
   }))
   private val highWatermarkCheckPointThreadStarted = new AtomicBoolean(false)
   @volatile var highWatermarkCheckpoints = logManager.liveLogDirs.map(dir =>
-    (dir.getAbsolutePath, new OffsetCheckpointFile(new File(dir, KafkaReaderWriter.HighWatermarkFilename), logDirFailureChannel))).toMap
+    (dir.getAbsolutePath, new OffsetCheckpointFile(new File(dir, ReplicaManager.HighWatermarkFilename), logDirFailureChannel))).toMap
 
   def getLog(topicPartition: TopicPartition): Option[Log] = logManager.getLog(topicPartition)
 
@@ -311,20 +311,11 @@ class KafkaReaderWriter(
           ))
         } else {
           try {
-            // force to maybrPut partition
+            // force to maybePut partition. Modified by dcaoyuan
             getOrCreatePartition(topicPartition)
 
-            val partitionOpt = getPartition(topicPartition)
-            val info = partitionOpt match {
-              case Some(partition) =>
-                if (partition eq KafkaReaderWriter.OfflinePartition)
-                  throw new KafkaStorageException(s"Partition $topicPartition is in an offline log directory on broker $localBrokerId")
-                partition.appendRecordsToLeader(records, isFromClient, requiredAcks)
-
-              case None => throw new UnknownTopicOrPartitionException("Partition %s doesn't exist on %d"
-                .format(topicPartition, localBrokerId))
-            }
-
+            val (partition, _) = getPartitionAndLeaderReplicaIfLocal(topicPartition)
+            val info = partition.appendRecordsToLeader(records, isFromClient, requiredAcks)
             val numAppendedMessages = info.numMessages
 
             // update stats for successfully appended bytes and messages as bytesInRate and messageInRate
@@ -377,26 +368,13 @@ class KafkaReaderWriter(
           (topicPartition, LogDeleteRecordsResult(-1L, -1L, Some(new InvalidTopicException(s"Cannot delete records of internal topic ${topicPartition.topic}"))))
         } else {
           try {
-            // force to maybrPut partition
+            // force to maybePut partition, modified by dcaoyuan
             getOrCreatePartition(topicPartition)
 
-            val partition = getPartition(topicPartition) match {
-              case Some(p) =>
-                if (p eq KafkaReaderWriter.OfflinePartition)
-                  throw new KafkaStorageException("Partition %s is in an offline log directory on broker %d".format(topicPartition, localBrokerId))
-                p
-              case None =>
-                throw new UnknownTopicOrPartitionException("Partition %s doesn't exist on %d".format(topicPartition, localBrokerId))
-            }
+            val (partition, replica) = getPartitionAndLeaderReplicaIfLocal(topicPartition)
             val convertedOffset =
               if (requestedOffset == DeleteRecordsRequest.HIGH_WATERMARK) {
-                partition.leaderReplicaIfLocal match {
-                  case Some(leaderReplica) =>
-                    leaderReplica.highWatermark.messageOffset
-                  case None =>
-                    throw new NotLeaderForPartitionException("Leader not local for partition %s on broker %d"
-                      .format(topicPartition, localBrokerId))
-                }
+                replica.highWatermark.messageOffset
               } else
                 requestedOffset
             if (convertedOffset < 0)
@@ -423,74 +401,6 @@ class KafkaReaderWriter(
   }
 
   // --- helpers
-
-  def getReplicaOrException(topicPartition: TopicPartition): Replica = {
-    // force to maybrPut partition
-    getOrCreatePartition(topicPartition)
-
-    getPartition(topicPartition) match {
-      case Some(partition) =>
-        if (partition eq KafkaReaderWriter.OfflinePartition)
-          throw new KafkaStorageException(s"Replica $localBrokerId is in an offline log directory for partition $topicPartition")
-        else
-          partition.getReplica(localBrokerId).getOrElse(
-            throw new ReplicaNotAvailableException(s"Replica $localBrokerId is not available for partition $topicPartition")
-          )
-      case None =>
-        throw new ReplicaNotAvailableException(s"Replica $localBrokerId is not available for partition $topicPartition")
-    }
-  }
-
-  def getLeaderReplicaIfLocal(topicPartition: TopicPartition): Replica = {
-    // force to maybrPut partition
-    getOrCreatePartition(topicPartition)
-
-    val partitionOpt = getPartition(topicPartition)
-    partitionOpt match {
-      case None =>
-        throw new UnknownTopicOrPartitionException(s"Partition $topicPartition doesn't exist on $localBrokerId")
-      case Some(partition) =>
-        if (partition eq KafkaReaderWriter.OfflinePartition)
-          throw new KafkaStorageException(s"Partition $topicPartition is in an offline log directory on broker $localBrokerId")
-        else partition.leaderReplicaIfLocal match {
-          case Some(leaderReplica) => leaderReplica
-          case None =>
-            throw new NotLeaderForPartitionException(s"Leader not local for partition $topicPartition on broker $localBrokerId")
-        }
-    }
-  }
-
-  def getOrCreatePartition(topicPartition: TopicPartition): Partition =
-    allPartitions.getAndMaybePut(topicPartition)
-
-  def getPartition(topicPartition: TopicPartition): Option[Partition] =
-    Option(allPartitions.get(topicPartition))
-
-  def getReplica(topicPartition: TopicPartition, replicaId: Int): Option[Replica] =
-    nonOfflinePartition(topicPartition).flatMap(_.getReplica(replicaId))
-
-  def getReplica(tp: TopicPartition): Option[Replica] = getReplica(tp, localBrokerId)
-
-  def getLogDir(topicPartition: TopicPartition): Option[String] = {
-    getReplica(topicPartition).flatMap(_.log) match {
-      case Some(log) => Some(log.dir.getParent)
-      case None      => None
-    }
-  }
-
-  /**
-   *  To avoid ISR thrashing, we only throttle a replica on the leader if it's in the throttled replica list,
-   *  the quota is exceeded and the replica is not in sync.
-   */
-  def shouldLeaderThrottle(quota: ReplicaQuota, topicPartition: TopicPartition, replicaId: Int): Boolean = {
-    val isReplicaInSync = nonOfflinePartition(topicPartition).exists { partition =>
-      partition.getReplica(replicaId).exists(partition.inSyncReplicas.contains)
-    }
-    quota.isThrottled(topicPartition) && quota.isQuotaExceeded && !isReplicaInSync
-  }
-
-  def nonOfflinePartition(topicPartition: TopicPartition): Option[Partition] =
-    getPartition(topicPartition).filter(_ ne KafkaReaderWriter.OfflinePartition)
 
   /**
    * Try to complete some delayed produce requests with the request key;
@@ -525,6 +435,117 @@ class KafkaReaderWriter(
     debug("Request key %s unblocked %d DeleteRecordsRequest.".format(key.keyLabel, completed))
   }
 
+  def stopReplica(topicPartition: TopicPartition, deletePartition: Boolean) = {
+    //stateChangeLogger.trace(s"Handling stop replica (delete=$deletePartition) for partition $topicPartition")
+
+    if (deletePartition) {
+      val removedPartition = allPartitions.remove(topicPartition)
+      if (removedPartition eq ReplicaManager.OfflinePartition)
+        throw new KafkaStorageException(s"Partition $topicPartition is on an offline disk")
+
+      if (removedPartition != null) {
+        val topicHasPartitions = allPartitions.values.exists(partition => topicPartition.topic == partition.topic)
+        if (!topicHasPartitions)
+          brokerTopicStats.removeMetrics(topicPartition.topic)
+        // this will delete the local log. This call may throw exception if the log is on offline directory
+        removedPartition.delete()
+      } else {
+        //stateChangeLogger.trace(s"Ignoring stop replica (delete=$deletePartition) for partition $topicPartition as replica doesn't exist on broker")
+      }
+
+      // Delete log and corresponding folders in case replica manager doesn't hold them anymore.
+      // This could happen when topic is being deleted while broker is down and recovers.
+      if (logManager.getLog(topicPartition).isDefined)
+        logManager.asyncDelete(topicPartition)
+      if (logManager.getLog(topicPartition, isFuture = true).isDefined)
+        logManager.asyncDelete(topicPartition, isFuture = true)
+    }
+    //stateChangeLogger.trace(s"Finished handling stop replica (delete=$deletePartition) for partition $topicPartition")
+  }
+
+  def getOrCreatePartition(topicPartition: TopicPartition): Partition =
+    allPartitions.getAndMaybePut(topicPartition)
+
+  def getPartition(topicPartition: TopicPartition): Option[Partition] =
+    Option(allPartitions.get(topicPartition))
+
+  def nonOfflinePartition(topicPartition: TopicPartition): Option[Partition] =
+    getPartition(topicPartition).filter(_ ne ReplicaManager.OfflinePartition)
+
+  def getReplicaOrException(topicPartition: TopicPartition, brokerId: Int): Replica = {
+    // force to maybePut partition, modified by dcaoyuan
+    getOrCreatePartition(topicPartition)
+
+    getPartition(topicPartition) match {
+      case Some(partition) =>
+        if (partition eq ReplicaManager.OfflinePartition)
+          throw new KafkaStorageException(s"Replica $brokerId is in an offline log directory for partition $topicPartition")
+        else
+          partition.getReplica(brokerId).getOrElse(
+            throw new ReplicaNotAvailableException(s"Replica $brokerId is not available for partition $topicPartition")
+          )
+      case None =>
+        throw new ReplicaNotAvailableException(s"Replica $brokerId is not available for partition $topicPartition")
+    }
+  }
+
+  def getReplicaOrException(topicPartition: TopicPartition): Replica = getReplicaOrException(topicPartition, localBrokerId)
+
+  def getLeaderReplicaIfLocal(topicPartition: TopicPartition): Replica = {
+    // force to maybePut partition, modified by dcaoyuan
+    getOrCreatePartition(topicPartition)
+
+    val (_, replica) = getPartitionAndLeaderReplicaIfLocal(topicPartition)
+    replica
+  }
+
+  def getPartitionAndLeaderReplicaIfLocal(topicPartition: TopicPartition): (Partition, Replica) = {
+    val partitionOpt = getPartition(topicPartition)
+    partitionOpt match {
+      case None if metadataCache.contains(topicPartition) =>
+        // The topic exists, but this broker is no longer a replica of it, so we return NOT_LEADER which
+        // forces clients to refresh metadata to find the new location. This can happen, for example,
+        // during a partition reassignment if a produce request from the client is sent to a broker after
+        // the local replica has been deleted.
+        throw new NotLeaderForPartitionException(s"Broker $localBrokerId is not a replica of $topicPartition")
+
+      case None =>
+        throw new UnknownTopicOrPartitionException(s"Partition $topicPartition doesn't exist")
+
+      case Some(partition) =>
+        if (partition eq ReplicaManager.OfflinePartition)
+          throw new KafkaStorageException(s"Partition $topicPartition is in an offline log directory on broker $localBrokerId")
+        else partition.leaderReplicaIfLocal match {
+          case Some(leaderReplica) => (partition, leaderReplica)
+          case None =>
+            throw new NotLeaderForPartitionException(s"Leader not local for partition $topicPartition on broker $localBrokerId")
+        }
+    }
+  }
+
+  def getReplica(topicPartition: TopicPartition, replicaId: Int): Option[Replica] =
+    nonOfflinePartition(topicPartition).flatMap(_.getReplica(replicaId))
+
+  def getReplica(tp: TopicPartition): Option[Replica] = getReplica(tp, localBrokerId)
+
+  def getLogDir(topicPartition: TopicPartition): Option[String] = {
+    getReplica(topicPartition).flatMap(_.log) match {
+      case Some(log) => Some(log.dir.getParent)
+      case None      => None
+    }
+  }
+
+  /**
+   *  To avoid ISR thrashing, we only throttle a replica on the leader if it's in the throttled replica list,
+   *  the quota is exceeded and the replica is not in sync.
+   */
+  def shouldLeaderThrottle(quota: ReplicaQuota, topicPartition: TopicPartition, replicaId: Int): Boolean = {
+    val isReplicaInSync = nonOfflinePartition(topicPartition).exists { partition =>
+      partition.getReplica(replicaId).exists(partition.inSyncReplicas.contains)
+    }
+    quota.isThrottled(topicPartition) && quota.isQuotaExceeded && !isReplicaInSync
+  }
+
   /*
    * Get the LogDirInfo for the specified list of partitions.
    *
@@ -544,8 +565,11 @@ class KafkaReaderWriter(
 
         logsByDir.get(absolutePath) match {
           case Some(logs) =>
-            val replicaInfos = logs.filter(log =>
-              partitions.contains(log.topicPartition)).map(log => log.topicPartition -> new ReplicaInfo(log.size, getLogEndOffsetLag(log.topicPartition), false)).toMap
+            val replicaInfos = logs.filter { log =>
+              partitions.contains(log.topicPartition)
+            }.map { log =>
+              log.topicPartition -> new ReplicaInfo(log.size, getLogEndOffsetLag(log.topicPartition, log.logEndOffset, log.isFuture), log.isFuture)
+            }.toMap
 
             (absolutePath, new LogDirInfo(Errors.NONE, replicaInfos.asJava))
           case None =>
@@ -562,52 +586,20 @@ class KafkaReaderWriter(
     }.toMap
   }
 
-  def getLogEndOffset(topicPartition: TopicPartition): Long = {
+  def getLogEndOffsetLag(topicPartition: TopicPartition, logEndOffset: Long, isFuture: Boolean): Long = {
     getReplica(topicPartition) match {
       case Some(replica) =>
-        replica.log.get.logEndOffset
+        if (isFuture)
+          replica.logEndOffset.messageOffset - logEndOffset
+        else
+          math.max(replica.highWatermark.messageOffset - logEndOffset, 0)
       case None =>
-        // return -1L to indicate that the LEO is not available if broker is neither follower or leader of this partition
-        -1L
-    }
-  }
-
-  def getLogEndOffsetLag(topicPartition: TopicPartition): Long = {
-    getReplica(topicPartition) match {
-      case Some(replica) =>
-        math.max(replica.highWatermark.messageOffset - replica.log.get.logEndOffset, 0)
-      case None =>
-        // return -1L to indicate that the LEO lag is not available if broker is neither follower or leader of this partition
+        // return -1L to indicate that the LEO lag is not available if the replica is not created or is offline
         DescribeLogDirsResponse.INVALID_OFFSET_LAG
     }
   }
 
-  def stopReplica(topicPartition: TopicPartition, deletePartition: Boolean) = {
-    //stateChangeLogger.trace(s"Handling stop replica (delete=$deletePartition) for partition $topicPartition")
-
-    if (deletePartition) {
-      val removedPartition = allPartitions.remove(topicPartition)
-      if (removedPartition eq KafkaReaderWriter.OfflinePartition)
-        throw new KafkaStorageException(s"Partition $topicPartition is on an offline disk")
-
-      if (removedPartition != null) {
-        val topicHasPartitions = allPartitions.values.exists(partition => topicPartition.topic == partition.topic)
-        if (!topicHasPartitions)
-          brokerTopicStats.removeMetrics(topicPartition.topic)
-        // this will delete the local log. This call may throw exception if the log is on offline directory
-        removedPartition.delete()
-      } else {
-        //stateChangeLogger.trace(s"Ignoring stop replica (delete=$deletePartition) for partition $topicPartition as replica doesn't exist on broker")
-      }
-
-      // Delete log and corresponding folders in case replica manager doesn't hold them anymore.
-      // This could happen when topic is being deleted while broker is down and recovers.
-      if (logManager.getLog(topicPartition).isDefined)
-        logManager.asyncDelete(topicPartition)
-      //if (logManager.getLog(topicPartition, isFuture = true).isDefined)
-      //  logManager.asyncDelete(topicPartition, isFuture = true)
-    }
-    //stateChangeLogger.trace(s"Finished handling stop replica (delete=$deletePartition) for partition $topicPartition")
-  }
+  def getLogEndOffset(topicPartition: TopicPartition): Option[Long] =
+    nonOfflinePartition(topicPartition).flatMap(_.leaderReplicaIfLocal.map(_.logEndOffset.messageOffset))
 
 }

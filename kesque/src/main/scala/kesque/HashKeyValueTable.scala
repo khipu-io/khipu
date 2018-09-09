@@ -188,7 +188,7 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
                 val record = if (t < 0) new SimpleRecord(k, v) else new SimpleRecord(t, k, v)
                 (records :+ record, keyToPrevOffsets += hash -> prevOffset)
               } else {
-                //log.debug(s"$topic: value not changed. cache hit ${caches(valueIndex).hitCount}, miss ${caches(valueIndex).missCount}, size ${caches(valueIndex).size}")
+                debug(s"$topic: value not changed. cache hit ${caches(valueIndex).hitCount}, miss ${caches(valueIndex).missCount}, size ${caches(valueIndex).size}")
                 acc
               }
             case None =>
@@ -198,33 +198,37 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
       }
 
       val indexRecords = db.write(topic, records).foldLeft(Vector[Vector[SimpleRecord]]()) {
-        case (indexRecords, (topicPartition, LogAppendResult(info, Some(ex)))) =>
+        case (indexRecords, (topicPartition, LogAppendResult(appendInfo, Some(ex)))) =>
           error(ex.getMessage, ex) // TODO
           indexRecords
 
-        case (indexRecords, (topicPartition, LogAppendResult(info, None))) =>
-          val firstOffert = info.firstOffset.getOrElse(0L)
-          val (lastOffset, parIdxRecords) = kvs.foldLeft(firstOffert, Vector[SimpleRecord]()) {
-            case ((offset, parIdxRecords), Record(k, v, t)) =>
-              val hash = Hash(k)
-              val hashCode = hash.hashCode
-              val indexRecord = new SimpleRecord(intToBytes(hashCode), intToBytes(offset.toInt))
+        case (indexRecords, (topicPartition, LogAppendResult(appendInfo, None))) =>
+          if (appendInfo.numMessages > 0) {
+            val firstOffert = appendInfo.firstOffset.get
+            val (lastOffset, parIdxRecords) = kvs.foldLeft(firstOffert, Vector[SimpleRecord]()) {
+              case ((offset, parIdxRecords), Record(k, v, t)) =>
+                val hash = Hash(k)
+                val hashCode = hash.hashCode
+                val indexRecord = new SimpleRecord(intToBytes(hashCode), intToBytes(offset.toInt))
 
-              keyToPrevOffsets.get(hash) match {
-                case Some(prevOffset) => // there is prevOffset, will also remove it (replace it with current one)
-                  hashOffsets.replace(hashCode, prevOffset.toInt, offset.toInt, valueIndex)
-                case None => // there is none prevOffset
-                  hashOffsets.put(hashCode, offset.toInt, valueIndex)
-              }
-              caches(valueIndex).put(hash, (TVal(v, t), offset.toInt))
-              (offset + 1, parIdxRecords :+ indexRecord)
-          }
-          if (kvs.nonEmpty) {
-            assert(info.lastOffset == lastOffset - 1, s"lastOffset(${info.lastOffset}) != ${lastOffset - 1}, firstOffset is ${info.firstOffset}")
-            val count = info.lastOffset - firstOffert + 1
-          }
+                keyToPrevOffsets.get(hash) match {
+                  case Some(prevOffset) => // there is prevOffset, will also remove it (replace it with current one)
+                    hashOffsets.replace(hashCode, prevOffset.toInt, offset.toInt, valueIndex)
+                  case None => // there is none prevOffset
+                    hashOffsets.put(hashCode, offset.toInt, valueIndex)
+                }
+                caches(valueIndex).put(hash, (TVal(v, t), offset.toInt))
+                (offset + 1, parIdxRecords :+ indexRecord)
+            }
+            if (kvs.nonEmpty) {
+              assert(appendInfo.lastOffset == lastOffset - 1, s"lastOffset(${appendInfo.lastOffset}) != ${lastOffset - 1}, firstOffset is ${appendInfo.firstOffset}")
+              val count = appendInfo.lastOffset - firstOffert + 1
+            }
 
-          indexRecords :+ parIdxRecords
+            indexRecords :+ parIdxRecords
+          } else {
+            indexRecords
+          }
       }
 
       db.write(indexTopics(valueIndex), indexRecords.flatten) map {
@@ -258,12 +262,12 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
       caches(valueIndex).remove(keys.map(Hash(_)))
       val records = keys map { key => new SimpleRecord(key, null) }
       val indexRecords = db.write(topic, records).foldLeft(Vector[Vector[SimpleRecord]]()) {
-        case (indexRecords, (topicPartition, LogAppendResult(info, Some(ex)))) =>
+        case (indexRecords, (topicPartition, LogAppendResult(appendInfo, Some(ex)))) =>
           error(ex.getMessage, ex) // TODO
           indexRecords
 
-        case (indexRecords, (topicPartition, LogAppendResult(info, None))) =>
-          val firstOffert = info.firstOffset.getOrElse(0L)
+        case (indexRecords, (topicPartition, LogAppendResult(appendInfo, None))) =>
+          val firstOffert = appendInfo.firstOffset.getOrElse(0L)
           val (lastOffset, parIdxRecords) = keys.foldLeft(firstOffert, Vector[SimpleRecord]()) {
             case ((offset, parIdxRecords), k) =>
               val hash = Hash(k)
@@ -276,8 +280,8 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
               (offset + 1, parIdxRecords :+ indexRecord)
           }
           if (keys.nonEmpty) {
-            assert(info.lastOffset == lastOffset - 1, s"lastOffset ${info.lastOffset} != ${lastOffset - 1} ")
-            val count = info.lastOffset - firstOffert + 1
+            assert(appendInfo.lastOffset == lastOffset - 1, s"lastOffset(${appendInfo.lastOffset}) != ${lastOffset - 1}, firstOffset is ${appendInfo.firstOffset}")
+            val count = appendInfo.lastOffset - firstOffert + 1
           }
 
           indexRecords :+ parIdxRecords

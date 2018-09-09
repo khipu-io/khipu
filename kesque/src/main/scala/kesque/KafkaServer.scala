@@ -121,7 +121,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM) extends Log
 
   var logDirFailureChannel: LogDirFailureChannel = null
   var logManager: LogManager = null
-  var readerWriter: KafkaReaderWriter = null
+  var replicaManager: ReplicaManager = null
   var metadataCache: MetadataCache = null
 
   var kafkaScheduler: KafkaScheduler = null
@@ -153,7 +153,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM) extends Log
       logManager.startup()
 
       metadataCache = new MetadataCache(config.brokerId)
-      readerWriter = createReaderWriter()
+      replicaManager = createReplicaManager()
     } catch {
       case e: Throwable =>
         fatal("Fatal error during KafkaServer startup. Prepare to shutdown", e)
@@ -206,8 +206,8 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM) extends Log
     }
   }
 
-  protected def createReaderWriter(): KafkaReaderWriter =
-    new KafkaReaderWriter(config, time, logManager, brokerTopicStats, metadataCache, logDirFailureChannel)
+  protected def createReplicaManager(): ReplicaManager =
+    new ReplicaManager(config, time, logManager, brokerTopicStats, metadataCache, logDirFailureChannel)
 
   /**
    * Generates new brokerId if enabled or reads from meta.properties based on following conditions
