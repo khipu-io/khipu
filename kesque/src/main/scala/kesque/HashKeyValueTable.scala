@@ -4,20 +4,28 @@ import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
+import org.apache.kafka.common.record.DefaultRecordBatch
 import org.apache.kafka.common.record.SimpleRecord
 import scala.collection.mutable
 
 object HashKeyValueTable {
   val fetchMaxBytesInLoadOffsets = 100 * 1024 * 1024 // 100M
+  val defaultFetchMaxBytes = 256 * 1024 // 256K 
 
   def intToBytes(v: Int) = ByteBuffer.allocate(4).putInt(v).array
   def bytesToInt(v: Array[Byte]) = ByteBuffer.wrap(v).getInt
 }
-final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque, withTimeToKey: Boolean, fetchMaxBytes: Int = 102400, cacheSize: Int = 10000) extends Logging {
+final class HashKeyValueTable private[kesque] (
+    topics: Array[String], db: Kesque, withTimeToKey: Boolean,
+    fetchMaxBytes: Int = HashKeyValueTable.defaultFetchMaxBytes, cacheSize: Int = 10000
+) extends Logging {
   import HashKeyValueTable._
 
   private val hashOffsets = new HashOffsets(200, topics.length)
-  private var timeIndex = Array.ofDim[Array[Byte]](200) // time to key table, should use first topic to initially create it
+  
+  /* time to key table, should be the first topic to initially create it */
+  private var timeIndex = Array.ofDim[Array[Byte]](200)
+  
   private val caches = Array.ofDim[FIFOCache[Hash, (TVal, Int)]](topics.length)
   private val (topicIndex, _) = topics.foldLeft(Map[String, Int](), 0) {
     case ((map, i), topic) => (map + (topic -> i), i + 1)
@@ -72,7 +80,7 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
 
     var count = 0
     db.iterateOver(indexTopic, 0, fetchMaxBytesInLoadOffsets) {
-      case (offset, Record(hashCode, recordOffset, timestamp)) =>
+      case (offset, TKeyVal(hashCode, recordOffset, timestamp)) =>
         if (hashCode != null && recordOffset != null) {
           hashOffsets.put(bytesToInt(hashCode), bytesToInt(recordOffset), valueIndex)
           count += 1
@@ -90,7 +98,7 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
 
     var count = 0
     db.iterateOver(topic, 0, fetchMaxBytesInLoadOffsets) {
-      case (offset, Record(key, value, timestamp)) =>
+      case (offset, TKeyVal(key, value, timestamp)) =>
         if (key != null && value != null) {
           putTimeToKey(timestamp, key)
           count += 1
@@ -151,7 +159,7 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
                 val offset = offsets(i)
                 val (topicPartition, result) = db.read(topic, offset, fetchMaxBytes).head
                 val recs = result.info.records.records.iterator
-                while (recs.hasNext) { // NOTE: the records are offset resversed !!
+                while (recs.hasNext) { // NOTE: the records are offset reversed !!
                   val rec = recs.next
                   if (rec.offset == offset && java.util.Arrays.equals(db.getBytes(rec.key), key)) {
                     foundOffset = offset
@@ -161,8 +169,8 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
                 i -= 1
               }
 
-              foundValue foreach { x =>
-                caches(valueIndex).put(hash, (x, foundOffset))
+              foundValue foreach { tv =>
+                caches(valueIndex).put(hash, (tv, foundOffset))
               }
 
               foundValue
@@ -174,30 +182,63 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
     }
   }
 
-  def write(kvs: Iterable[Record], topic: String): Iterable[Long] = {
+  def write(kvs: Iterable[TKeyVal], topic: String) = {
+    val topicIdx = topicIndex(topic)
+
+    // used to calc recordBatch size
+    val simpleRecords = new java.util.LinkedList[SimpleRecord]()
+
+    // create simple records, filter no changed ones
+    var recordBatches = Vector[(Vector[(TKeyVal, SimpleRecord)], Map[Hash, Int])]()
+    var records = List[(TKeyVal, SimpleRecord)]()
+    var keyToPrevOffsets = Map[Hash, Int]()
+    val itr = kvs.iterator
+    while (itr.hasNext) {
+      val tkv @ TKeyVal(key, value, timestamp) = itr.next()
+      val hash = Hash(key)
+      caches(topicIdx).get(hash) match {
+        case Some((TVal(prevValue, _), prevOffset)) =>
+          if (isValueChanged(value, prevValue)) {
+            val rec = if (timestamp < 0) new SimpleRecord(key, value) else new SimpleRecord(timestamp, key, value)
+            simpleRecords.add(rec)
+            records ::= tkv -> rec
+            keyToPrevOffsets += hash -> prevOffset
+          } else {
+            debug(s"$topic: value not changed. cache: hit ${caches(topicIdx).hitCount}, miss ${caches(topicIdx).missCount}, size ${caches(topicIdx).size}")
+          }
+        case None =>
+          val rec = if (timestamp < 0) new SimpleRecord(key, value) else new SimpleRecord(timestamp, key, value)
+          simpleRecords.add(rec)
+          records ::= tkv -> rec
+      }
+
+      val sizeInBytes = DefaultRecordBatch.sizeInBytes(simpleRecords)
+      if (sizeInBytes >= fetchMaxBytes) {
+        debug(s"sizeIbytes: $sizeInBytes, fetchMaxBytes: $fetchMaxBytes")
+
+        val (head :: tail) = records
+        recordBatches :+= (tail.toVector, keyToPrevOffsets)
+
+        simpleRecords.clear()
+        simpleRecords.add(head._2)
+        records = List(head)
+        keyToPrevOffsets = Map()
+      }
+    }
+    recordBatches :+= (records.toVector, keyToPrevOffsets)
+
+    debug(s"${recordBatches.map(x => x._1.size).mkString(",")}")
+    recordBatches map { case (records, keyToPrevOffsets) => writeRecords(records, keyToPrevOffsets, topic) }
+  }
+
+  private def writeRecords(records: Vector[(TKeyVal, SimpleRecord)], keyToPrevOffsets: Map[Hash, Int], topic: String): Iterable[Int] = {
     try {
       writeLock.lock()
 
-      val valueIndex = topicIndex(topic)
-      val (records, keyToPrevOffsets) = kvs.foldLeft(Vector[SimpleRecord](), mutable.Map[Hash, Int]()) {
-        case (acc @ (records, keyToPrevOffsets), Record(k, v, t)) =>
-          val hash = Hash(k)
-          caches(valueIndex).get(hash) match {
-            case Some((tval, prevOffset)) =>
-              if (isValueChanged(v, tval.value)) {
-                val record = if (t < 0) new SimpleRecord(k, v) else new SimpleRecord(t, k, v)
-                (records :+ record, keyToPrevOffsets += hash -> prevOffset)
-              } else {
-                debug(s"$topic: value not changed. cache hit ${caches(valueIndex).hitCount}, miss ${caches(valueIndex).missCount}, size ${caches(valueIndex).size}")
-                acc
-              }
-            case None =>
-              val record = if (t < 0) new SimpleRecord(k, v) else new SimpleRecord(t, k, v)
-              (records :+ record, keyToPrevOffsets)
-          }
-      }
+      val topicIdx = topicIndex(topic)
 
-      val indexRecords = db.write(topic, records).foldLeft(Vector[Vector[SimpleRecord]]()) {
+      // write simple records and create index records
+      val indexRecords = db.write(topic, records.map(_._2)).foldLeft(Vector[Vector[SimpleRecord]]()) {
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, Some(ex)))) =>
           error(ex.getMessage, ex) // TODO
           indexRecords
@@ -205,40 +246,39 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, None))) =>
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
-            val (lastOffset, parIdxRecords) = kvs.foldLeft(firstOffert, Vector[SimpleRecord]()) {
-              case ((offset, parIdxRecords), Record(k, v, t)) =>
-                val hash = Hash(k)
+            val (lastOffset, idxRecords) = records.foldLeft(firstOffert, Vector[SimpleRecord]()) {
+              case ((offset, idxRecords), (TKeyVal(key, value, timestamp), _)) =>
+                val hash = Hash(key)
                 val hashCode = hash.hashCode
                 val indexRecord = new SimpleRecord(intToBytes(hashCode), intToBytes(offset.toInt))
 
                 keyToPrevOffsets.get(hash) match {
                   case Some(prevOffset) => // there is prevOffset, will also remove it (replace it with current one)
-                    hashOffsets.replace(hashCode, prevOffset.toInt, offset.toInt, valueIndex)
+                    hashOffsets.replace(hashCode, prevOffset, offset.toInt, topicIdx)
                   case None => // there is none prevOffset
-                    hashOffsets.put(hashCode, offset.toInt, valueIndex)
+                    hashOffsets.put(hashCode, offset.toInt, topicIdx)
                 }
-                caches(valueIndex).put(hash, (TVal(v, t), offset.toInt))
-                (offset + 1, parIdxRecords :+ indexRecord)
-            }
-            if (kvs.nonEmpty) {
-              assert(appendInfo.lastOffset == lastOffset - 1, s"lastOffset(${appendInfo.lastOffset}) != ${lastOffset - 1}, firstOffset is ${appendInfo.firstOffset}")
-              val count = appendInfo.lastOffset - firstOffert + 1
+                caches(topicIdx).put(hash, (TVal(value, timestamp), offset.toInt))
+                (offset + 1, idxRecords :+ indexRecord)
             }
 
-            indexRecords :+ parIdxRecords
+            assert(appendInfo.lastOffset == lastOffset - 1, s"lastOffset(${appendInfo.lastOffset}) != ${lastOffset - 1}, firstOffset is ${appendInfo.firstOffset}, numOfMessages is ${appendInfo.numMessages}, numRecords is ${records.size}, appendInfo: $appendInfo")
+
+            indexRecords :+ idxRecords
           } else {
             indexRecords
           }
       }
 
-      db.write(indexTopics(valueIndex), indexRecords.flatten) map {
+      // write index records
+      db.write(indexTopics(topicIdx), indexRecords.flatten) map {
         case (topicPartition, LogAppendResult(appendInfo, Some(ex))) =>
           error(ex.getMessage, ex) // TODO
         case (topicPartition, LogAppendResult(appendInfo, None)) =>
-          debug(s"$topic: append index records $indexRecords")
+          debug(s"$topic: append index records ${indexRecords.size}")
       }
 
-      indexRecords.map(_.size.toLong)
+      indexRecords.map(_.size)
     } finally {
       writeLock.unlock()
     }
@@ -254,53 +294,60 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
     }
   }
 
-  def remove(keys: Seq[Array[Byte]], topic: String) = {
+  def remove(keys: Seq[Array[Byte]], topic: String): Iterable[Int] = {
     try {
       writeLock.lock()
 
-      val valueIndex = topicIndex(topic)
-      caches(valueIndex).remove(keys.map(Hash(_)))
-      val records = keys map { key => new SimpleRecord(key, null) }
-      val indexRecords = db.write(topic, records).foldLeft(Vector[Vector[SimpleRecord]]()) {
+      val topicIdx = topicIndex(topic)
+      caches(topicIdx).remove(keys.map(Hash(_)))
+
+      // create simple records
+      val records = keys map { key => key -> new SimpleRecord(key, null) }
+
+      // write simple records and create index records
+      val indexRecords = db.write(topic, records.map(_._2)).foldLeft(Vector[Vector[SimpleRecord]]()) {
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, Some(ex)))) =>
           error(ex.getMessage, ex) // TODO
           indexRecords
 
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, None))) =>
-          val firstOffert = appendInfo.firstOffset.getOrElse(0L)
-          val (lastOffset, parIdxRecords) = keys.foldLeft(firstOffert, Vector[SimpleRecord]()) {
-            case ((offset, parIdxRecords), k) =>
-              val hash = Hash(k)
-              val hashCode = hash.hashCode
-              val indexRecord = new SimpleRecord(intToBytes(hashCode), intToBytes(offset.toInt))
+          if (appendInfo.numMessages > 0) {
+            val firstOffert = appendInfo.firstOffset.get
+            val (lastOffset, idxRecords) = records.foldLeft(firstOffert, Vector[SimpleRecord]()) {
+              case ((offset, idxRecords), (key, _)) =>
+                val hash = Hash(key)
+                val hashCode = hash.hashCode
+                val indexRecord = new SimpleRecord(intToBytes(hashCode), intToBytes(offset.toInt))
 
-              hashOffsets.put(hashCode, offset.toInt, valueIndex)
-              // should also find and remove previous offsets? it will cost 
-              // a i/o reading. Not necessary or do it in write
-              (offset + 1, parIdxRecords :+ indexRecord)
-          }
-          if (keys.nonEmpty) {
-            assert(appendInfo.lastOffset == lastOffset - 1, s"lastOffset(${appendInfo.lastOffset}) != ${lastOffset - 1}, firstOffset is ${appendInfo.firstOffset}")
-            val count = appendInfo.lastOffset - firstOffert + 1
-          }
+                hashOffsets.put(hashCode, offset.toInt, topicIdx)
+                // should also find and remove previous offsets? it will cost 
+                // a i/o reading. Not necessary or do it in write
+                (offset + 1, idxRecords :+ indexRecord)
+            }
 
-          indexRecords :+ parIdxRecords
+            assert(appendInfo.lastOffset == lastOffset - 1, s"lastOffset(${appendInfo.lastOffset}) != ${lastOffset - 1}, firstOffset is ${appendInfo.firstOffset}, numOfMessages is ${appendInfo.numMessages}, numRecords is ${keys.size}, appendInfo: $appendInfo")
+
+            indexRecords :+ idxRecords
+          } else {
+            indexRecords
+          }
       }
 
-      db.write(indexTopics(valueIndex), indexRecords.flatten) map {
+      // write index records
+      db.write(indexTopics(topicIdx), indexRecords.flatten) map {
         case (topicPartition, LogAppendResult(appendInfo, Some(ex))) =>
           error(ex.getMessage, ex) // TODO
         case (topicPartition, LogAppendResult(appendInfo, None)) =>
           debug(s"$topic: append index records $indexRecords")
       }
 
-      indexRecords.map(_.size.toLong)
+      indexRecords.map(_.size)
     } finally {
       writeLock.unlock()
     }
   }
 
-  def iterateOver(fetchOffset: Long, topic: String)(op: (Long, Record) => Unit) = {
+  def iterateOver(fetchOffset: Long, topic: String)(op: (Long, TKeyVal) => Unit) = {
     try {
       readLock.lock()
 
@@ -310,7 +357,7 @@ final class HashKeyValueTable private[kesque] (topics: Array[String], db: Kesque
     }
   }
 
-  def readOnce(fetchOffset: Long, topic: String)(op: (Long, Record) => Unit) = {
+  def readOnce(fetchOffset: Long, topic: String)(op: (Long, TKeyVal) => Unit) = {
     try {
       readLock.lock()
 

@@ -60,10 +60,10 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
 
       cacheMap.get(key) match {
         case None =>
-          _hitCount += 1
+          _missCount += 1
           None
         case some =>
-          _missCount += 1
+          _hitCount += 1
           some
       }
     } finally {

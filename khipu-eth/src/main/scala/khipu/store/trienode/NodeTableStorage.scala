@@ -5,9 +5,6 @@ import kesque.TVal
 import khipu.Hash
 import khipu.store.datasource.KesqueDataSource
 
-/**
- * Global node cache
- */
 final class NodeTableStorage(source: KesqueDataSource)(implicit system: ActorSystem) extends NodeKeyValueStorage {
   import system.dispatcher
 
@@ -18,8 +15,7 @@ final class NodeTableStorage(source: KesqueDataSource)(implicit system: ActorSys
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): NodeTableStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
-    toUpsert foreach { case (key, value) => source.put(key, TVal(value, -1L)) }
-    toRemove foreach { key => source.remove(key) }
+    source.update(toRemove, toUpsert map { case (key, value) => key -> TVal(value, -1L) })
     this
   }
 

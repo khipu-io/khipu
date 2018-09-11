@@ -111,10 +111,11 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     }
     lazy val kesque = new Kesque(kafkaProps)
     log.info(s"Kesque started using config file: $kafkaConfigFile")
+    // make sure enough fetchMaxBytes, especially with batched stored records, eg size of 400 storage nodes may > 102,400
     private val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(KesqueDataSource.account))),
-      Future(kesque.getTable(Array(KesqueDataSource.storage))),
-      Future(kesque.getTable(Array(KesqueDataSource.evmcode))),
+      Future(kesque.getTable(Array(KesqueDataSource.account), 262144)), // 256KB size
+      Future(kesque.getTable(Array(KesqueDataSource.storage), 262144)),
+      Future(kesque.getTable(Array(KesqueDataSource.evmcode), 262144)),
       Future(kesque.getTimedTable(Array(
         KesqueDataSource.header,
         KesqueDataSource.body,

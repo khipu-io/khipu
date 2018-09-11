@@ -38,23 +38,20 @@ object Kesque {
     val table = kesque.getTable(Array(topic))
 
     kesque.deleteTable(topic)
-    testWrite(table, topic)
+    (1 to 2) foreach { i => testWrite(table, topic, i) }
     testRead(table, topic)
 
     System.exit(0)
   }
 
-  def testWrite(table: HashKeyValueTable, topic: String) = {
-    val kvs = List(
-      Record("a".getBytes, "valuea".getBytes),
-      Record("b".getBytes, "valueb".getBytes),
-      Record("c".getBytes, "valuec".getBytes)
-    )
+  def testWrite(table: HashKeyValueTable, topic: String, seq: Int) = {
+    val kvs = 1 to 100000 map (i =>
+      TKeyVal(i.toString.getBytes, (s"value_$i").getBytes))
     table.write(kvs, topic)
   }
 
   def testRead(table: HashKeyValueTable, topic: String) {
-    val keys = List("a", "b", "c")
+    val keys = List("1", "2", "3")
     keys foreach { key =>
       val value = table.read(key.getBytes, topic) map (v => new String(v.value))
       println(value)
@@ -67,11 +64,11 @@ final class Kesque(props: Properties) {
 
   private val topicToTable = mutable.Map[String, HashKeyValueTable]()
 
-  def getTable(topics: Array[String], fetchMaxBytes: Int = 102400) = {
+  def getTable(topics: Array[String], fetchMaxBytes: Int = 262144) = {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, fetchMaxBytes))
   }
 
-  def getTimedTable(topics: Array[String], fetchMaxBytes: Int = 102400) = {
+  def getTimedTable(topics: Array[String], fetchMaxBytes: Int = 262144) = {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes))
   }
 
@@ -121,7 +118,7 @@ final class Kesque(props: Properties) {
    * @param fetchOffset
    * @param op: action applied on (offset, key, value)
    */
-  private[kesque] def iterateOver(topic: String, fetchOffset: Long = 0L, fetchMaxBytes: Int)(op: (Long, Record) => Unit) = {
+  private[kesque] def iterateOver(topic: String, fetchOffset: Long = 0L, fetchMaxBytes: Int)(op: (Long, TKeyVal) => Unit) = {
     var offset = fetchOffset
     var nRead = 0
     do {
@@ -138,7 +135,7 @@ final class Kesque(props: Properties) {
    * @param fetchOffset
    * @param op: action applied on (offset, key, value)
    */
-  private[kesque] def readOnce(topic: String, fetchOffset: Long, fetchMaxBytes: Int)(op: (Long, Record) => Unit) = {
+  private[kesque] def readOnce(topic: String, fetchOffset: Long, fetchMaxBytes: Int)(op: (Long, TKeyVal) => Unit) = {
     val (topicPartition, result) = read(topic, fetchOffset, fetchMaxBytes).head
     val recs = result.info.records.records.iterator
     var i = 0
@@ -149,7 +146,7 @@ final class Kesque(props: Properties) {
       val value = if (rec.hasValue) getBytes(rec.value) else null
       val timestamp = rec.timestamp
       val offset = rec.offset
-      op(offset, Record(key, value, timestamp))
+      op(offset, TKeyVal(key, value, timestamp))
 
       lastOffset = offset
       i += 1
@@ -184,5 +181,5 @@ final class Kesque(props: Properties) {
 
 }
 
-final case class Record(key: Array[Byte], value: Array[Byte], timestamp: Long = -1L)
+final case class TKeyVal(key: Array[Byte], value: Array[Byte], timestamp: Long = -1L)
 final case class TVal(value: Array[Byte], timestamp: Long)

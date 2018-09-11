@@ -1,7 +1,7 @@
 ## Khipu: A Scala/Akka implementation of the Ethereum protocol
 
 Khipu is developed and maintained by khipu.io Team.
-It is built on earlier work on Mantis by [Grothendieck Team](https://iohk.io/projects/ethereum-classic/).
+It is built on earlier work on Mantis by [Grothendieck Team](https://iohk.io/projects/ethereum-classic/), but supports ETH.
 
 The major researches of Khipu so far:
 
