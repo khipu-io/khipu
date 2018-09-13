@@ -117,7 +117,6 @@ object Dependencies {
     "ch.megard" %% "akka-http-cors" % "0.2.1",
     "org.json4s" %% "json4s-native" % "3.5.1",
     "de.heikoseeberger" %% "akka-http-json4s" % "1.11.0",
-    "io.suzaku" %% "boopickle" % "1.2.6",
     "org.consensusresearch" %% "scrypto" % "1.2.0-RC3",
     "org.scorexfoundation" %% "iodb" % "0.3.0",
     "org.jline" % "jline" % "3.1.2",

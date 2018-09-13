@@ -22,10 +22,10 @@ final class HashKeyValueTable private[kesque] (
   import HashKeyValueTable._
 
   private val hashOffsets = new HashOffsets(200, topics.length)
-  
+
   /* time to key table, should be the first topic to initially create it */
   private var timeIndex = Array.ofDim[Array[Byte]](200)
-  
+
   private val caches = Array.ofDim[FIFOCache[Hash, (TVal, Int)]](topics.length)
   private val (topicIndex, _) = topics.foldLeft(Map[String, Int](), 0) {
     case ((map, i), topic) => (map + (topic -> i), i + 1)
