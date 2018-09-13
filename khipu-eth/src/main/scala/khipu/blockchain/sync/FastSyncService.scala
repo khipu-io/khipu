@@ -394,7 +394,6 @@ trait FastSyncService { _: SyncService =>
           val blockchainOnlys = blockchainOnlyPeers.values.toSet
           val nodeWorks = unassignedPeers.filterNot(blockchainOnlys.contains)
             .take(maxConcurrentRequests - workingPeers.size)
-            .toSeq.sortBy(_.id)
             .foldLeft(Vector[(Peer, List[NodeHash])]()) {
               case (acc, peer) =>
                 if (syncState.pendingNonMptNodes.nonEmpty || syncState.pendingMptNodes.nonEmpty) {
@@ -464,7 +463,6 @@ trait FastSyncService { _: SyncService =>
         if (isThereHeaderToDownload && headerWorkingPeer.isEmpty) {
           val candicates = unassignedPeers
             .take(maxConcurrentRequests - workingPeers.size)
-            .toSeq.sortBy(_.id).take(3)
 
           val headerWorks = nextPeer(candicates) flatMap { peer =>
             if (isThereHeaderToDownload && headerWorkingPeer.isEmpty) {
