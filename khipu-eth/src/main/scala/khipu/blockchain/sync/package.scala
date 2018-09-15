@@ -159,7 +159,7 @@ package object sync {
     }
   }
 
-  final case class ReceiptsResponse(peerId: String, remainingHashes: List[Hash], receivedHashes: List[Hash], receiptsToSave: List[(Hash, Seq[Receipt])]) extends PeerResponse
+  final case class ReceiptsResponse(peerId: String, remainingHashes: List[Hash], receivedHashes: List[Hash], receipts: List[Seq[Receipt]]) extends PeerResponse
   final case class ReceiptsRequest(peerId: String, message: PV63.GetReceipts) extends RequestToPeer[PV63.Receipts, ReceiptsResponse] {
     def messageToSend = message
 
@@ -168,12 +168,29 @@ package object sync {
       if (receipts.receiptsForBlocks.isEmpty) {
         None
       } else {
-        val receiptsToSave = (requestHashes zip receipts.receiptsForBlocks)
+        val receivedReceipts = receipts.receiptsForBlocks.toList
+        val receivedHashes = requestHashes.take(receivedReceipts.size)
+        val remainingHashes = requestHashes.drop(receivedReceipts.size)
 
-        val receivedHashes = requestHashes.take(receipts.receiptsForBlocks.size)
-        val remainingHashes = requestHashes.drop(receipts.receiptsForBlocks.size)
+        Some(ReceiptsResponse(peerId, remainingHashes, receivedHashes, receivedReceipts))
+      }
+    }
+  }
 
-        Some(ReceiptsResponse(peerId, remainingHashes, receivedHashes, receiptsToSave))
+  final case class BlockBodiesResponse(peerId: String, remainingHashes: List[Hash], receivedHashes: List[Hash], bodies: List[PV62.BlockBody]) extends PeerResponse
+  final case class BlockBodiesRequest(peerId: String, message: PV62.GetBlockBodies) extends RequestToPeer[PV62.BlockBodies, BlockBodiesResponse] {
+    def messageToSend = message
+
+    def processResponse(blockBodies: PV62.BlockBodies) = {
+      val requestedHashes = message.hashes.toList
+      if (blockBodies.bodies.isEmpty) {
+        None
+      } else {
+        val receivedBodies = blockBodies.bodies.toList
+        val receivedHashes = requestedHashes.take(receivedBodies.size)
+        val remainingHashes = requestedHashes.drop(receivedBodies.size)
+
+        Some(BlockBodiesResponse(peerId, remainingHashes, receivedHashes, receivedBodies))
       }
     }
   }
@@ -203,20 +220,6 @@ package object sync {
         }
       } else {
         true
-      }
-    }
-  }
-
-  final case class BlockBodiesResponse(peerId: String, bodies: List[PV62.BlockBody]) extends PeerResponse
-  final case class BlockBodiesRequest(peerId: String, message: PV62.GetBlockBodies) extends RequestToPeer[PV62.BlockBodies, BlockBodiesResponse] {
-    def messageToSend = message
-
-    def processResponse(blockBodies: PV62.BlockBodies) = {
-      val requestedHashes = message.hashes
-      if (blockBodies.bodies.isEmpty) {
-        None
-      } else {
-        Some(BlockBodiesResponse(peerId, blockBodies.bodies.toList))
       }
     }
   }

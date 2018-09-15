@@ -181,9 +181,10 @@ trait RegularSyncService { _: SyncService =>
 
   private def doProcessBlockHeaders(peer: Peer, headers: List[BlockHeader]) {
     if (checkHeaders(headers)) {
-      blockchain.getBlockHeaderByNumber(headers.head.number - 1) match {
+      val firstHeader = headers.head
+      blockchain.getBlockHeaderByNumber(firstHeader.number - 1) match {
         case Some(parent) =>
-          if (parent.hash == headers.head.parentHash) {
+          if (parent.hash == firstHeader.parentHash) {
             // we have same chain prefix
             val oldBranch = getPrevBlocks(headers)
             val oldBranchTotalDifficulty = oldBranch.map(_.header.difficulty).foldLeft(BigInteger.ZERO)(_ add _)
@@ -197,7 +198,7 @@ trait RegularSyncService { _: SyncService =>
               log.debug(s"Request block bodies from $peer")
 
               requestingBodies(peer, hashes)(syncRequestTimeout.plus((hashes.size * 100).millis)) andThen {
-                case Success(Some(BlockBodiesResponse(peerId, bodies))) =>
+                case Success(Some(BlockBodiesResponse(peerId, remainingHashes, receivedHashes, bodies))) =>
                   log.debug(s"Got block bodies from $peer")
                   self ! ProcessBlockBodies(peer, bodies)
 
@@ -216,19 +217,19 @@ trait RegularSyncService { _: SyncService =>
 
             } else {
               // add first block from branch as ommer
-              headers.headOption foreach { header => ommersPool ! OmmersPool.AddOmmers(List(header)) }
+              ommersPool ! OmmersPool.AddOmmers(List(firstHeader))
               scheduleResume()
             }
 
           } else {
             log.info(s"[sync] Received branch block ${headers.head.number} from ${peer.id}, resolving fork ...")
 
-            requestingHeaders(peer, None, Right(headers.head.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) andThen {
+            requestingHeaders(peer, None, Right(firstHeader.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) andThen {
               case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
                 self ! ProcessBlockHeaders(peer, headers)
 
-              case Success(Some(BlockHeadersResponse(peerId, headers, false))) =>
-                blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: ${headers.head.parentHash}")
+              case Success(Some(BlockHeadersResponse(peerId, List(), false))) =>
+                blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: ${firstHeader.parentHash}")
 
               case Success(None) =>
                 scheduleResume()
@@ -243,7 +244,7 @@ trait RegularSyncService { _: SyncService =>
 
         case None =>
           log.info(s"[warn] Received block header ${headers.head.number} without parent from ${peer.id}, trying to lookback to ${headers.head.number - 1}")
-          lookbackFromBlock = Some(headers.head.number - 1)
+          lookbackFromBlock = Some(firstHeader.number - 1)
           blockPeerAndResumeWithAnotherOne(peer, s"Got block header ${headers.head.number} that does not have parent")
       }
     } else {
@@ -305,7 +306,7 @@ trait RegularSyncService { _: SyncService =>
                     log.debug(s"Request block bodies from $peer")
 
                     requestingBodies(peer, hashes)(syncRequestTimeout.plus((hashes.size * 100).millis)) andThen {
-                      case Success(Some(BlockBodiesResponse(peerId, bodies))) =>
+                      case Success(Some(BlockBodiesResponse(peerId, remainingHashes, receivedHashes, bodies))) =>
                         log.debug(s"Got block bodies from $peer")
                         self ! ProcessBlockBodies(peer, bodies)
 

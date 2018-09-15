@@ -27,6 +27,7 @@ object JsonRpcHttpServer {
   }
 
 }
+// curl localhost:8546 -H 'Content-Type: application/json' -X POST --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":[5000000, true],"id":1}' 
 class JsonRpcHttpServer(jsonRpcController: JsonRpcController, config: JsonRpcHttpServerConfig)(implicit val system: ActorSystem) extends Json4sSupport {
 
   private val log = Logging(system, this.getClass)

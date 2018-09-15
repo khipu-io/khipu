@@ -71,12 +71,12 @@ object FastSyncService {
 
   )
 
-  sealed trait Works
-  final case class BlockBodyWorks(hashes: List[Hash], syncedBlockNumber: Option[Long]) extends Works
-  final case class ReceiptWorks(hashes: List[Hash], syncedBlockNumber: Option[Long]) extends Works
-  final case class NodeWorks(hashes: List[NodeHash], downloadedCount: Option[Int]) extends Works
+  sealed trait Work
+  final case class BlockBodiesWork(hashes: List[Hash], syncedBlockNumber: Option[Long]) extends Work
+  final case class ReceiptsWork(hashes: List[Hash]) extends Work
+  final case class NodesWork(hashes: List[NodeHash], downloadedCount: Option[Int]) extends Work
 
-  final case class PeerWorkDone(peerId: String, works: Works)
+  final case class PeerWorkDone(peerId: String, work: Work)
   final case class HeaderWorkDone(peerId: String)
 
   final case class MarkPeerBlockchainOnly(peer: Peer)
@@ -311,19 +311,18 @@ trait FastSyncService { _: SyncService =>
       case ProcessSyncingTick =>
         processSyncing()
 
-      case PeerWorkDone(peerId, works) =>
+      case PeerWorkDone(peerId, work) =>
         workingPeers -= peerId
 
-        works match {
-          case BlockBodyWorks(hashes, syncedBlockNumber) =>
+        work match {
+          case BlockBodiesWork(hashes, syncedBlockNumber) =>
             syncState.workingBlockBodies --= hashes
-            syncedBlockNumber map (currSyncedBlockNumber = _)
+            syncedBlockNumber foreach (currSyncedBlockNumber = _)
 
-          case ReceiptWorks(hashes, syncedBlockNumber) =>
+          case ReceiptsWork(hashes) =>
             syncState.workingReceipts --= hashes
-            syncedBlockNumber map (currSyncedBlockNumber = _)
 
-          case NodeWorks(hashes, downloadedCount) =>
+          case NodesWork(hashes, downloadedCount) =>
             hashes foreach {
               case h: EvmcodeHash                => syncState.workingNonMptNodes -= h
               case h: StorageRootHash            => syncState.workingNonMptNodes -= h
@@ -523,26 +522,24 @@ trait FastSyncService { _: SyncService =>
       //log.debug(s"Request block headers: ${request.message.block.fold(n => n, _.hexString)}, bestBlockHeaderNumber is ${syncState.bestBlockHeaderNumber}, target is ${syncState.targetBlockNumber}")
       blockchain.getBlockHeaderByNumber(syncState.bestBlockHeaderNumber) match {
         case Some(parentHeader) =>
-          val future = requestingHeaders(peer, Some(parentHeader), Left(syncState.bestBlockHeaderNumber + 1), limit, skip = 0, reverse = false) map {
-            case Some(BlockHeadersResponse(peerId, headers, true)) =>
+          requestingHeaders(peer, Some(parentHeader), Left(syncState.bestBlockHeaderNumber + 1), limit, skip = 0, reverse = false) andThen {
+            case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
               log.debug(s"Got block headers ${headers.size} from ${peer.id} in ${System.currentTimeMillis - start}ms")
-              val blockHeaderObtained = insertHeaders(headers)
-              val blockHashes = blockHeaderObtained.map(_.hash)
+              val blockHeadersObtained = insertHeaders(headers)
+              val blockHashes = blockHeadersObtained.map(_.hash)
               self ! EnqueueBlockBodies(blockHashes)
               self ! EnqueueReceipts(blockHashes)
 
-            case Some(BlockHeadersResponse(peerId, headers, false)) =>
+            case Success(Some(BlockHeadersResponse(peerId, List(), false))) =>
               self ! BlacklistPeer(peer.id, s"Got block headers non-consistent for requested: ${syncState.bestBlockHeaderNumber + 1}")
 
-            case None =>
+            case Success(None) =>
               self ! BlacklistPeer(peer.id, s"Got block headers empty for known header: ${syncState.bestBlockHeaderNumber + 1}")
 
-          } andThen {
             case Failure(e: AskTimeoutException) =>
               self ! BlacklistPeer(peer.id, s"${e.getMessage}")
             case Failure(e) =>
               self ! BlacklistPeer(peer.id, s"${e.getMessage}")
-            case _ =>
           } andThen {
             case _ => self ! HeaderWorkDone(peer.id)
           }
@@ -555,21 +552,25 @@ trait FastSyncService { _: SyncService =>
       log.debug(s"Request block bodies from ${peer.id}")
       val start = System.currentTimeMillis
 
-      requestingBodies(peer, requestingHashes) flatMap {
-        case Some(BlockBodiesResponse(peerId, bodies)) =>
+      requestingBodies(peer, requestingHashes) andThen {
+        case Success(Some(BlockBodiesResponse(peerId, remainingHashes, receivedHashes, bodies))) =>
           log.debug(s"Got block bodies ${bodies.size} from ${peer.id} in ${System.currentTimeMillis - start}ms")
-          validateBlocks(requestingHashes, bodies) match {
+          validateBlocks(receivedHashes, bodies) match {
             case Valid =>
-              val receivedHashes = requestingHashes.take(bodies.size)
-              val remainingBlockBodies = requestingHashes.drop(bodies.size)
-
-              self ! EnqueueBlockBodies(remainingBlockBodies)
-              (persistenceService ? SaveBodies((requestingHashes zip bodies).toMap, receivedHashes))(5.seconds).mapTo[Option[Long]]
+              self ! EnqueueBlockBodies(remainingHashes)
+              (persistenceService ? SaveBodies((receivedHashes zip bodies).toMap, receivedHashes))(20.seconds).mapTo[Option[Long]] andThen {
+                case Success(syncedBlockNumber) =>
+                  log.debug(s"SaveBodies success with syncedBlockNumber=$syncedBlockNumber")
+                  self ! PeerWorkDone(peer.id, BlockBodiesWork(requestingHashes, syncedBlockNumber))
+                case Failure(e) =>
+                  log.error(e, e.getMessage)
+                  self ! PeerWorkDone(peer.id, BlockBodiesWork(requestingHashes, None))
+              }
 
             case Invalid =>
               self ! EnqueueBlockBodies(requestingHashes)
               self ! BlacklistPeer(peerId, s"$peerId responded with invalid block bodies that are not matching block headers")
-              Future.successful(None)
+              self ! PeerWorkDone(peer.id, BlockBodiesWork(requestingHashes, None))
 
             case DbError =>
               log.error("DbError")
@@ -578,53 +579,53 @@ trait FastSyncService { _: SyncService =>
               //todo adjust the formula to minimize redownloaded block headers
               syncState.bestBlockHeaderNumber = syncState.bestBlockHeaderNumber - 2 * blockHeadersPerRequest
               log.warning("missing block header for known hash")
-              Future.successful(None)
+              self ! PeerWorkDone(peer.id, BlockBodiesWork(requestingHashes, None))
           }
 
-        case None =>
+        case Success(None) =>
           self ! BlacklistPeer(peer.id, s"Got block bodies empty response for known hashes ${peer.id}")
           self ! EnqueueBlockBodies(requestingHashes)
-          Future.successful(None)
+          self ! PeerWorkDone(peer.id, BlockBodiesWork(requestingHashes, None))
 
-      } andThen {
         case Failure(e: AskTimeoutException) =>
           self ! EnqueueBlockBodies(requestingHashes)
           self ! BlacklistPeer(peer.id, s"${e.getMessage}")
+          self ! PeerWorkDone(peer.id, BlockBodiesWork(requestingHashes, None))
+
         case Failure(e) =>
           self ! EnqueueBlockBodies(requestingHashes)
           self ! BlacklistPeer(peer.id, s"${e.getMessage}")
-      } andThen {
-        case Success(syncedNumber) => self ! PeerWorkDone(peer.id, BlockBodyWorks(requestingHashes, syncedNumber))
-        case Failure(_)            => self ! PeerWorkDone(peer.id, BlockBodyWorks(requestingHashes, None))
+          self ! PeerWorkDone(peer.id, BlockBodiesWork(requestingHashes, None))
       }
     }
 
     def requestReceipts(peer: Peer, requestingHashes: List[Hash]) {
       log.debug(s"Request receipts from ${peer.id}")
       val start = System.currentTimeMillis
-      requestingReceipts(peer, requestingHashes) flatMap {
-        case Some(ReceiptsResponse(peerId, remainingHashes, receivedHashes, receiptsToSave)) =>
-          log.debug(s"Got receipts ${receiptsToSave.size} from ${peer.id} in ${System.currentTimeMillis - start}ms")
+      requestingReceipts(peer, requestingHashes) andThen {
+        case Success(Some(ReceiptsResponse(peerId, remainingHashes, receivedHashes, receipts))) =>
+          log.debug(s"Got receipts ${receipts.size} from ${peer.id} in ${System.currentTimeMillis - start}ms")
 
           // TODO valid receipts
-          self ! EnqueueReceipts(remainingHashes)
-          (persistenceService ? SaveReceipts(receiptsToSave.toMap, receivedHashes))(5.seconds).mapTo[Option[Long]]
+          persistenceService ! SaveReceipts((receivedHashes zip receipts).toMap, receivedHashes)
 
-        case None =>
+          self ! EnqueueReceipts(remainingHashes)
+          self ! PeerWorkDone(peer.id, ReceiptsWork(requestingHashes))
+
+        case Success(None) =>
           self ! EnqueueReceipts(requestingHashes)
           self ! BlacklistPeer(peer.id, s"Got receipts empty for known hashes ${peer.id}")
-          Future(None)
+          self ! PeerWorkDone(peer.id, ReceiptsWork(requestingHashes))
 
-      } andThen {
         case Failure(e: AskTimeoutException) =>
           self ! EnqueueReceipts(requestingHashes)
           self ! BlacklistPeer(peer.id, s"${e.getMessage}")
+          self ! PeerWorkDone(peer.id, ReceiptsWork(requestingHashes))
+
         case Failure(e) =>
           self ! EnqueueReceipts(requestingHashes)
           self ! BlacklistPeer(peer.id, s"${e.getMessage}")
-      } andThen {
-        case Success(syncedNumber) => self ! PeerWorkDone(peer.id, ReceiptWorks(requestingHashes, syncedNumber))
-        case Failure(_)            => self ! PeerWorkDone(peer.id, ReceiptWorks(requestingHashes, None))
+          self ! PeerWorkDone(peer.id, ReceiptsWork(requestingHashes))
       }
     }
 
@@ -632,7 +633,7 @@ trait FastSyncService { _: SyncService =>
       log.debug(s"Request nodes from ${peer.id}")
       val start = System.currentTimeMillis
 
-      requestingNodeDatas(peer, requestingHashes) transform {
+      requestingNodeDatas(peer, requestingHashes) andThen {
         case Success(Some(NodeDatasResponse(peerId, nDownloadedNodes, remainingHashes, childrenHashes, accounts, storages, evmcodes))) =>
           log.debug(s"Got nodes $nDownloadedNodes from ${peer.id} in ${System.currentTimeMillis - start}ms")
 
@@ -641,34 +642,30 @@ trait FastSyncService { _: SyncService =>
           persistenceService ! SaveEvmcodes(evmcodes.toMap)
 
           self ! EnqueueNodes(remainingHashes ++ childrenHashes)
-          Success(nDownloadedNodes)
+          self ! PeerWorkDone(peer.id, NodesWork(requestingHashes, Some(nDownloadedNodes)))
 
         case Success(None) =>
           log.debug(s"Got nodes empty response for known hashes. Mark ${peer.id} blockchain only")
           self ! EnqueueNodes(requestingHashes)
           self ! MarkPeerBlockchainOnly(peer)
-          Failure(new RuntimeException(s"Got nodes empty response for known hashes. Mark ${peer.id} blockchain only"))
+          self ! PeerWorkDone(peer.id, NodesWork(requestingHashes, None))
 
         case Failure(e: AskTimeoutException) =>
           log.debug(s"Got node $e when request nodes. Mark ${peer.id} blockchain only")
           self ! EnqueueNodes(requestingHashes)
           self ! MarkPeerBlockchainOnly(peer)
-          Failure(e)
+          self ! PeerWorkDone(peer.id, NodesWork(requestingHashes, None))
 
         case Failure(e) =>
           log.debug(s"Got node $e when request nodes. Mark ${peer.id} blockchain only")
           self ! EnqueueNodes(requestingHashes)
           self ! MarkPeerBlockchainOnly(peer)
-          Failure(e)
-
-      } andThen {
-        case Success(nDownloadNodes) => self ! PeerWorkDone(peer.id, NodeWorks(requestingHashes, Some(nDownloadNodes)))
-        case Failure(_)              => self ! PeerWorkDone(peer.id, NodeWorks(requestingHashes, None))
+          self ! PeerWorkDone(peer.id, NodesWork(requestingHashes, None))
       }
     }
 
-    private def validateBlocks(requestHashes: Seq[Hash], blockBodies: Seq[PV62.BlockBody]): BlockBodyValidationResult = {
-      val headerToBody = (requestHashes zip blockBodies).map {
+    private def validateBlocks(receviedHashes: Seq[Hash], blockBodies: Seq[PV62.BlockBody]): BlockBodyValidationResult = {
+      val headerToBody = (receviedHashes zip blockBodies).map {
         case (hash, body) => (blockchain.getBlockHeaderByHash(hash), body)
       }
 
@@ -808,7 +805,6 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
       val start = System.currentTimeMillis
       kvs foreach { case (k, v) => blockchain.saveReceipts(k, v) }
       log.debug(s"SaveReceipts ${kvs.size} in ${System.currentTimeMillis - start} ms")
-      sender() ! updateBestBlockIfNeeded(receivedHashes)
 
     case SaveAccountNodes(kvs) =>
       val start = System.currentTimeMillis
@@ -827,20 +823,19 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
       log.debug(s"SaveEvmcodes ${kvs.size} in ${System.currentTimeMillis - start} ms")
   }
 
-  private def updateBestBlockIfNeeded(receivedHashes: Seq[Hash]): Option[Long] = {
-    val syncedBlocks = receivedHashes.flatMap { hash =>
-      for {
-        header <- blockchain.getBlockHeaderByHash(hash)
-        _ <- blockchain.getBlockBodyByHash(hash)
-      } yield header
+  private def updateBestBlockIfNeeded(receivedBodyHashes: Seq[Hash]): Option[Long] = {
+    val blockNumbers = receivedBodyHashes flatMap { blockHash =>
+      blockchain.getBlockHeaderByHash(blockHash) map (_.number)
     }
 
-    val prevSyncedBlockNumber = appStateStorage.getBestBlockNumber
-    if (syncedBlocks.nonEmpty) {
-      val bestReceivedBlock = syncedBlocks.maxBy(_.number)
-      if (bestReceivedBlock.number > prevSyncedBlockNumber) {
-        appStateStorage.putBestBlockNumber(bestReceivedBlock.number)
-        Some(bestReceivedBlock.number)
+    if (blockNumbers.nonEmpty) {
+      val bestReceivedBlockNumber = blockNumbers.max
+      val prevSyncedBlockNumber = appStateStorage.getBestBlockNumber
+      log.debug(s"bestReceivedBlockNumber: ${bestReceivedBlockNumber}, prevSyncedBlockNumber: ${prevSyncedBlockNumber}")
+      if (bestReceivedBlockNumber > prevSyncedBlockNumber) {
+        appStateStorage.putBestBlockNumber(bestReceivedBlockNumber)
+        log.debug(s"bestReceivedBlockNumber: ${bestReceivedBlockNumber}, prevSyncedBlockNumber: ${prevSyncedBlockNumber}. Saved")
+        Some(bestReceivedBlockNumber)
       } else {
         None
       }

@@ -15,6 +15,7 @@ This version of the code supports
   - Peer discovery
   - Fast sync (download a recent state trie snapshot and all blocks, this is the default behaviour)
   - Regular sync (download and execute every transaction in every block in the chain), this will be enabled once fast sync finished
+  - JSON RPC API
 
 Features to be done
 
@@ -22,7 +23,6 @@ Features to be done
   - Reduce memory usage
   - CPU mining
   - Execute transactions in parallel in mining
-  - JSON RPC API (useful for console and Mist integration)
   - Morden testnet and private network
   - Unit tests
 
