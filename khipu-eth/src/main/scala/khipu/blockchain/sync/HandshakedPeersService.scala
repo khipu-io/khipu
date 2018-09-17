@@ -1,5 +1,7 @@
 package khipu.blockchain.sync
 
+import akka.pattern.AskTimeoutException
+import khipu.domain.BlockHeader
 import khipu.network.handshake.EtcHandshake.PeerInfo
 import khipu.network.p2p.messages.WireProtocol.Disconnect
 import khipu.network.rlpx.IncomingPeer
@@ -9,7 +11,11 @@ import khipu.network.rlpx.PeerEntity
 import khipu.network.rlpx.PeerManager
 import khipu.store.AppStateStorage
 import khipu.util
+import scala.concurrent.duration._
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import scala.util.Failure
+import scala.util.Success
 
 object HandshakedPeersService {
   final case class BlacklistPeer(peerId: String, reason: String, always: Boolean = false)
@@ -29,12 +35,23 @@ trait HandshakedPeersService { _: SyncService =>
   protected var blacklistPeers = Set[String]()
   protected var blacklistCounts = Map[String, Int]()
 
+  protected var blockHeaderForChecking: Option[BlockHeader] = None
+  protected var headerWhitePeers = Set[Peer]()
+  protected var headerBlackPeers = Set[Peer]()
+
   def peerUpdateBehavior: Receive = {
     case PeerEntity.PeerHandshaked(peer, peerInfo) =>
       if (peerInfo.forkAccepted) {
         log.debug(s"[sync] added handshaked peer: $peer")
         handshakedPeers += (peer.id -> (peer, peerInfo))
         log.debug(s"[sync] handshaked peers: ${handshakedPeers.size}")
+
+        blockHeaderForChecking map checkPeerByBlockHeader(peer) map { f =>
+          f map {
+            case true  => headerWhitePeers += peer
+            case false =>
+          }
+        }
       }
 
     case PeerEntity.PeerDisconnected(peerId) if handshakedPeers.contains(peerId) =>
@@ -112,4 +129,28 @@ trait HandshakedPeersService { _: SyncService =>
   }
 
   def isBlacklisted(peerId: String): Boolean = blacklistPeers.contains(peerId) || blacklistCounts.getOrElse(peerId, 0) >= 4
+
+  private def checkPeerByBlockHeader(peer: Peer)(targetBlockHeader: BlockHeader): Future[Boolean] = {
+    requestingHeaders(peer, None, Left(targetBlockHeader.number), 1, 0, reverse = false)(20.seconds) transform {
+      case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
+        headers.find(_.number == targetBlockHeader.number) match {
+          case Some(blockHeader) =>
+            Success(blockHeader == targetBlockHeader)
+          case None =>
+            Success(false)
+        }
+
+      case Success(Some(BlockHeadersResponse(peerId, _, false))) =>
+        Success(false)
+
+      case Success(None) =>
+        Success(false)
+
+      case Failure(e: AskTimeoutException) =>
+        Success(false)
+
+      case Failure(e) =>
+        Success(false)
+    }
+  }
 }

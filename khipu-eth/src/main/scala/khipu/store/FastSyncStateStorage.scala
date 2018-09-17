@@ -9,6 +9,7 @@ import khipu.blockchain.sync.StateMptNodeHash
 import khipu.blockchain.sync.StorageRootHash
 import khipu.blockchain.sync.ContractStorageMptNodeHash
 import khipu.blockchain.sync.EvmcodeHash
+import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.store.datasource.DataSource
 
 object FastSyncStateStorage {
@@ -23,9 +24,19 @@ final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage
   override def keySerializer: String => Array[Byte] = _.getBytes
   override def valueSerializer: SyncState => Array[Byte] = syncState => {
     val builder = ByteString.newBuilder
+
     builder.putLong(syncState.targetBlockNumber)
-    builder.putInt(syncState.downloadedNodesCount)
+    syncState.targetBlockHeader match {
+      case Some(blockHeader) =>
+        val blockHeaderBytes = blockHeader.toBytes
+        builder.putInt(blockHeaderBytes.length)
+        builder.putBytes(blockHeaderBytes)
+      case None =>
+        builder.putInt(0)
+    }
     builder.putLong(syncState.bestBlockHeaderNumber)
+
+    builder.putInt(syncState.downloadedNodesCount)
 
     val mptNodes = syncState.workingMptNodes.map(_._1) ++ syncState.pendingMptNodes
     builder.putInt(mptNodes.size)
@@ -67,8 +78,15 @@ final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage
       val data = ByteString(bytes).iterator
 
       val targetBlockNumber = data.getLong
-      val downloadedNodesCount = data.getInt
+      val targetBlockHeaderLength = data.getInt
+      val targetBlockHeader = if (targetBlockHeaderLength == 0) {
+        None
+      } else {
+        Some(data.getBytes(targetBlockHeaderLength).toBlockHeader)
+      }
       val bestBlockHeaderNumber = data.getLong
+
+      val downloadedNodesCount = data.getInt
 
       var queueSize = data.getInt
       var i = 0
@@ -124,7 +142,7 @@ final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage
         i += 1
       }
 
-      SyncState(targetBlockNumber, downloadedNodesCount, bestBlockHeaderNumber, mptNodes.reverse, nonMptNodes.reverse, blockBodies.reverse, receipts.reverse)
+      SyncState(targetBlockNumber, targetBlockHeader, bestBlockHeaderNumber, downloadedNodesCount, mptNodes.reverse, nonMptNodes.reverse, blockBodies.reverse, receipts.reverse)
     }
   }
 

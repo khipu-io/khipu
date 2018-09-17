@@ -18,10 +18,10 @@ final class KnownNodesStorage(val source: DataSource) extends KeyValueStorage[St
   protected def apply(dataSource: DataSource): KnownNodesStorage = new KnownNodesStorage(dataSource)
 
   def getKnownNodes: Set[URI] = {
-    get(key).getOrElse(Set.empty).filter(_.nonEmpty).map(new URI(_))
+    get(key).getOrElse(Set()).filter(_.nonEmpty).map(new URI(_))
   }
 
-  def updateKnownNodes(toAdd: Set[URI] = Set.empty, toRemove: Set[URI] = Set.empty): KnownNodesStorage = {
+  def updateKnownNodes(toAdd: Set[URI] = Set(), toRemove: Set[URI] = Set()): KnownNodesStorage = {
     val updated = (getKnownNodes ++ toAdd) -- toRemove
     put(key, updated.map(_.toString))
   }
