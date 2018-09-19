@@ -69,8 +69,6 @@ object SyncService {
   final case class MinedBlock(block: Block)
 
   case object StartSync
-  case object ReportStatusTask
-  case object ReportStatusTick
   case object FastSyncDone
 }
 class SyncService() extends FastSyncService with RegularSyncService with HandshakedPeersService with Actor with Timers with ActorLogging {
@@ -126,8 +124,6 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
           fastSyncStateStorage.purge()
           startRegularSync()
       }
-
-      timers.startPeriodicTimer(ReportStatusTask, ReportStatusTick, reportStatusInterval)
 
     case FastSyncDone =>
       startRegularSync()

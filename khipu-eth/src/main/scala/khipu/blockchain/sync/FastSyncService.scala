@@ -49,6 +49,7 @@ import scala.util.Success
  */
 object FastSyncService {
   case object RetryStart
+
   case object BlockHeadersTimeout
   case object TargetBlockTimeout
 
@@ -57,6 +58,9 @@ object FastSyncService {
 
   case object PersistSyncStateTask
   case object PersistSyncStateTick
+
+  case object ReportStatusTask
+  case object ReportStatusTick
 
   final case class SyncState(
     targetBlockNumber:         Long,
@@ -292,6 +296,8 @@ trait FastSyncService { _: SyncService =>
     timers.startPeriodicTimer(ProcessSyncingTask, ProcessSyncingTick, syncRetryInterval)
     timers.startPeriodicTimer(PersistSyncStateTask, PersistSyncStateTick, persistStateSnapshotInterval)
 
+    reportStatus()
+
     def receive: Receive = peerUpdateBehavior orElse ommersBehavior orElse {
       // always enqueue hashes in the front, this will get shorter pending queue !!!
       case EnqueueNodes(remainingHashes) =>
@@ -344,7 +350,7 @@ trait FastSyncService { _: SyncService =>
         workingPeers -= peerId
         processSyncing()
 
-      case SyncService.ReportStatusTick =>
+      case ReportStatusTick =>
         reportStatus()
 
       case PersistSyncStateTick =>
@@ -354,7 +360,7 @@ trait FastSyncService { _: SyncService =>
     def processSyncing() {
       if (isFullySynced) {
         // TODO check isFullySynced is not enough, since saving blockbodies and appStateStorage are async 
-        reportStatus
+        reportStatus()
         val bestBlockNumber = appStateStorage.getBestBlockNumber
         if (bestBlockNumber == syncState.targetBlockNumber) {
           log.info("s[fast] Block synchronization in fast mode finished, switching to regular mode")
@@ -373,6 +379,8 @@ trait FastSyncService { _: SyncService =>
 
     private def finishFastSync() {
       blockHeaderForChecking = None
+      blockchainOnlyPeers = Map()
+      timers.cancel(ReportStatusTask)
       timers.cancel(ProcessSyncingTask)
       timers.cancel(PersistSyncStateTask)
       syncStatePersist ! SyncService.FastSyncDone
@@ -382,7 +390,6 @@ trait FastSyncService { _: SyncService =>
 
       appStateStorage.fastSyncDone()
       context become idle
-      blockchainOnlyPeers = Map()
       self ! SyncService.FastSyncDone
     }
 
@@ -394,10 +401,9 @@ trait FastSyncService { _: SyncService =>
           log.debug("There are no available peers, waiting for ProcessSyncingTick or working peers done")
         }
       } else {
-
-        if (syncState.pendingNonMptNodes.nonEmpty || syncState.pendingMptNodes.nonEmpty) {
+        val nodeWorks = if (syncState.pendingNonMptNodes.nonEmpty || syncState.pendingMptNodes.nonEmpty) {
           val blockchainOnlys = blockchainOnlyPeers.values.toSet
-          val nodeWorks = unassignedPeers.filterNot(blockchainOnlys.contains)
+          unassignedPeers.filterNot(blockchainOnlys.contains)
             .take(maxConcurrentRequests - workingPeers.size)
             .foldLeft(Vector[(Peer, List[NodeHash])]()) {
               case (acc, peer) =>
@@ -417,12 +423,12 @@ trait FastSyncService { _: SyncService =>
                   acc
                 }
             }
-
-          nodeWorks foreach { case (peer, requestingNodes) => requestNodes(peer, requestingNodes) }
+        } else {
+          Vector()
         }
 
-        if (syncState.pendingReceipts.nonEmpty) {
-          val receiptWorks = unassignedPeers
+        val receiptWorks = if (syncState.pendingReceipts.nonEmpty) {
+          unassignedPeers
             .take(maxConcurrentRequests - workingPeers.size)
             .foldLeft(Vector[(Peer, List[Hash])]()) {
               case (acc, peer) =>
@@ -439,12 +445,12 @@ trait FastSyncService { _: SyncService =>
                   acc
                 }
             }
-
-          receiptWorks foreach { case (peer, requestingReceipts) => requestReceipts(peer, requestingReceipts) }
+        } else {
+          Vector()
         }
 
-        if (syncState.pendingBlockBodies.nonEmpty) {
-          val bodyWorks = unassignedPeers
+        val bodyWorks = if (syncState.pendingBlockBodies.nonEmpty) {
+          unassignedPeers
             .take(maxConcurrentRequests - workingPeers.size)
             .foldLeft(Vector[(Peer, List[Hash])]()) {
               case (acc, peer) =>
@@ -461,21 +467,27 @@ trait FastSyncService { _: SyncService =>
                   acc
                 }
             }
-
-          bodyWorks foreach { case (peer, requestingHashes) => requestBlockBodies(peer, requestingHashes) }
+        } else {
+          Vector()
         }
 
-        if (isThereHeaderToDownload && headerWorkingPeer.isEmpty) {
+        val headerWork = if (isThereHeaderToDownload && headerWorkingPeer.isEmpty) {
           val candicates = headerWhitePeers -- workingPeers
-
-          val headerPeer = nextPeer(candicates.toArray) map { peer =>
+          nextPeer(candicates.toArray) map { peer =>
             headerWorkingPeer = Some(peer.id)
             workingPeers += peer
             peer
           }
-
-          headerPeer foreach requestBlockHeaders
+        } else {
+          None
         }
+
+        // node work is priority since nodes are the most waiting in queue
+        nodeWorks foreach { case (peer, requestingNodes) => requestNodes(peer, requestingNodes) }
+        receiptWorks foreach { case (peer, requestingReceipts) => requestReceipts(peer, requestingReceipts) }
+        bodyWorks foreach { case (peer, requestingHashes) => requestBlockBodies(peer, requestingHashes) }
+        // leave header work as the last to avoid too many receipts/bodies waiting in queue
+        headerWork foreach { peer => requestBlockHeaders(peer) }
       }
     }
 
@@ -708,15 +720,18 @@ trait FastSyncService { _: SyncService =>
       val goodPeers = peersToDownloadFrom
       val nodeOkPeers = goodPeers -- blockchainOnlyPeers.values.toSet
       val nBlackPeers = handshakedPeers.size - goodPeers.size
-      prevReportTime = System.currentTimeMillis
-      prevSyncedBlockNumber = currSyncedBlockNumber
-      prevDownloadeNodes = syncState.downloadedNodesCount
       log.info(
         s"""|[fast] Block: ${currSyncedBlockNumber}/${syncState.targetBlockNumber}, $blockRate/s.
             |State: ${syncState.downloadedNodesCount}/$nTotalNodes, $stateRate/s, $nWorkingNodes in working.
             |Peers: (in/out) (${incomingPeers.size}/${outgoingPeers.size}), (working/good/node/black) (${workingPeers.size}/${goodPeers.size}/${nodeOkPeers.size}/${nBlackPeers})
             |""".stripMargin.replace("\n", " ")
       )
+
+      prevReportTime = System.currentTimeMillis
+      prevSyncedBlockNumber = currSyncedBlockNumber
+      prevDownloadeNodes = syncState.downloadedNodesCount
+
+      timers.startSingleTimer(ReportStatusTask, ReportStatusTick, reportStatusInterval)
     }
 
   }

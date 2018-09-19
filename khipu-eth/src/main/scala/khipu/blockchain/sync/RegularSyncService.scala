@@ -77,9 +77,6 @@ trait RegularSyncService { _: SyncService =>
 
     case SyncService.MinedBlock(block) =>
       processMinedBlock(block)
-
-    case SyncService.ReportStatusTick =>
-      log.debug(s"Block: ${appStateStorage.getBestBlockNumber()}. Peers(in/out): ${handshakedPeers.size}(${incomingPeers.size}/${outgoingPeers.size}) black: ${blacklistPeers.size}")
   }
 
   private def resumeRegularSync() {

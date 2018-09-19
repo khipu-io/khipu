@@ -74,6 +74,14 @@ trait HandshakedPeersService { _: SyncService =>
             blacklist(peerId, util.Config.Sync.blacklistDuration, disconnect.toString, always = true)
           } else {
             handshakedPeers += (peerId -> (peer, peerInfo))
+            if (!headerWhitePeers.contains(peer)) {
+              blockHeaderForChecking map checkPeerByBlockHeader(peer) map { f =>
+                f map {
+                  case true  => headerWhitePeers += peer
+                  case false =>
+                }
+              }
+            }
           }
       }
 
@@ -93,6 +101,7 @@ trait HandshakedPeersService { _: SyncService =>
     log.debug(s"[sync] removing peer $peerId")
     timers.cancel(UnblacklistPeerTask(peerId))
     handshakedPeers -= peerId
+    headerWhitePeers = headerWhitePeers.filterNot(_.id == peerId)
   }
 
   def peersToDownloadFrom: Map[Peer, PeerInfo] =
