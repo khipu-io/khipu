@@ -112,20 +112,23 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     }
     lazy val kesque = new Kesque(kafkaProps)
     log.info(s"Kesque started using config file: $kafkaConfigFile")
-    // Make sure enough fetchMaxBytes, especially with batched stored records, eg size of 400 storage nodes may > 102,400
-    // It's difficult to process the FetchMaxBytes, which may across the batched records page?
-    // Currently, I can not figure it out. So will leave CompressType.NONE for future exploring.
-    // https://github.com/khipu-io/khipu/issues/9
+    // block size evalution: https://etherscan.io/chart/blocksize, https://ethereum.stackexchange.com/questions/1106/is-there-a-limit-for-transaction-size/1110#1110
+    // trie node size evalution:
+    //   LeafNode - 256bytes(key) + value ~ 256 + value
+    //   ExtensionNode - 256bytes(key) + 256bytes(hash) ~ 512
+    //   BranchNode - 32bytes (children) + (256bytes(key) + value) (terminator with k-v) ~ 288 + value
+    // account trie node size evalution: account value - 4x256bytes ~ 288 + 1024
+    // storage trie node size evalution: storage valye - 256bytes ~ 288 + 256 
     private val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(KesqueDataSource.account), 262144, CompressionType.NONE)), // 256KB size
-      Future(kesque.getTable(Array(KesqueDataSource.storage), 262144, CompressionType.NONE)),
-      Future(kesque.getTable(Array(KesqueDataSource.evmcode), 262144, CompressionType.NONE)),
+      Future(kesque.getTable(Array(KesqueDataSource.account), 2048, CompressionType.NONE)),
+      Future(kesque.getTable(Array(KesqueDataSource.storage), 2048, CompressionType.NONE)),
+      Future(kesque.getTable(Array(KesqueDataSource.evmcode), 24576, CompressionType.NONE)),
       Future(kesque.getTimedTable(Array(
         KesqueDataSource.header,
         KesqueDataSource.body,
         KesqueDataSource.receipts,
         KesqueDataSource.td
-      ), 1024000, CompressionType.NONE))
+      ), 32768, CompressionType.NONE))
     ))
     private val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
     //private val headerTable = kesque.getTimedTable(Array(KesqueDataSource.header), 1024000)

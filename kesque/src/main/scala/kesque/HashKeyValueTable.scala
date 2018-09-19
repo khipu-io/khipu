@@ -5,7 +5,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
 import org.apache.kafka.common.record.CompressionType
-import org.apache.kafka.common.record.DefaultRecordBatch
 import org.apache.kafka.common.record.SimpleRecord
 import scala.collection.mutable
 
@@ -213,27 +212,6 @@ final class HashKeyValueTable private[kesque] (
           val rec = if (timestamp < 0) new SimpleRecord(key, value) else new SimpleRecord(timestamp, key, value)
           tkvs ::= tkv
           records ::= rec
-      }
-
-      import scala.collection.JavaConverters._
-      val sizeInBytes = DefaultRecordBatch.sizeInBytes(records.asJava)
-      if (sizeInBytes >= fetchMaxBytes) {
-        debug(s"sizeInBytes: $sizeInBytes, fetchMaxBytes: $fetchMaxBytes")
-
-        // pull out head of records and put it to next loop
-        if (records.nonEmpty) {
-          recordBatches :+= (tkvs.tail, records.tail, keyToPrevOffsets)
-
-          tkvs = List(tkvs.head)
-          records = List(records.head)
-          val headHash = Hash(tkvs.head.key)
-          keyToPrevOffsets = keyToPrevOffsets.get(headHash) match {
-            case Some(prevOffsets) => Map(headHash -> prevOffsets)
-            case None              => Map()
-          }
-        } else {
-          keyToPrevOffsets = Map()
-        }
       }
     }
 
