@@ -5,8 +5,15 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.Properties
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.record.AbstractRecords
+import org.apache.kafka.common.record.CompressionType
+import org.apache.kafka.common.record.MemoryRecords
+import org.apache.kafka.common.record.MemoryRecordsBuilder
+import org.apache.kafka.common.record.RecordBatch
 import org.apache.kafka.common.record.SimpleRecord
+import org.apache.kafka.common.record.TimestampType
 import org.apache.kafka.common.requests.FetchRequest.PartitionData
+import org.apache.kafka.common.utils.ByteBufferOutputStream
 import scala.collection.mutable
 
 /**
@@ -35,7 +42,7 @@ object Kesque {
     val props = org.apache.kafka.common.utils.Utils.loadProps(configFile.getAbsolutePath)
     val kesque = new Kesque(props)
     val topic = "kesque-test"
-    val table = kesque.getTable(Array(topic))
+    val table = kesque.getTable(Array(topic), fetchMaxBytes = 262144, CompressionType.SNAPPY)
 
     kesque.deleteTable(topic)
     (1 to 2) foreach { i => testWrite(table, topic, i) }
@@ -44,17 +51,50 @@ object Kesque {
     System.exit(0)
   }
 
-  def testWrite(table: HashKeyValueTable, topic: String, seq: Int) = {
-    val kvs = 1 to 100000 map (i =>
-      TKeyVal(i.toString.getBytes, (s"value_$i").getBytes))
+  private def testWrite(table: HashKeyValueTable, topic: String, seq: Int) = {
+    val kvs = 1 to 100000 map { i =>
+      TKeyVal(i.toString.getBytes, (s"value_$i").getBytes)
+    }
     table.write(kvs, topic)
   }
 
-  def testRead(table: HashKeyValueTable, topic: String) {
+  private def testRead(table: HashKeyValueTable, topic: String) {
     val keys = List("1", "2", "3")
     keys foreach { key =>
       val value = table.read(key.getBytes, topic) map (v => new String(v.value))
-      println(value)
+      println(value) // Some(value_1), Some(value_2), Some(value_3)
+    }
+  }
+
+  def buildRecords(compressionType: CompressionType, initialOffset: Long, records: SimpleRecord*): MemoryRecords = buildRecords(
+    RecordBatch.CURRENT_MAGIC_VALUE, initialOffset, compressionType,
+    TimestampType.CREATE_TIME, 0, 0,
+    0, RecordBatch.NO_PARTITION_LEADER_EPOCH, isTransactional = false,
+    records: _*
+  )
+
+  def buildRecords(magic: Byte, initialOffset: Long, compressionType: CompressionType,
+                   timestampType: TimestampType, producerId: Long, producerEpoch: Short,
+                   baseSequence: Int, partitionLeaderEpoch: Int, isTransactional: Boolean,
+                   records: SimpleRecord*): MemoryRecords = {
+    if (records.isEmpty) {
+      MemoryRecords.EMPTY
+    } else {
+      import scala.collection.JavaConverters._
+      val sizeEstimate = AbstractRecords.estimateSizeInBytes(magic, compressionType, records.asJava)
+      val bufferStream = new ByteBufferOutputStream(sizeEstimate)
+      val logAppendTime = timestampType match {
+        case TimestampType.LOG_APPEND_TIME => System.currentTimeMillis()
+        case _                             => RecordBatch.NO_TIMESTAMP
+      }
+
+      val builder = new MemoryRecordsBuilder(bufferStream, magic, compressionType, timestampType,
+        initialOffset, logAppendTime, producerId, producerEpoch, baseSequence, isTransactional, false,
+        partitionLeaderEpoch, sizeEstimate)
+
+      records foreach builder.append
+
+      builder.build()
     }
   }
 }
@@ -64,12 +104,12 @@ final class Kesque(props: Properties) {
 
   private val topicToTable = mutable.Map[String, HashKeyValueTable]()
 
-  def getTable(topics: Array[String], fetchMaxBytes: Int = 262144) = {
-    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, fetchMaxBytes))
+  def getTable(topics: Array[String], fetchMaxBytes: Int = 262144, compressionType: CompressionType = CompressionType.NONE) = {
+    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, fetchMaxBytes, compressionType))
   }
 
-  def getTimedTable(topics: Array[String], fetchMaxBytes: Int = 262144) = {
-    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes))
+  def getTimedTable(topics: Array[String], fetchMaxBytes: Int = 262144, compressionType: CompressionType = CompressionType.NONE) = {
+    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes, compressionType))
   }
 
   private[kesque] def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {
@@ -81,7 +121,7 @@ final class Kesque(props: Properties) {
       fetchOnlyFromLeader = true,
       readOnlyCommitted = false,
       fetchMaxBytes = fetchMaxBytes,
-      hardMaxBytesLimit = true,
+      hardMaxBytesLimit = false, // read at lease one message even exceeds the fetchMaxBytes
       readPartitionInfo = List((partition, partitionData)),
       quota = UnboundedQuota,
       isolationLevel = org.apache.kafka.common.requests.IsolationLevel.READ_COMMITTED
@@ -91,12 +131,12 @@ final class Kesque(props: Properties) {
   /**
    * Should make sure the size in bytes of batched records is not exceeds the maximum configure value
    */
-  private[kesque] def write(topic: String, records: Seq[SimpleRecord]) = {
+  private[kesque] def write(topic: String, records: Seq[SimpleRecord], compressionType: CompressionType) = {
     val partition = new TopicPartition(topic, 0)
     //val initialOffset = readerWriter.getLogEndOffset(partition) + 1 // TODO check -1L
     val initialOffset = 0L // TODO is this useful?
 
-    val memoryRecords = ReplicaManager.buildRecords(initialOffset, records: _*)
+    val memoryRecords = Kesque.buildRecords(compressionType, initialOffset, records: _*)
     val entriesPerPartition = Map(partition -> memoryRecords)
 
     replicaManager.appendToLocalLog(
@@ -163,7 +203,7 @@ final class Kesque(props: Properties) {
     val length = buffer.remaining
     val value = Array.ofDim[Byte](length)
     if (buffer.hasArray) {
-      System.arraycopy(buffer.array(), buffer.position() + buffer.arrayOffset(), value, 0, length)
+      System.arraycopy(buffer.array, buffer.position + buffer.arrayOffset, value, 0, length)
     } else {
       val pos = buffer.position
       var i = pos

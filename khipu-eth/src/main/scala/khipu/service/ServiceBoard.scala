@@ -41,6 +41,7 @@ import khipu.validators.OmmersValidator
 import khipu.validators.SignedTransactionValidator
 import khipu.validators.SignedTransactionValidatorImpl
 import khipu.validators.Validators
+import org.apache.kafka.common.record.CompressionType
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 import scala.concurrent.Await
 import scala.concurrent.Future
@@ -111,17 +112,20 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     }
     lazy val kesque = new Kesque(kafkaProps)
     log.info(s"Kesque started using config file: $kafkaConfigFile")
-    // make sure enough fetchMaxBytes, especially with batched stored records, eg size of 400 storage nodes may > 102,400
+    // Make sure enough fetchMaxBytes, especially with batched stored records, eg size of 400 storage nodes may > 102,400
+    // It's difficult to process the FetchMaxBytes, which may across the batched records page?
+    // Currently, I can not figure it out. So will leave CompressType.NONE for future exploring.
+    // https://github.com/khipu-io/khipu/issues/9
     private val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(KesqueDataSource.account), 262144)), // 256KB size
-      Future(kesque.getTable(Array(KesqueDataSource.storage), 262144)),
-      Future(kesque.getTable(Array(KesqueDataSource.evmcode), 262144)),
+      Future(kesque.getTable(Array(KesqueDataSource.account), 262144, CompressionType.NONE)), // 256KB size
+      Future(kesque.getTable(Array(KesqueDataSource.storage), 262144, CompressionType.NONE)),
+      Future(kesque.getTable(Array(KesqueDataSource.evmcode), 262144, CompressionType.NONE)),
       Future(kesque.getTimedTable(Array(
         KesqueDataSource.header,
         KesqueDataSource.body,
         KesqueDataSource.receipts,
         KesqueDataSource.td
-      ), 1024000))
+      ), 1024000, CompressionType.NONE))
     ))
     private val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
     //private val headerTable = kesque.getTimedTable(Array(KesqueDataSource.header), 1024000)

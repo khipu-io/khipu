@@ -46,17 +46,9 @@ import org.apache.kafka.common.requests.DescribeLogDirsResponse.LogDirInfo
 import org.apache.kafka.common.requests.DescribeLogDirsResponse.ReplicaInfo
 import org.apache.kafka.common.requests.FetchRequest.PartitionData
 import org.apache.kafka.common.requests.IsolationLevel
-import org.apache.kafka.common.utils.ByteBufferOutputStream
 import org.apache.kafka.common.utils.Time
 import scala.collection.mutable
 import scala.collection.JavaConverters._
-
-import org.apache.kafka.common.record.CompressionType
-import org.apache.kafka.common.record.TimestampType
-import org.apache.kafka.common.record.MemoryRecordsBuilder
-import org.apache.kafka.common.record.RecordBatch
-import org.apache.kafka.common.record.SimpleRecord
-import org.apache.kafka.common.record.AbstractRecords
 
 /**
  * from kafka.server.ReplicaManager.scala
@@ -66,40 +58,6 @@ object ReplicaManager {
   val IsrChangePropagationBlackOut = 5000L
   val IsrChangePropagationInterval = 60000L
   val OfflinePartition = new Partition("", -1, null, null, isOffline = true)
-
-  def buildRecords(initialOffset: Long, records: SimpleRecord*): MemoryRecords =
-    buildRecords(RecordBatch.CURRENT_MAGIC_VALUE, initialOffset, CompressionType.NONE,
-      TimestampType.CREATE_TIME, 0, 0,
-      0, RecordBatch.NO_PARTITION_LEADER_EPOCH, isTransactional = false,
-      records: _*)
-
-  def buildRecords(compressionType: CompressionType, initialOffset: Long, records: SimpleRecord*): MemoryRecords =
-    buildRecords(RecordBatch.CURRENT_MAGIC_VALUE, initialOffset, compressionType,
-      TimestampType.CREATE_TIME, 0, 0,
-      0, RecordBatch.NO_PARTITION_LEADER_EPOCH, isTransactional = false,
-      records: _*)
-
-  def buildRecords(magic: Byte, initialOffset: Long, compressionType: CompressionType,
-                   timestampType: TimestampType, producerId: Long, producerEpoch: Short,
-                   baseSequence: Int, partitionLeaderEpoch: Int, isTransactional: Boolean,
-                   records: SimpleRecord*): MemoryRecords = {
-    if (records.isEmpty)
-      return MemoryRecords.EMPTY
-
-    import scala.collection.JavaConverters._
-    val sizeEstimate = AbstractRecords.estimateSizeInBytes(magic, compressionType, records.asJava)
-    val bufferStream = new ByteBufferOutputStream(sizeEstimate)
-    var logAppendTime = RecordBatch.NO_TIMESTAMP
-    if (timestampType == TimestampType.LOG_APPEND_TIME)
-      logAppendTime = System.currentTimeMillis()
-    val builder = new MemoryRecordsBuilder(bufferStream, magic, compressionType, timestampType,
-      initialOffset, logAppendTime, producerId, producerEpoch, baseSequence, isTransactional, false,
-      partitionLeaderEpoch, sizeEstimate)
-
-    for (record <- records) builder.append(record)
-
-    builder.build()
-  }
 }
 class ReplicaManager(
     val config:                        KafkaConfig,

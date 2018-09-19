@@ -12,6 +12,7 @@ import kesque.TVal
 import khipu.Hash
 import khipu.util.Clock
 import khipu.util.SimpleMap
+import org.apache.kafka.common.record.CompressionType
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
@@ -120,12 +121,11 @@ object KesqueDataSource {
   }
 
   private def dump(db: Kesque, fetchOffset: Long) = {
-    val fetchMaxBytes = 102400
     val src = "evmcode"
     val tgt = "evmcode_new"
     db.deleteTable(tgt)
-    val tableSrc = db.getTable(Array(src), fetchMaxBytes)
-    val tableTgt = db.getTable(Array(tgt), fetchMaxBytes)
+    val tableSrc = db.getTable(Array(src), fetchMaxBytes = 102400, CompressionType.NONE)
+    val tableTgt = db.getTable(Array(tgt), fetchMaxBytes = 102400, CompressionType.NONE)
 
     val hashOffsets = new HashOffsets(200)
 
@@ -161,7 +161,7 @@ object KesqueDataSource {
    * # while true;  do echo 1 > /proc/sys/vm/drop_caches;echo clean cache ok; sleep 1; done
    */
   private def testRead(db: Kesque, topic: String, fetchMaxBytes: Int = 1024000) = {
-    val table = db.getTable(Array(topic), fetchMaxBytes)
+    val table = db.getTable(Array(topic), fetchMaxBytes, CompressionType.NONE)
 
     val records = new mutable.HashMap[Hash, ByteString]()
     table.iterateOver(0, topic) {

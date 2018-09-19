@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
+import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.DefaultRecordBatch
 import org.apache.kafka.common.record.SimpleRecord
 import scala.collection.mutable
@@ -16,8 +17,12 @@ object HashKeyValueTable {
   def bytesToInt(v: Array[Byte]) = ByteBuffer.wrap(v).getInt
 }
 final class HashKeyValueTable private[kesque] (
-    topics: Array[String], db: Kesque, withTimeToKey: Boolean,
-    fetchMaxBytes: Int = HashKeyValueTable.defaultFetchMaxBytes, cacheSize: Int = 10000
+    topics:          Array[String],
+    db:              Kesque,
+    withTimeToKey:   Boolean,
+    fetchMaxBytes:   Int             = HashKeyValueTable.defaultFetchMaxBytes,
+    compressionType: CompressionType = CompressionType.NONE,
+    cacheSize:       Int             = 10000
 ) extends Logging {
   import HashKeyValueTable._
 
@@ -185,12 +190,10 @@ final class HashKeyValueTable private[kesque] (
   def write(kvs: Iterable[TKeyVal], topic: String) = {
     val topicIdx = topicIndex(topic)
 
-    // used to calc recordBatch size
-    val simpleRecords = new java.util.LinkedList[SimpleRecord]()
-
     // create simple records, filter no changed ones
-    var recordBatches = Vector[(Vector[(TKeyVal, SimpleRecord)], Map[Hash, Int])]()
-    var records = List[(TKeyVal, SimpleRecord)]()
+    var recordBatches = Vector[(List[TKeyVal], List[SimpleRecord], Map[Hash, Int])]()
+    var tkvs = List[TKeyVal]()
+    var records = List[SimpleRecord]()
     var keyToPrevOffsets = Map[Hash, Int]()
     val itr = kvs.iterator
     while (itr.hasNext) {
@@ -200,45 +203,56 @@ final class HashKeyValueTable private[kesque] (
         case Some((TVal(prevValue, _), prevOffset)) =>
           if (isValueChanged(value, prevValue)) {
             val rec = if (timestamp < 0) new SimpleRecord(key, value) else new SimpleRecord(timestamp, key, value)
-            simpleRecords.add(rec)
-            records ::= tkv -> rec
+            tkvs ::= tkv
+            records ::= rec
             keyToPrevOffsets += hash -> prevOffset
           } else {
             debug(s"$topic: value not changed. cache: hit ${caches(topicIdx).hitCount}, miss ${caches(topicIdx).missCount}, size ${caches(topicIdx).size}")
           }
         case None =>
           val rec = if (timestamp < 0) new SimpleRecord(key, value) else new SimpleRecord(timestamp, key, value)
-          simpleRecords.add(rec)
-          records ::= tkv -> rec
+          tkvs ::= tkv
+          records ::= rec
       }
 
-      val sizeInBytes = DefaultRecordBatch.sizeInBytes(simpleRecords)
+      import scala.collection.JavaConverters._
+      val sizeInBytes = DefaultRecordBatch.sizeInBytes(records.asJava)
       if (sizeInBytes >= fetchMaxBytes) {
-        debug(s"sizeIbytes: $sizeInBytes, fetchMaxBytes: $fetchMaxBytes")
+        debug(s"sizeInBytes: $sizeInBytes, fetchMaxBytes: $fetchMaxBytes")
 
-        val (head :: tail) = records
-        recordBatches :+= (tail.toVector, keyToPrevOffsets)
+        // pull out head of records and put it to next loop
+        if (records.nonEmpty) {
+          recordBatches :+= (tkvs.tail, records.tail, keyToPrevOffsets)
 
-        simpleRecords.clear()
-        simpleRecords.add(head._2)
-        records = List(head)
-        keyToPrevOffsets = Map()
+          tkvs = List(tkvs.head)
+          records = List(records.head)
+          val headHash = Hash(tkvs.head.key)
+          keyToPrevOffsets = keyToPrevOffsets.get(headHash) match {
+            case Some(prevOffsets) => Map(headHash -> prevOffsets)
+            case None              => Map()
+          }
+        } else {
+          keyToPrevOffsets = Map()
+        }
       }
     }
-    recordBatches :+= (records.toVector, keyToPrevOffsets)
+
+    if (records.nonEmpty) {
+      recordBatches :+= (tkvs, records, keyToPrevOffsets)
+    }
 
     debug(s"${recordBatches.map(x => x._1.size).mkString(",")}")
-    recordBatches map { case (records, keyToPrevOffsets) => writeRecords(records, keyToPrevOffsets, topic) }
+    recordBatches map { case (tkvs, records, keyToPrevOffsets) => writeRecords(tkvs, records, keyToPrevOffsets, topic) }
   }
 
-  private def writeRecords(records: Vector[(TKeyVal, SimpleRecord)], keyToPrevOffsets: Map[Hash, Int], topic: String): Iterable[Int] = {
+  private def writeRecords(tkvs: List[TKeyVal], records: List[SimpleRecord], keyToPrevOffsets: Map[Hash, Int], topic: String): Iterable[Int] = {
     try {
       writeLock.lock()
 
       val topicIdx = topicIndex(topic)
 
       // write simple records and create index records
-      val indexRecords = db.write(topic, records.map(_._2)).foldLeft(Vector[Vector[SimpleRecord]]()) {
+      val indexRecords = db.write(topic, records, compressionType).foldLeft(Vector[Vector[SimpleRecord]]()) {
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, Some(ex)))) =>
           error(ex.getMessage, ex) // TODO
           indexRecords
@@ -246,8 +260,8 @@ final class HashKeyValueTable private[kesque] (
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, None))) =>
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
-            val (lastOffset, idxRecords) = records.foldLeft(firstOffert, Vector[SimpleRecord]()) {
-              case ((offset, idxRecords), (TKeyVal(key, value, timestamp), _)) =>
+            val (lastOffset, idxRecords) = tkvs.foldLeft(firstOffert, Vector[SimpleRecord]()) {
+              case ((offset, idxRecords), TKeyVal(key, value, timestamp)) =>
                 val hash = Hash(key)
                 val hashCode = hash.hashCode
                 val indexRecord = new SimpleRecord(intToBytes(hashCode), intToBytes(offset.toInt))
@@ -271,7 +285,7 @@ final class HashKeyValueTable private[kesque] (
       }
 
       // write index records
-      db.write(indexTopics(topicIdx), indexRecords.flatten) map {
+      db.write(indexTopics(topicIdx), indexRecords.flatten, compressionType) map {
         case (topicPartition, LogAppendResult(appendInfo, Some(ex))) =>
           error(ex.getMessage, ex) // TODO
         case (topicPartition, LogAppendResult(appendInfo, None)) =>
@@ -305,7 +319,7 @@ final class HashKeyValueTable private[kesque] (
       val records = keys map { key => key -> new SimpleRecord(key, null) }
 
       // write simple records and create index records
-      val indexRecords = db.write(topic, records.map(_._2)).foldLeft(Vector[Vector[SimpleRecord]]()) {
+      val indexRecords = db.write(topic, records.map(_._2), compressionType).foldLeft(Vector[Vector[SimpleRecord]]()) {
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, Some(ex)))) =>
           error(ex.getMessage, ex) // TODO
           indexRecords
@@ -334,7 +348,7 @@ final class HashKeyValueTable private[kesque] (
       }
 
       // write index records
-      db.write(indexTopics(topicIdx), indexRecords.flatten) map {
+      db.write(indexTopics(topicIdx), indexRecords.flatten, compressionType) map {
         case (topicPartition, LogAppendResult(appendInfo, Some(ex))) =>
           error(ex.getMessage, ex) // TODO
         case (topicPartition, LogAppendResult(appendInfo, None)) =>
