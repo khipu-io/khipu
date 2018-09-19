@@ -41,7 +41,6 @@ import khipu.validators.OmmersValidator
 import khipu.validators.SignedTransactionValidator
 import khipu.validators.SignedTransactionValidatorImpl
 import khipu.validators.Validators
-import org.apache.kafka.common.record.CompressionType
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 import scala.concurrent.Await
 import scala.concurrent.Future
@@ -120,15 +119,15 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     // account trie node size evalution: account value - 4x256bytes ~ 288 + 1024
     // storage trie node size evalution: storage valye - 256bytes ~ 288 + 256 
     private val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(KesqueDataSource.account), 2048, CompressionType.NONE)),
-      Future(kesque.getTable(Array(KesqueDataSource.storage), 2048, CompressionType.NONE)),
-      Future(kesque.getTable(Array(KesqueDataSource.evmcode), 24576, CompressionType.NONE)),
+      Future(kesque.getTable(Array(KesqueDataSource.account), 2048)),
+      Future(kesque.getTable(Array(KesqueDataSource.storage), 2048)),
+      Future(kesque.getTable(Array(KesqueDataSource.evmcode), 24576)),
       Future(kesque.getTimedTable(Array(
         KesqueDataSource.header,
         KesqueDataSource.body,
         KesqueDataSource.receipts,
         KesqueDataSource.td
-      ), 32768, CompressionType.NONE))
+      ), 102400))
     ))
     private val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
     //private val headerTable = kesque.getTimedTable(Array(KesqueDataSource.header), 1024000)
