@@ -122,7 +122,7 @@ object Khipu {
 
     import serviceBoard.materializer
 
-    val peer = new OutgoingPeer(Peer.peerId(uri), uri)
+    val peer = new OutgoingPeer(Peer.peerId(uri).get, uri)
     val authHandshake = AuthHandshake(serviceBoard.nodeKey, serviceBoard.secureRandom)
     val handshake = new EtcHandshake(serviceBoard.nodeStatus, serviceBoard.blockchain, serviceBoard.storages.appStateStorage, serviceBoard.peerConfiguration, serviceBoard.forkResolverOpt)
     RLPx.startOutgoing(peer, serviceBoard.messageDecoder, serviceBoard.protocolVersion, authHandshake, handshake)(system)

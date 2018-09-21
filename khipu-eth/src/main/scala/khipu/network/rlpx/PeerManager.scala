@@ -19,6 +19,7 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Success
+import scala.util.Try
 
 object PeerManager {
   def props(peerConfiguration: PeerConfiguration) =
@@ -76,7 +77,7 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
   override def receive: Receive = {
     case KnownNodesService.KnownNodes(addresses) =>
       // toMap to make sure only one node of same interface:port is left
-      val idToNode = addresses.map(uri => (Peer.peerId(uri), uri)).toMap.filterNot {
+      val idToNode = addresses.flatMap(uri => Peer.peerId(uri).map(_ -> uri)).toMap.filterNot {
         case (peerId, uri) => isInConnecting(peerId)
       }
 
@@ -92,7 +93,9 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
 
     case NodeDiscoveryService.DiscoveredNodes(nodes) =>
       // toMap to make sure only one node of same interface:port is left
-      val idToNode = nodes.map(node => (Peer.peerId(node.uri) -> node)).toMap.filterNot {
+      val idToNode = nodes.flatMap { node =>
+        Peer.peerId(node.uri).map(_ -> node)
+      }.toMap.filterNot {
         case (peerId, uri) => isInConnecting(peerId) || droppedNodes.contains(peerId) || triedNodes.contains(peerId)
       }
 

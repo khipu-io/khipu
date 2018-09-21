@@ -38,7 +38,7 @@ object RLPx {
       system.log.debug(s"Incoming connection from: ${incomingConn.remoteAddress}")
 
       // we should build a new layer instance for each incomingConnection, so do it here
-      val peer = new IncomingPeer(Peer.peerId(incomingConn.remoteAddress), incomingConn.remoteAddress)
+      val peer = new IncomingPeer(Peer.peerId(incomingConn.remoteAddress).get, incomingConn.remoteAddress)
       val incomingLayer = BluePrint(peer, messageDecoder, protocolVersion, authHandshake, handshake)
 
       incomingConn.handleWith(incomingLayer)
