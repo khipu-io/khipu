@@ -5,7 +5,14 @@ import java.net.InetSocketAddress
 import java.net.URI
 
 object Peer {
-  def peerId(uri: URI): Option[String] = peerId(new InetSocketAddress(uri.getHost, uri.getPort))
+  def peerId(uri: URI): Option[String] = {
+    try {
+      val remoteAddress = new InetSocketAddress(uri.getHost, uri.getPort)
+      peerId(remoteAddress)
+    } catch {
+      case _: Throwable => None
+    }
+  }
   def peerId(remoteAddress: InetSocketAddress): Option[String] = {
     try {
       val ip = remoteAddress.getAddress.getHostAddress
