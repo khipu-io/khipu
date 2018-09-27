@@ -1279,12 +1279,8 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
       case CALL =>
         if (state.config.eip161) {
           if (state.world.isAccountDead(target) && endowment.compare(UInt256.Zero) != 0) {
-            if (!state.world.isAccountExist(target)) {
             state.config.feeSchedule.G_newaccount
           } else {
-            0
-          }
-        } else {
             0
           }
         } else {
