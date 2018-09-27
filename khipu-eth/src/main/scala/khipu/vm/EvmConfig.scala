@@ -19,7 +19,7 @@ object EvmConfig {
    * returns the evm config that should be used for given block
    */
   def forBlock(blockNumber: Long, blockchainConfig: BlockchainConfig): EvmConfig = {
-    val transitionBlockToConfig: Map[Long, EvmConfig] = Map(
+    val transitionBlockToConfig = Map(
       blockchainConfig.frontierBlockNumber -> FrontierConfig,
       blockchainConfig.homesteadBlockNumber -> HomesteadConfig,
       blockchainConfig.eip150BlockNumber -> PostEIP150Config,
@@ -129,7 +129,6 @@ final case class EvmConfig(
     eip212:                          Boolean, // replaced eip197
     eip198:                          Boolean,
     eip658:                          Boolean
-
 ) {
   import EvmConfig._
 

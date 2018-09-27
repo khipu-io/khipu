@@ -11,9 +11,9 @@ object VM {
    * @param context context to be executed
    * @return result of the execution
    */
-  def run[W <: WorldState[W, S], S <: Storage[S]](context: ProgramContext[W, S]): ProgramResult[W, S] = {
+  def run[W <: WorldState[W, S], S <: Storage[S]](context: ProgramContext[W, S], isDebugTraceEnabled: Boolean): ProgramResult[W, S] = {
     // new init state is created for each run(context)
-    val initState = new ProgramState[W, S](context)
+    val initState = new ProgramState[W, S](context, isDebugTraceEnabled)
     val postState = run(initState)
 
     ProgramResult[W, S](
@@ -26,24 +26,24 @@ object VM {
       postState.addressesTouched,
       postState.error,
       postState.isRevert,
-      postState.parallelRaceConditions,
-      postState.trace
+      postState.parallelRaceConditions
     )
   }
 
+  // TODO write debug trace to a file
   @tailrec
   private def run[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]): ProgramState[W, S] = {
     val byte = state.program.getByte(state.pc)
     state.config.byteToOpCode.get(byte) match {
       case Some(opcode) =>
-        if (state.isTraceEnabled) {
-          state.addTrace(s"[trace] $opcode | pc: ${state.pc} | depth: ${state.env.callDepth} | gas: ${state.gas} | ${state.stack} | ${state.memory} | error: ${state.error}")
+        if (state.isDebugTraceEnabled) {
+          println(s"[trace] $opcode | pc: ${state.pc} | depth: ${state.env.callDepth} | gas: ${state.gas} | ${state.stack} | ${state.memory} | error: ${state.error}")
         }
         val newState = opcode.execute(state) // may reentry VM.run(context) by CREATE/CALL op
 
         if (newState.isHalted) {
-          if (state.isTraceEnabled) {
-            state.addTrace(s"[trace] halt | pc: ${newState.pc} | depth: ${newState.env.callDepth} | gas: ${newState.gas} | ${newState.stack} | ${newState.memory} | error: ${newState.error}")
+          if (state.isDebugTraceEnabled) {
+            println(s"[trace] halt | pc: ${newState.pc} | depth: ${newState.env.callDepth} | gas: ${newState.gas} | ${newState.stack} | ${newState.memory} | error: ${newState.error}")
           }
           newState
         } else {
@@ -51,8 +51,8 @@ object VM {
         }
 
       case None =>
-        if (state.isTraceEnabled) {
-          state.addTrace(s"[trace] ${InvalidOpCode(byte)} | pc: ${state.pc} | depth: ${state.env.callDepth} | gas: ${state.gas} | ${state.stack} | error: ${state.error}")
+        if (state.isDebugTraceEnabled) {
+          println(s"[trace] ${InvalidOpCode(byte)} | pc: ${state.pc} | depth: ${state.env.callDepth} | gas: ${state.gas} | ${state.stack} | error: ${state.error}")
         }
         state.withError(InvalidOpCode(byte)).halt()
     }

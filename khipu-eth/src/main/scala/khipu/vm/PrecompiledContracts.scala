@@ -73,8 +73,7 @@ object PrecompiledContracts {
         context.initialAddressesTouched,
         error,
         false,
-        Set(),
-        Vector()
+        Set()
       )
     }
   }

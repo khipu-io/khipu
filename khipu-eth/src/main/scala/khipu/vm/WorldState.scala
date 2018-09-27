@@ -51,7 +51,7 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
     getAccount(address).isDefined
 
   def isAccountDead(address: Address): Boolean =
-    getAccount(address).fold(true)(_.isEmpty)
+    getAccount(address).map(_.isEmpty).getOrElse(true)
 
   def getBalance(address: Address): UInt256 =
     getAccount(address).map(a => UInt256(a.balance)).getOrElse(UInt256.Zero)

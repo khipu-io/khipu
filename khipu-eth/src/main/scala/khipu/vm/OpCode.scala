@@ -1001,8 +1001,7 @@ case object CREATE extends OpCode[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
           state.context.isStaticCall
         )
 
-        val result = VM.run(context)
-        state.mergeTrace(result.trace)
+        val result = VM.run(context, state.isDebugTraceEnabled)
         state.mergeParallelRaceConditions(result.parallelRaceConditions)
 
         if (result.isRevert) {
@@ -1078,6 +1077,7 @@ case object CREATE extends OpCode[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
 sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolean, isStateless: Boolean, isStatic: Boolean) extends OpCode[(UInt256, UInt256, UInt256, UInt256, UInt256, UInt256, UInt256)](code.toByte, delta, alpha) {
   final protected def constGasFn(s: FeeSchedule) = s.G_zero
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
+    //0,122880940852228918464873281768847672783306374405,2783495134220423,224,0,224,0
     val List(gas, target, callValue, inOffset, inSize, outOffset, outSize) =
       if (hasValue) {
         state.stack.pop(7)
@@ -1178,12 +1178,11 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
           case None =>
             val code = state.world.getCode(codeAddress)
             val context = prepareProgramContext(code)
-            VM.run(context)
+            VM.run(context, state.isDebugTraceEnabled)
         }
 
         //println(s"result: $result")
 
-        state.mergeTrace(result.trace)
         state.mergeParallelRaceConditions(result.parallelRaceConditions)
 
         state.withReturnDataBuffer(result.returnData)
@@ -1281,11 +1280,11 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
         if (state.config.eip161) {
           if (state.world.isAccountDead(target) && endowment.compare(UInt256.Zero) != 0) {
             if (!state.world.isAccountExist(target)) {
-              state.config.feeSchedule.G_newaccount
-            } else {
-              0
-            }
+            state.config.feeSchedule.G_newaccount
           } else {
+            0
+          }
+        } else {
             0
           }
         } else {

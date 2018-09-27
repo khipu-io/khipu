@@ -223,7 +223,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
    */
   override def executeBlock(block: Block, validators: Validators)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
     val start1 = System.currentTimeMillis
-    val parallelResult = executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = true) map {
+    val parallelResult = executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = true && !blockchainConfig.isDebugTraceEnabled) map {
       case Right(blockResult) =>
         log.debug(s"${block.header.number} parallel-executed in ${System.currentTimeMillis - start1}ms")
 
@@ -533,6 +533,9 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     // TODO catch prepareProgramContext's throwable (MPTException etc from mtp) here
     val (checkpoint, context) = prepareProgramContext(stx, blockHeader, evmCfg)(world)
 
+    if (blockchainConfig.isDebugTraceEnabled) {
+      println(s"\nTx 0x${stx.hash} ========>")
+    }
     val result = runVM(stx, context, evmCfg)(checkpoint)
 
     val gasLimit = stx.tx.gasLimit
@@ -542,8 +545,9 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val txFee = UInt256(gasUsed) * gasPrice
     val refund = UInt256(totalGasToRefund) * gasPrice
 
-    // print trace
-    //log.info(s"\nTx 0x${stx.hash} executing ${result.trace.mkString("\n", "\n", "\n")}\n0x${stx.hash} gasLimit: ${stx.tx.gasLimit} gasUsed $gasUsed, isRevert: ${result.isRevert}, error: ${result.error}")
+    if (blockchainConfig.isDebugTraceEnabled) {
+      println(s"\nTx 0x${stx.hash} gasLimit: ${stx.tx.gasLimit} gasUsed $gasUsed, isRevert: ${result.isRevert}, error: ${result.error}")
+    }
 
     val worldRefundGasPaid = result.world.pay(stx.sender, refund)
     val worldDeletedAccounts = deleteAccounts(result.addressesToDelete)(worldRefundGasPaid)
@@ -677,13 +681,13 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
    */
   private def runVM(stx: SignedTransaction, context: PC, evmCfg: EvmConfig)(checkpoint: BlockWorldState): PR = {
     val r = if (stx.tx.isContractCreation) { // create
-      VM.run(context)
+      VM.run(context, blockchainConfig.isDebugTraceEnabled)
     } else { // call
       PrecompiledContracts.getContractForAddress(context.targetAddress, evmCfg) match {
         case Some(contract) =>
           contract.run(context)
         case None =>
-          VM.run(context)
+          VM.run(context, blockchainConfig.isDebugTraceEnabled)
       }
     }
 

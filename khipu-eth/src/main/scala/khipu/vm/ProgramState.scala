@@ -22,7 +22,7 @@ object ProgramState {
  * @param halted a flag to indicate program termination
  * @param error indicates whether the program terminated abnormally
  */
-final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: ProgramContext[W, S]) {
+final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: ProgramContext[W, S], val isDebugTraceEnabled: Boolean) {
   import ProgramState._
 
   var gas: Long = context.startGas
@@ -39,9 +39,6 @@ final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: Pr
   private var _isRevert: Boolean = false
 
   var returnDataBuffer: ByteString = ByteString()
-
-  var isTraceEnabled = false
-  private var _trace = Vector[String]()
 
   private var _parallelRaceConditions = Set[ParallelRace]()
 
@@ -145,16 +142,6 @@ final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: Pr
   }
   def mergeParallelRaceConditions(races: Set[ParallelRace]) = {
     this._parallelRaceConditions ++= races
-    this
-  }
-
-  def trace = _trace
-  def addTrace(trace: String) = {
-    this._trace :+= trace
-    this
-  }
-  def mergeTrace(trace: Vector[String]) = {
-    this._trace ++= trace
     this
   }
 

@@ -230,6 +230,8 @@ object BlockchainConfig {
       val chainId = khipu.hexDecode(blockchainConfig.getString("chain-id")).head
 
       val monetaryPolicyConfig = MonetaryPolicyConfig(blockchainConfig.getConfig("monetary-policy"))
+
+      val isDebugTraceEnabled = blockchainConfig.getBoolean("debug-trace-enabled")
     }
   }
 }
@@ -267,6 +269,8 @@ trait BlockchainConfig {
   def chainId: Byte
 
   def monetaryPolicyConfig: MonetaryPolicyConfig
+
+  def isDebugTraceEnabled: Boolean
 }
 
 object MonetaryPolicyConfig {

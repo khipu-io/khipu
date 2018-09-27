@@ -22,6 +22,5 @@ final case class ProgramResult[W <: WorldState[W, S], S <: Storage[S]](
   addressesTouched:       Set[Address],
   error:                  Option[ProgramError],
   isRevert:               Boolean,
-  parallelRaceConditions: Set[ProgramState.ParallelRace],
-  trace:                  Vector[String]
+  parallelRaceConditions: Set[ProgramState.ParallelRace]
 )
