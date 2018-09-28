@@ -1077,14 +1077,12 @@ case object CREATE extends OpCode[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
 sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolean, isStateless: Boolean, isStatic: Boolean) extends OpCode[(UInt256, UInt256, UInt256, UInt256, UInt256, UInt256, UInt256)](code.toByte, delta, alpha) {
   final protected def constGasFn(s: FeeSchedule) = s.G_zero
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
-    //0,122880940852228918464873281768847672783306374405,2783495134220423,224,0,224,0
-    val List(gas, target, callValue, inOffset, inSize, outOffset, outSize) =
-      if (hasValue) {
-        state.stack.pop(7)
-      } else {
-        val List(gas, target, inOffset, inSize, outOffset, outSize) = state.stack.pop(6)
-        List(gas, target, UInt256.Zero, inOffset, inSize, outOffset, outSize)
-      }
+    val List(gas, target, callValue, inOffset, inSize, outOffset, outSize) = if (hasValue) {
+      state.stack.pop(7)
+    } else {
+      val List(gas, target, inOffset, inSize, outOffset, outSize) = state.stack.pop(6)
+      List(gas, target, UInt256.Zero, inOffset, inSize, outOffset, outSize)
+    }
     if (inOffset.compareTo(UInt256.MAX_INT) > 0 || inSize.compareTo(UInt256.MAX_INT) > 0 || outOffset.compareTo(UInt256.MAX_INT) > 0 || outOffset.compareTo(UInt256.MAX_INT) > 0) {
       state.withError(ArithmeticException)
     }
@@ -1221,13 +1219,11 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
             state.withAddAddressTouched(codeAddress)
           }
 
-          // Do not relay error to parent state, since it's only of the sub-routine
-
-          if (result.isRevert) {
-            // tx 0xe62a2b4e348e805ec4bddd4dbf9ae9bcf278622ddc5d5a49ff68f8c994e9d36f of block 6020296 got error gasUsed if state.spendGas(-result.gasRemaining), the diff is extractly result.gasRemaining - whose bug?
-            // but most blocks, such as 6020299 got error gasUsed if not state.spendGas(-result.gasRemaining)
+          if (result.isRevert && result.error.isEmpty) {
             state.spendGas(-result.gasRemaining)
           }
+
+          // do not relay error to parent state, since it's only of the sub-routine
 
           // the error result may be caused by parallel condition, so merge all possible modifies
           state
@@ -1323,11 +1319,12 @@ case object DELEGATECALL extends CallOp(0xf4, 6, 1, hasValue = false, isStateles
 case object STATICCALL extends CallOp(0xfa, 6, 1, hasValue = false, isStateless = false, isStatic = true)
 
 case object RETURN extends OpCode[(UInt256, UInt256)](0xf3, 2, 0) {
-  // do not neet to check params bounds, just use safe int value
   protected def constGasFn(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
-    // do not neet to check params bounds, just use safe int value
     val List(offset, size) = state.stack.pop(2)
+    if (offset.compareTo(UInt256.MAX_INT) > 0 || size.compareTo(UInt256.MAX_INT) > 0) {
+      state.withError(ArithmeticException)
+    }
     (offset, size)
   }
 
@@ -1346,8 +1343,10 @@ case object RETURN extends OpCode[(UInt256, UInt256)](0xf3, 2, 0) {
 case object REVERT extends OpCode[(UInt256, UInt256)](0xfd, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
-    // do not neet to check params bounds, just use safe int value
     val List(offset, size) = state.stack.pop(2)
+    if (offset.compareTo(UInt256.MAX_INT) > 0 || size.compareTo(UInt256.MAX_INT) > 0) {
+      state.withError(ArithmeticException)
+    }
     (offset, size)
   }
 
