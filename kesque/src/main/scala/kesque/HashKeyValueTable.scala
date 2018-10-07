@@ -150,9 +150,9 @@ final class HashKeyValueTable private[kesque] (
       readLock.lock
 
       val valueIndex = topicIndex(topic)
-      caches(valueIndex).get(Hash(key)) match {
+      val hash = Hash(key)
+      caches(valueIndex).get(hash) match {
         case None =>
-          val hash = Hash(key)
           hashOffsets.get(hash.hashCode, valueIndex) match {
             case IntIntsMap.NO_VALUE => None
             case offsets =>
@@ -165,9 +165,9 @@ final class HashKeyValueTable private[kesque] (
                 val recs = result.info.records.records.iterator
                 while (recs.hasNext) { // NOTE: the records are offset reversed !!
                   val rec = recs.next
-                  if (rec.offset == offset && java.util.Arrays.equals(db.getBytes(rec.key), key)) {
+                  if (rec.offset == offset && java.util.Arrays.equals(kesque.getBytes(rec.key), key)) {
                     foundOffset = offset
-                    foundValue = if (rec.hasValue) Some(TVal(db.getBytes(rec.value), rec.timestamp)) else None
+                    foundValue = if (rec.hasValue) Some(TVal(kesque.getBytes(rec.value), rec.timestamp)) else None
                   }
                 }
                 i -= 1
