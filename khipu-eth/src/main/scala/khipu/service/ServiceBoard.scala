@@ -119,8 +119,8 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     // account trie node size evalution: account value - 4x256bytes ~ 288 + 1024
     // storage trie node size evalution: storage valye - 256bytes ~ 288 + 256 
     private val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(KesqueDataSource.account), 2048)),
-      Future(kesque.getTable(Array(KesqueDataSource.storage), 2048)),
+      Future(kesque.getTable(Array(KesqueDataSource.account), 4096)),
+      Future(kesque.getTable(Array(KesqueDataSource.storage), 4096)),
       Future(kesque.getTable(Array(KesqueDataSource.evmcode), 24576)),
       Future(kesque.getTimedTable(Array(
         KesqueDataSource.header,

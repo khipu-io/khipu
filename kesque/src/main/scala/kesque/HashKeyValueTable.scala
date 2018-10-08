@@ -10,7 +10,7 @@ import scala.collection.mutable
 
 object HashKeyValueTable {
   val fetchMaxBytesInLoadOffsets = 100 * 1024 * 1024 // 100M
-  val defaultFetchMaxBytes = 256 * 1024 // 256K 
+  val defaultFetchMaxBytes = 4 * 1024 // 4K the size of SSD block
 
   def intToBytes(v: Int) = ByteBuffer.allocate(4).putInt(v).array
   def bytesToInt(v: Array[Byte]) = ByteBuffer.wrap(v).getInt

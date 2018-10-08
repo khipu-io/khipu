@@ -4,7 +4,6 @@ import java.util.Properties
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.yammer.metrics.core.Gauge
-import kafka.api.LeaderAndIsr
 import kafka.api.Request
 import kafka.cluster.Replica
 import kafka.controller.KafkaController
@@ -19,7 +18,7 @@ import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.protocol.Errors._
 import org.apache.kafka.common.record.MemoryRecords
 import org.apache.kafka.common.requests.EpochEndOffset._
-import org.apache.kafka.common.requests.{ EpochEndOffset, LeaderAndIsrRequest }
+import org.apache.kafka.common.requests.EpochEndOffset
 import org.apache.kafka.common.utils.Time
 
 import scala.collection.JavaConverters._

@@ -1,8 +1,8 @@
 package kesque
 
-import kafka.server.QuotaFactory.UnboundedQuota
 import java.io.File
 import java.util.Properties
+import kafka.server.QuotaFactory.UnboundedQuota
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.SimpleRecord
