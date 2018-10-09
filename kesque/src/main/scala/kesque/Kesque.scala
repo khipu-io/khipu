@@ -65,12 +65,12 @@ final class Kesque(props: Properties) {
 
   private val topicToTable = mutable.Map[String, HashKeyValueTable]()
 
-  def getTable(topics: Array[String], fetchMaxBytes: Int = 262144, compressionType: CompressionType = CompressionType.NONE) = {
-    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, fetchMaxBytes, compressionType))
+  def getTable(topics: Array[String], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
+    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, fetchMaxBytes, compressionType, cacheSize))
   }
 
-  def getTimedTable(topics: Array[String], fetchMaxBytes: Int = 262144, compressionType: CompressionType = CompressionType.NONE) = {
-    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes, compressionType))
+  def getTimedTable(topics: Array[String], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
+    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes, compressionType, cacheSize))
   }
 
   private[kesque] def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {
