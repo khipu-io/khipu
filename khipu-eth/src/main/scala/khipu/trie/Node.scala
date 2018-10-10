@@ -165,13 +165,14 @@ final case class BranchNode(children: Array[Option[Either[Array[Byte], Node]]], 
   /**
    * This function creates a new BranchNode by updating one of the children of the self node.
    *
-   * @param childIndex of the BranchNode children where the child should be inserted.
+   * @param position of the BranchNode children where the child should be inserted.
    * @param childNode  to be inserted as a child of the new BranchNode (and hashed if necessary).
    * @return a new BranchNode.
    */
-  def updateChild(childIndex: Int, childNode: Node): BranchNode = {
+  def updateChild(position: Int, childNode: Node): BranchNode = {
     val childCapped = childNode.capped
-    BranchNode(children.updated(childIndex, Some(if (childCapped.length == 32) Left(childCapped) else Right(childNode))), terminator)
+    children(position) = Some(if (childCapped.length == 32) Left(childCapped) else Right(childNode))
+    BranchNode(children, terminator)
   }
 
   override def toString = {
