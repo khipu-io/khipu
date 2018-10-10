@@ -44,19 +44,17 @@ object PV63 {
   }
 
   object AccountImplicits {
-    import rlp.UInt256RLPImplicits._
-
     implicit final class AccountEnc(val account: Account) extends RLPSerializable {
       override def toRLPEncodable: RLPEncodeable = {
         import account._
-        RLPList(nonce.toRLPEncodable, balance.toRLPEncodable, stateRoot, codeHash)
+        RLPList(rlp.toRLPEncodable(nonce), rlp.toRLPEncodable(balance), stateRoot, codeHash)
       }
     }
 
     implicit final class AccountDec(val bytes: Array[Byte]) {
       def toAccount: Account = rlp.rawDecode(bytes) match {
         case RLPList(nonce, balance, stateRoot, codeHash) =>
-          Account(nonce.toUInt256, balance.toUInt256, stateRoot, codeHash)
+          Account(rlp.toUInt256(nonce), rlp.toUInt256(balance), stateRoot, codeHash)
         case _ => throw new RuntimeException("Cannot decode Account")
       }
     }

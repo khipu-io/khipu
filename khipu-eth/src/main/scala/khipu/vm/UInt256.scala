@@ -21,6 +21,7 @@ object UInt256 {
   val MAX_LONG = BigInteger.valueOf(Long.MaxValue)
   val THIRTY_ONE = BigInteger.valueOf(31)
   val THIRTY_TWO = BigInteger.valueOf(32)
+  val TWO_FIVE_SIX = BigInteger.valueOf(256)
 
   val MODULUS = TWO pow SizeInBits
   val MAX_VALUE = MODULUS subtract ONE
@@ -32,10 +33,11 @@ object UInt256 {
   val Zero: UInt256 = new UInt256(ZERO)
   val One: UInt256 = new UInt256(ONE)
   val Two: UInt256 = new UInt256(TWO)
+  val TwoFiveSix = new UInt256(TWO_FIVE_SIX)
 
+  def apply(b: Boolean): UInt256 = if (b) One else Zero
   def apply(n: Long): UInt256 = new UInt256(BigInteger.valueOf(n))
   def apply(n: Int): UInt256 = new UInt256(BigInteger.valueOf(n))
-  def apply(b: Boolean): UInt256 = if (b) One else Zero
   def apply(bytes: ByteString): UInt256 = apply(bytes.toArray)
   def apply(bytes: Hash): UInt256 = apply(bytes.bytes)
 
@@ -45,6 +47,9 @@ object UInt256 {
     require(bytes.length <= Size, s"Input byte array cannot be longer than $Size: ${bytes.length}")
     new UInt256(new BigInteger(1, bytes))
   }
+
+  def safe(n: Int): UInt256 = new UInt256(BigInteger.valueOf(n))
+  def safe(n: Long): UInt256 = new UInt256(BigInteger.valueOf(n))
 
   private def boundBigInt(n: BigInteger): BigInteger = {
     if (n.signum == 0) {
@@ -68,23 +73,15 @@ object UInt256 {
    * We assume n is not neseccary to exceed Long.MaxValue, and use Long here
    */
   def wordsForBytes(n: Long): Long = if (n == 0) 0 else (n - 1) / Size + 1
-
-  implicit final class BigIntAsUInt256(val bigInt: BigInteger) extends AnyVal {
-    def toUInt256: UInt256 = UInt256(bigInt)
-  }
-
-  implicit def uint256ToBigInt(uint: UInt256): BigInteger = uint.n
-  implicit def byte2UInt256(b: Byte): UInt256 = UInt256(b)
-  implicit def int2UInt256(i: Int): UInt256 = UInt256(i)
-  implicit def long2UInt256(l: Long): UInt256 = UInt256(l)
-  implicit def bool2UInt256(b: Boolean): UInt256 = UInt256(b)
 }
 
 // TODO: consider moving to util as Uint256, which follows Scala numeric conventions, and is used across the system for P_256 numbers (see YP 4.3) [EC-252]
-/** Represents 256 bit unsigned integers with standard arithmetic, byte-wise operation and EVM-specific extensions */
+/**
+ * Represents 256 bit unsigned integers with standard arithmetic, byte-wise operation and EVM-specific extensions
+ * require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid UInt256 value: $n") --- already checked in apply(n: BigInteger)
+ */
 final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
   import UInt256._
-  require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid UInt256 value: $n")
 
   // EVM-specific arithmetic
   private lazy val signedN: BigInteger = if (n.compareTo(MAX_SIGNED_VALUE) > 0) n subtract MODULUS else n
@@ -124,7 +121,7 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
    *
    * @return Size in bytes excluding the leading 0 bytes
    */
-  def byteSize: Int = if (n.compareTo(ZERO) == 0) 0 else (n.bitLength - 1) / 8 + 1
+  def byteSize: Int = if (n.signum == 0) 0 else (n.bitLength - 1) / 8 + 1
 
   def getByte(that: UInt256): UInt256 =
     if (that.n.compareTo(THIRTY_ONE) > 0) Zero else UInt256(bytes(that.n.intValue).toInt & 0xff)
@@ -143,21 +140,21 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
   def compare(that: UInt256): Int = n.compareTo(that.n)
   def min(that: UInt256): UInt256 = if (n.compareTo(that.n) < 0) this else that
   def max(that: UInt256): UInt256 = if (n.compareTo(that.n) > 0) this else that
-  def isZero: Boolean = n.compareTo(ZERO) == 0
-  def nonZero: Boolean = n.compareTo(ZERO) != 0
+  def isZero: Boolean = n.signum == 0
+  def nonZero: Boolean = n.signum != 0
 
-  def div(that: UInt256): UInt256 = if (that.n.compareTo(ZERO) == 0) Zero else new UInt256(n divide that.n)
-  def sdiv(that: UInt256): UInt256 = if (that.n.compareTo(ZERO) == 0) Zero else UInt256(signedN divide that.signedN)
-  def mod(that: UInt256): UInt256 = if (that.n.compareTo(ZERO) == 0) Zero else UInt256(n mod that.n)
-  def smod(that: UInt256): UInt256 = if (that.n.compareTo(ZERO) == 0) Zero else UInt256(signedN remainder that.signedN.abs)
-  def addmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.compareTo(ZERO) == 0) Zero else new UInt256((n add that.n) remainder modulus.n)
-  def mulmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.compareTo(ZERO) == 0) Zero else new UInt256((n multiply that.n) mod modulus.n)
+  def div(that: UInt256): UInt256 = if (that.n.signum == 0) Zero else new UInt256(n divide that.n)
+  def sdiv(that: UInt256): UInt256 = if (that.n.signum == 0) Zero else UInt256(signedN divide that.signedN)
+  def mod(that: UInt256): UInt256 = if (that.n.signum == 0) Zero else UInt256(n mod that.n)
+  def smod(that: UInt256): UInt256 = if (that.n.signum == 0) Zero else UInt256(signedN remainder that.signedN.abs)
+  def addmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.signum == 0) Zero else new UInt256((n add that.n) remainder modulus.n)
+  def mulmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.signum == 0) Zero else new UInt256((n multiply that.n) mod modulus.n)
 
   def slt(that: UInt256): Boolean = signedN.compareTo(that.signedN) < 0
   def sgt(that: UInt256): Boolean = signedN.compareTo(that.signedN) > 0
 
   def signExtend(that: UInt256): UInt256 = {
-    if (that.n.compareTo(ZERO) < 0 || that.n.compareTo(THIRTY_ONE) > 0) {
+    if (that.n.signum < 0 || that.n.compareTo(THIRTY_ONE) > 0) {
       this
     } else {
       val idx = that.n.byteValue

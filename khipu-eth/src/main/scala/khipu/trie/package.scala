@@ -27,10 +27,9 @@ package object trie {
   }
 
   val rlpUInt256Serializer = new ByteArraySerializable[UInt256] {
-    import khipu.rlp.UInt256RLPImplicits._
-    // NOTE should rlp decode first before deser to UInt256, see UInt256RLPImplicits
-    override def fromBytes(bytes: Array[Byte]): UInt256 = bytes.toUInt256
-    override def toBytes(input: UInt256): Array[Byte] = input.toBytes
+    // NOTE should rlp decode first before deser to UInt256, see rlp.toUInt256
+    override def fromBytes(bytes: Array[Byte]): UInt256 = rlp.toUInt256(bytes)
+    override def toBytes(input: UInt256): Array[Byte] = rlp.encode(rlp.toRLPEncodable(input))
   }
 
   val hashUInt256Serializable = new ByteArrayEncoder[UInt256] {

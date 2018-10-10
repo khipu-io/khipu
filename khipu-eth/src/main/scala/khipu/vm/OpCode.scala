@@ -296,23 +296,23 @@ case object SIGNEXTEND extends BinaryOp(0x0b) with ConstGas[(UInt256, UInt256)] 
 }
 case object LT extends BinaryOp(0x10) with ConstGas[(UInt256, UInt256)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x < y
+  protected def f(x: UInt256, y: UInt256) = UInt256(x < y)
 }
 case object GT extends BinaryOp(0x11) with ConstGas[(UInt256, UInt256)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x > y
+  protected def f(x: UInt256, y: UInt256) = UInt256(x > y)
 }
 case object SLT extends BinaryOp(0x12) with ConstGas[(UInt256, UInt256)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x slt y
+  protected def f(x: UInt256, y: UInt256) = UInt256(x slt y)
 }
 case object SGT extends BinaryOp(0x13) with ConstGas[(UInt256, UInt256)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x sgt y
+  protected def f(x: UInt256, y: UInt256) = UInt256(x sgt y)
 }
 case object EQ extends BinaryOp(0x14) with ConstGas[(UInt256, UInt256)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x == y
+  protected def f(x: UInt256, y: UInt256) = UInt256(x.n.compareTo(y.n) == 0)
 }
 case object AND extends BinaryOp(0x16) with ConstGas[(UInt256, UInt256)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
@@ -356,7 +356,7 @@ sealed abstract class UnaryOp(code: Int) extends OpCode[UInt256](code, 1, 1) wit
 }
 case object ISZERO extends UnaryOp(0x15) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256) = x.isZero
+  protected def f(x: UInt256) = UInt256(x.isZero)
 }
 case object NOT extends UnaryOp(0x19) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
@@ -393,7 +393,7 @@ case object SHA3 extends OpCode[(UInt256, UInt256)](0x20, 2, 1) {
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bounds, just use safe int value
     val List(offset, size) = state.stack.pop(2)
-    (offset.intValueSafe, size.intValueSafe)
+    (UInt256.safe(offset.intValueSafe), UInt256.safe(size.intValueSafe))
   }
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
@@ -436,13 +436,13 @@ case object CALLVALUE extends ConstOp(0x34) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.value
 }
 case object CALLDATASIZE extends ConstOp(0x36) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.inputData.size
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.inputData.size)
 }
 case object GASPRICE extends ConstOp(0x3a) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.gasPrice
 }
 case object CODESIZE extends ConstOp(0x38) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.program.length
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.env.program.length)
 }
 case object COINBASE extends ConstOp(0x41) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.beneficiary)
@@ -460,7 +460,7 @@ case object GASLIMIT extends ConstOp(0x45) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.gasLimit)
 }
 case object PC extends ConstOp(0x58) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.pc)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.pc)
 }
 case object MSIZE extends ConstOp(0x59) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(UInt256.Size * UInt256.wordsForBytes(s.memory.size))
@@ -566,7 +566,7 @@ case object EXTCODECOPY extends OpCode[(UInt256, UInt256, UInt256, UInt256)](0x3
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
     val List(address, memOffset, codeOffset, size) = state.stack.pop(4)
-    (address, memOffset.intValueSafe, codeOffset.intValueSafe, size.intValueSafe)
+    (address, UInt256.safe(memOffset.intValueSafe), UInt256.safe(codeOffset.intValueSafe), UInt256.safe(size.intValueSafe))
   }
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): ProgramState[W, S] = {
@@ -714,7 +714,7 @@ case object MSTORE8 extends OpCode[(UInt256, UInt256)](0x53, 2, 0) {
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
     val (offset, value) = params
-    val valueToByte = (value mod 256).byteValue
+    val valueToByte = (value mod UInt256.TwoFiveSix).n.byteValue
     state.memory.store(offset.intValueSafe, valueToByte)
     state.step()
   }

@@ -2,11 +2,11 @@ package khipu.vm
 
 import akka.util.ByteString
 import khipu.crypto
-import khipu.domain.{ Account, Address }
+import khipu.domain.Account
+import khipu.domain.Address
 import khipu.rlp
 import khipu.rlp.RLPImplicitConversions._
 import khipu.rlp.RLPList
-import khipu.rlp.UInt256RLPImplicits._
 
 /**
  * This is a single entry point to all VM interactions with the persisted state. Implementations are meant to be
@@ -54,7 +54,7 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
     getAccount(address).map(_.isEmpty).getOrElse(true)
 
   def getBalance(address: Address): UInt256 =
-    getAccount(address).map(a => UInt256(a.balance)).getOrElse(UInt256.Zero)
+    getAccount(address).map(a => a.balance).getOrElse(UInt256.Zero)
 
   def transfer(from: Address, to: Address, value: UInt256): W = {
     if (from == to) {
@@ -89,7 +89,7 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
    */
   def createAddress(creatorAddr: Address): Address = {
     val creatorAccount = getGuaranteedAccount(creatorAddr)
-    val hash = crypto.kec256(rlp.encode(RLPList(creatorAddr.bytes, (creatorAccount.nonce - 1).toRLPEncodable)))
+    val hash = crypto.kec256(rlp.encode(RLPList(creatorAddr.bytes, rlp.toRLPEncodable(creatorAccount.nonce - UInt256.One))))
     Address(hash)
   }
 

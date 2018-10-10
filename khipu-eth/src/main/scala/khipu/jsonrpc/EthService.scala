@@ -35,7 +35,6 @@ import khipu.ommers.OmmersPool
 import khipu.rlp
 import khipu.rlp.RLPList
 import khipu.rlp.RLPImplicitConversions._
-import khipu.rlp.UInt256RLPImplicits._
 import khipu.vm.UInt256
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -289,7 +288,7 @@ class EthService(
 
       val contractAddress = if (stx.tx.isContractCreation) {
         //do not subtract 1 from nonce because in transaction we have nonce of account before transaction execution
-        val hash = crypto.kec256(rlp.encode(RLPList(stx.sender.bytes, UInt256(stx.tx.nonce).toRLPEncodable)))
+        val hash = crypto.kec256(rlp.encode(RLPList(stx.sender.bytes, rlp.toRLPEncodable(UInt256(stx.tx.nonce)))))
         Some(Address(hash))
       } else {
         None

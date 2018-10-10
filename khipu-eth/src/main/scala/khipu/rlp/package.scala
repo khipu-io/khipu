@@ -1,5 +1,8 @@
 package khipu
 
+import akka.util.ByteString
+import khipu.vm.UInt256
+
 package object rlp {
 
   val EmptyRLPData = encode(RLPValue(Array[Byte]()))
@@ -46,4 +49,17 @@ package object rlp {
     def toBytes: Array[Byte] = encode(this.toRLPEncodable)
   }
 
+  // --- utilities for UInt256
+
+  def toRLPEncodable(value: UInt256): RLPEncodeable =
+    RLPValue(if (value.n.signum == 0) RLP.byteToByteArray(0: Byte) else value.nonZeroLeadingBytes)
+
+  def toUInt256(bytes: ByteString): UInt256 = toUInt256(bytes.toArray)
+  def toUInt256(bytes: Array[Byte]): UInt256 = toUInt256(rawDecode(bytes))
+  def toUInt256(rLPEncodeable: RLPEncodeable): UInt256 = {
+    rLPEncodeable match {
+      case RLPValue(bytes) => UInt256(bytes)
+      case _               => throw RLPException("src is not an RLPValue")
+    }
+  }
 }

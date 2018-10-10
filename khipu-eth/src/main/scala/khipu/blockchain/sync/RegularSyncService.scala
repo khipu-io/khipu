@@ -414,7 +414,7 @@ trait RegularSyncService { _: SyncService =>
           blockchain.saveReceipts(block.header.hash, receipts)
           blockchain.saveTotalDifficulty(block.header.hash, newTd)
           appStateStorage.putBestBlockNumber(block.header.number)
-          log.debug(s"${block.header.number} persisted in ${System.currentTimeMillis - start1}ms")
+          log.debug(s"${block.header.number} persisted in ${System.currentTimeMillis - start1}ms") // usually less than 20ms
 
           pendingTransactionsService ! PendingTransactionsService.RemoveTransactions(block.body.transactionList)
           ommersPool ! OmmersPool.RemoveOmmers((block.header +: block.body.uncleNodesList).toList)
