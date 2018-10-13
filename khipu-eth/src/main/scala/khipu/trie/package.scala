@@ -33,7 +33,7 @@ package object trie {
   }
 
   val hashUInt256Serializable = new ByteArrayEncoder[UInt256] {
-    override def toBytes(input: UInt256): Array[Byte] = crypto.kec256(input.bytes.toArray)
+    override def toBytes(input: UInt256): Array[Byte] = crypto.kec256(input.bytes)
   }
 
   def toHash(bytes: Array[Byte]): Array[Byte] = crypto.kec256(bytes)

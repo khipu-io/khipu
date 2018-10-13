@@ -70,15 +70,28 @@ object BigInt {
   def main(args: Array[String]) {
     import TEST._
 
-    val s = "246313781983713469235139859013498018470170100003957203570275438387"
-    val x = new BigInt(s)
-    val y = x.toBigInteger
-    val z = new BigInteger(s)
-    val h = new BigInt(z)
+    List(
+      "0",
+      "246313781983713469235139859013498018470170100003957203570275438387",
+      "-246313781983713469235139859013498018470170100003957203570275438387"
+    ) foreach { s =>
+        val x = new BigInt(s)
+        val y = x.toBigInteger
+        val z = new BigInteger(s)
+        val h = new BigInt(z)
 
-    assert(x.bitLength == y.bitLength && x.bitLength == z.bitLength, s"$x, $y should be same bitLength")
-    assert(Arrays.equals(x.toByteArray, z.toByteArray), s"$x, $y should be same toByteArray")
-    assert(x.toString == y.toString && x.toString == z.toString && x.toString == h.toString, s"$x, $y, $z, $h should be same")
+        assert(x.bitLength == y.bitLength && x.bitLength == z.bitLength, s"$x, $y should be same bitLength")
+        assert(Arrays.equals(x.toByteArray, z.toByteArray), s"$x, $y should be same toByteArray")
+        assert(x.toString == y.toString && x.toString == z.toString && x.toString == h.toString, s"$x, $y, $z, $h should be same")
+        assertEquals(s"Should $x == ${x.copy}", x, x.copy)
+      }
+
+    val zeroBigInteger = new BigInteger(1, Array[Byte]())
+    println(s"zero BigInteger: $zeroBigInteger, bytes: ${zeroBigInteger.toByteArray.mkString(",")}")
+    val zeroBigInt = new BigInt(0)
+    println(s"zero BigInt: $zeroBigInt, bytes: ${zeroBigInt.toByteArray.mkString(",")}")
+    val zero = new BigInt(zeroBigInteger)
+    println(s"zero from BigInteger: $zero, bytes: ${zero.toByteArray.mkString(",")}")
 
     constructorTest()
     addTest()
@@ -99,6 +112,7 @@ object BigInt {
     testNot()
     testLongAdd()
     testMod()
+    testByteArray()
   }
 
   private object TEST {
@@ -116,7 +130,7 @@ object BigInt {
       return num
     }
 
-    private def assertEquals(msg: String, a: Any, b: Any) = assert(a == b, s"$msg: $a != $b")
+    def assertEquals(msg: String, a: Any, b: Any) = assert(a == b, s"$msg: $a != $b")
 
     def constructorTest() {
       val s = "246313781983713469235139859013498018470170100003957203570275438387"
@@ -181,21 +195,21 @@ object BigInt {
       val s = "246313781983713469235139859013498018470170100003957203570275438387"
       val t = "2374283475698324756873245832748"
       var me = new BigInt(s)
-      me.sub(new BigInt(s))
+      me.subtract(new BigInt(s))
       assertEquals("Sub to zero", "0", me.toString)
       me = new BigInt(t)
-      me.sub(new BigInt(t))
+      me.subtract(new BigInt(t))
       assertEquals("Sub2 to zero", "0", me.toString)
       me = new BigInt("1337")
       me.usub(1337)
       assertEquals("Small sub", "0", me.toString)
       me = new BigInt("4000000000")
-      me.sub(new BigInt("2000000000"))
+      me.subtract(new BigInt("2000000000"))
       assertEquals("Small sub", "2000000000", me.toString)
 
       var facit = new BigInteger(s).subtract(new BigInteger(t))
       me = new BigInt(s)
-      me.sub(new BigInt(t))
+      me.subtract(new BigInt(t))
       assertEquals("Sub", facit.toString, me.toString)
 
       facit = new BigInteger(t).subtract(new BigInteger(s))
@@ -207,9 +221,9 @@ object BigInt {
       me.umul(0)
       me.usub(1)
       assertEquals("From 0 to -1", "-1", me.toString)
-      me.mul(-16)
+      me.multiply(-16)
       assertEquals("From -1 to 16", "16", me.toString)
-      me.div(-4)
+      me.divide(-4)
       assertEquals("From 16 to -4", "-4", me.toString)
     }
 
@@ -218,7 +232,7 @@ object BigInt {
       me.umul(3)
       assertEquals("Small", "6000000000", me.toString)
       me = new BigInt("4000000000")
-      me.mul(me)
+      me.multiply(me)
       assertEquals("Two", "16000000000000000000", me.toString)
 
       val s = "246313781983713469235139859013498018470170100003957203570275438387"
@@ -226,15 +240,15 @@ object BigInt {
       var facit = new BigInteger(s).multiply(new BigInteger(t))
 
       me = new BigInt(t)
-      me.mul(new BigInt(s))
+      me.multiply(new BigInt(s))
       assertEquals("Mul ", facit.toString, me.toString)
 
       me.umul(0)
       me.uadd(1)
       assertEquals("0 to 1", "1", me.toString)
-      me.mul(new BigInt(s))
+      me.multiply(new BigInt(s))
       assertEquals("1 to s", s, me.toString)
-      me.mul(new BigInt(t))
+      me.multiply(new BigInt(t))
       assertEquals("Mul2", facit.toString(), me.toString)
 
       facit = new BigInteger(1, Array[Byte](-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1))
@@ -265,23 +279,23 @@ object BigInt {
       facit = new BigInteger(s).divide(new BigInteger(t))
       me = new BigInt(s)
       var tmp = new BigInt(t)
-      me.div(tmp)
+      me.divide(tmp)
       assertEquals("Div3 ", facit.toString(), me.toString)
 
-      me.div(new BigInt(s))
+      me.divide(new BigInt(s))
       assertEquals("Should be 0", "0", me.toString)
 
       facit = new BigInteger(s).divide(new BigInteger("-" + t + t))
       me.assign(s)
       tmp.assign("-" + t + t)
-      me.div(tmp)
+      me.divide(tmp)
       assertEquals("Div4 ", facit.toString(), me.toString)
 
       s = "253187224242823454860064468797249161593623134834254603067018"
       t = "434771785074759645588146668555"
       facit = new BigInteger(s).divide(new BigInteger(t))
       me = new BigInt(s)
-      me.div(new BigInt(t))
+      me.divide(new BigInt(t))
       assertEquals("Div5 ", facit.toString(), me.toString)
 
       val m = Array[Int](2, 2, 2, 2)
@@ -350,16 +364,16 @@ object BigInt {
       facit = new BigInteger(s).remainder(new BigInteger(t))
       me = new BigInt(s)
       var tmp = new BigInt(t)
-      me.rem(tmp)
+      me.remainder(tmp)
       assertEquals("Rem3 ", facit.toString(), me.toString)
 
-      me.rem(me)
+      me.remainder(me)
       assertEquals("Should be 0", "0", me.toString)
 
       facit = new BigInteger(s).remainder(new BigInteger("-" + t + t))
       me.assign(s)
       tmp.assign("-" + t + t)
-      me.rem(tmp)
+      me.remainder(tmp)
       assertEquals("Rem4 ", facit.toString(), me.toString)
     }
 
@@ -394,7 +408,7 @@ object BigInt {
     def testLongCastInMul() {
       val a = new BigInt("1000000000000000")
       val b = new BigInt("1000000000000000")
-      a.mul(b)
+      a.multiply(b)
       assertEquals("10^15 * 10^15", "1000000000000000000000000000000", a.toString)
     }
 
@@ -409,9 +423,9 @@ object BigInt {
       a.add(-1L)
       assertEquals("-1L + 2L + -1L = 0", true, a.isZero)
       a.usub(7L)
-      a.sub(-8L)
+      a.subtract(-8L)
       assertEquals("-7L - -8L != 0", false, a.isZero)
-      a.sub(1L)
+      a.subtract(1L)
       assertEquals("1 - 1L = 0", true, a.isZero)
     }
 
@@ -428,7 +442,7 @@ object BigInt {
       {
         val p = new BigInt(104608886616216589L)
         val q = new BigInt(104608886616125069L)
-        p.div(q)
+        p.divide(q)
         assertEquals("div", "1", p.toString)
         assertEquals("div", "104608886616125069", q.toString)
       }
@@ -436,7 +450,7 @@ object BigInt {
       {
         val p = new BigInt(104608886616216589L)
         val q = new BigInt(104608886616125069L)
-        p.rem(q)
+        p.remainder(q)
         assertEquals("rem", "91520", p.toString)
         assertEquals("rem", "104608886616125069", q.toString)
       }
@@ -598,7 +612,7 @@ object BigInt {
       a.shiftLeft(2048)
       b.assign(1)
       b.shiftLeft(2048)
-      b.sub(1)
+      b.subtract(1)
       a.or(b)
       assertEquals("-2^2048 or 2^2048-1 = ", "-1", a.toString)
     }
@@ -706,11 +720,32 @@ object BigInt {
         var bb = new BigInteger(new String(t))
         if (bb.compareTo(BigInteger.ZERO) <= 0) {
           bb = bb.negate().add(BigInteger.ONE)
-          b.mul(-1)
+          b.multiply(-1)
           b.add(1)
         }
         a.mod(b)
         assertEquals("Random mod", aa.mod(bb).toString(), a.toString())
+        i += 1
+      }
+    }
+
+    def testByteArray() {
+      var i = 0
+      while (i < 1024) {
+        val s = getRndNumber(1 + i * 10)
+        var facit = new BigInteger(new String(s))
+        val x = new BigInt(new String(s))
+        val y = x.toBigInteger
+        val z = new BigInt(y)
+        assert(facit.bitLength == x.bitLength, s"$i: bitLength equation of ${facit.bitLength}, ${x.bitLength}")
+        assert(Arrays.equals(facit.toByteArray, x.toByteArray), s"$i: ByteArray equation of ${facit}, ${x}")
+
+        assert(x.bitLength == y.bitLength, s"$i: bitLength equation of x and x.toBigInteger $x, $y")
+        assert(y.bitLength == z.bitLength, s"$i: bitLength equation of x.toBigInteger and new BigInt(x.toBigInteger) $y, $z")
+
+        assert(Arrays.equals(x.toByteArray, y.toByteArray), s"$i: ByteArray equation x and x.toBigInteger $x, $y")
+        assert(Arrays.equals(y.toByteArray, z.toByteArray), s"$i: ByteArray equation x.toBigInteger and new BigInt(x.toBigInteger) $y, $z")
+
         i += 1
       }
     }
@@ -721,15 +756,21 @@ object BigInt {
    */
   private val MASK = (1L << 32) - 1
 
-  def pow(a: BigInt, _b: Long): BigInt = {
+  /**
+   * This mask is used to obtain the value of an int as if it were unsigned.
+   */
+  private val LONG_MASK = 0xffffffffL;
+
+  // TODO - private it
+  private def pow(a: BigInt, _b: Long): BigInt = {
     var b = _b
     val res = new BigInt(1)
     val bitPow = a.copy
     while (b > 0) {
       if ((b & 1) != 0) {
-        res.mul(bitPow)
+        res.multiply(bitPow)
       }
-      bitPow.mul(bitPow)
+      bitPow.multiply(bitPow)
       b >>>= 1
     }
     res
@@ -1049,15 +1090,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * is and not be copied.
    *
    * @param sign	The sign of the number.
-   * @param v	The magnitude of the number, the first position gives the least
+   * @param mag	The magnitude of the number, the first position gives the least
    * significant 32 bits.
    * @param len	The (first) number of entries of v that are considered part of
    * the number.
    * @complexity	O(1)
    */
-  def this(sign: Int, v: Array[Int], len: Int) = {
+  def this(sign: Int, mag: Array[Int], len: Int) = {
     this()
-    assign(sign, v, len)
+    this.sign = sign
+    this.len = len
+    this.mag = mag
   }
 
   /**
@@ -1157,110 +1200,23 @@ final class BigInt private () extends Number with Ordered[BigInt] {
 
   def this(v: BigInteger) = {
     this()
-    val bytes = reverse(v.toByteArray)
-    assign(v.signum, bytes, bytes.length)
-  }
-
-  private def reverse[T](xs: Array[T]) = {
-    var i = 0
-    while (i < xs.length / 2) {
-      val tmp = xs(i)
-      xs(i) = xs(xs.length - i - 1)
-      xs(xs.length - i - 1) = tmp
-      i += 1
-    }
-    xs
+    assign(v.toByteArray)
   }
 
   /*** <General Helper> ***/
   /**
-   * Parses a part of a char array as an unsigned decimal number.
+   * Assigns the given BigInt parameter to this number.
+   * The input magnitude array will be used as is and not copied.
    *
-   * @param s		A char array representing the number in decimal.
-   * @param from	The index (inclusive) where we start parsing.
-   * @param to		The index (exclusive) where we stop parsing.
-   * @return		The parsed number.
-   * @complexity	O(n)
+   * @param sign	The sign of the number.
+   * @param mag		The magnitude of the number.
+   * @param len 	The length of the magnitude array to be used.
+   * @complexity	O(1)
    */
-  private def parse(s: Array[Char], _from: Int, to: Int): Int = {
-    var from = _from
-    var res = s(from) - '0'
-    while ({ from += 1; from } < to) {
-      res = res * 10 + s(from) - '0'
-    }
-    res
-  }
-
-  /**
-   * Multiplies this number and then adds something to it.
-   * I.e. sets this = this*mul + add.
-   *
-   * @param mul	The value we multiply our number with, mul < 2^31.
-   * @param add	The value we add to our number, add < 2^31.
-   * @complexity	O(n)
-   */
-  private def mulAdd(mul: Int, add: Int) {
-    var carry = 0L
-    var i = 0
-    while (i < len) {
-      carry = mul * (mag(i) & MASK) + carry
-      mag(i) = carry.toInt
-      carry >>>= 32
-      i += 1
-    }
-    if (carry != 0) {
-      mag(len) = carry.toInt
-      len += 1
-    }
-    carry = (mag(0) & MASK) + add
-    mag(0) = carry.toInt
-    if ((carry >>> 32) != 0) {
-      var i = 1
-      while (i < len && { mag(i) += 1; mag(i) == 0 }) {
-        i += 1
-      }
-      if (i == len) {
-        mag(len) = 1 //Todo: realloc() for general case?
-        len += 1
-      }
-    }
-  }
-
-  /**
-   * Reallocates the magnitude array to one twice its size.
-   *
-   * @complexity	O(n)
-   */
-  private def realloc() {
-    val res = Array.ofDim[Int](mag.length * 2)
-    System.arraycopy(mag, 0, res, 0, len)
-    mag = res
-  }
-
-  /**
-   * Reallocates the magnitude array to one of the given size.
-   *
-   * @param newLen	The new size of the magnitude array.
-   * @complexity	O(n)
-   */
-  private def realloc(newLen: Int) {
-    val res = Array.ofDim[Int](newLen)
-    System.arraycopy(mag, 0, res, 0, len)
-    mag = res
-  }
-  /*** </General Helper> ***/
-
-  /*** <General functions> ***/
-  /**
-   * Creates a copy of this number.
-   *
-   * @return The BigInt copy.
-   * @complexity	O(n)
-   */
-  def copy() = {
-    val xs = Array.ofDim[Int](len)
-    System.arraycopy(mag, 0, xs, 0, len)
-    new BigInt(sign, xs, len)
+  def assign(sign: Int, mag: Array[Int], len: Int) {
+    this.sign = sign
+    this.len = len
+    this.mag = mag
   }
 
   /**
@@ -1292,21 +1248,6 @@ final class BigInt private () extends Number with Ordered[BigInt] {
 
   /**
    * Assigns the given BigInt parameter to this number.
-   * The input magnitude array will be used as is and not copied.
-   *
-   * @param sign	The sign of the number.
-   * @param v		The magnitude of the number.
-   * @param len 	The length of the magnitude array to be used.
-   * @complexity	O(1)
-   */
-  def assign(sign: Int, v: Array[Int], len: Int) {
-    this.sign = sign
-    this.len = len
-    mag = v
-  }
-
-  /**
-   * Assigns the given BigInt parameter to this number.
    * Assumes no leading zeroes of the input-array, i.e. that v[vlen-1]!=0, except for the case when vlen==1.
    *
    * @param sign	The sign of the number.
@@ -1315,11 +1256,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @complexity	O(n)
    */
   def assign(sign: Int, v: Array[Byte], vlen: Int) {
+    this.sign = sign
     len = (vlen + 3) / 4
     if (len > mag.length) {
       mag = Array.ofDim[Int](len + 2)
     }
-    this.sign = sign
     var tmp = vlen / 4
     var j = 0
     var i = 0
@@ -1397,7 +1338,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   def uassign(s: Int, v: Long) {
     sign = s
     len = 2
-    if (mag.length < 2) realloc(2)
+    if (mag.length < 2) {
+      realloc(2)
+    }
     mag(0) = (v & MASK).toInt
     mag(1) = (v >>> 32).toInt
     if (mag(1) == 0) len -= 1
@@ -1444,14 +1387,230 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   }
 
   /**
+   * Translates a byte array containing the two's-complement binary
+   * representation of a BigInteger into a BigInteger.  The input array is
+   * assumed to be in <i>big-endian</i> byte-order: the most significant
+   * byte is in the zeroth element.
+   *
+   * @param  val big-endian two's-complement binary representation of
+   *         BigInteger.
+   * @throws NumberFormatException {@code val} is zero bytes long.
+   */
+  private def assign(bigEndianMag: Array[Byte]) {
+    if (bigEndianMag.length == 0) {
+      throw new NumberFormatException("Zero length BigInteger")
+    }
+
+    if (bigEndianMag(0) < 0) {
+      mag = reverse(makePositive(bigEndianMag))
+      sign = -1
+    } else {
+      mag = reverse(stripLeadingZeroBytes(bigEndianMag))
+      if (mag.length == 0) {
+        mag = Array(0)
+        sign = 0
+      } else {
+        sign = 1
+      }
+    }
+    len = mag.length
+  }
+
+  /**
+   * Takes an array a representing a negative 2's-complement number and
+   * returns the minimal (no leading zero bytes) unsigned whose value is -a.
+   */
+  private def makePositive(a: Array[Byte]): Array[Int] = {
+    val byteLength = a.length
+
+    var keep = 0
+    // find first non-sign (0xff) byte of input
+    while (keep < byteLength && a(keep) == -1) {
+      keep += 1
+    }
+
+    // allocate output array.  If all non-sign bytes are 0x00, we must
+    // allocate space for one extra output byte. */
+    var k = keep
+    while (k < byteLength && a(k) == 0) {
+      k += 1
+    }
+
+    val extraByte = if (k == byteLength) 1 else 0
+    val intLength = ((byteLength - keep + extraByte) + 3) >>> 2
+    val result = Array.ofDim[Int](intLength)
+
+    // copy one's complement of input into output, leaving extra
+    // byte (if it exists) == 0x00 
+    var b = byteLength - 1
+    var i = intLength - 1
+    while (i >= 0) {
+      result(i) = a(b) & 0xff
+      b -= 1
+      var numBytesToTransfer = math.min(3, b - keep + 1)
+      if (numBytesToTransfer < 0) {
+        numBytesToTransfer = 0
+      }
+      var j = 8
+      while (j <= 8 * numBytesToTransfer) {
+        result(i) |= ((a(b) & 0xff) << j)
+        b -= 1
+        j += 8
+      }
+
+      // mask indicates which bits must be complemented
+      val mask = -1 >>> (8 * (3 - numBytesToTransfer))
+      result(i) = ~result(i) & mask
+      i -= 1
+    }
+
+    // add one to one's complement to generate two's complement
+    i = result.length - 1
+    var break = false
+    while (!break && i >= 0) {
+      result(i) = ((result(i) & LONG_MASK) + 1).toInt
+      if (result(i) != 0) {
+        break = true
+      }
+      i -= 1
+    }
+
+    result
+  }
+
+  /**
+   * Returns a copy of the input array stripped of any leading zero bytes.
+   */
+  private def stripLeadingZeroBytes(a: Array[Byte]): Array[Int] = {
+    val byteLength = a.length
+
+    // find first nonzero byte
+    var keep = 0
+    while (keep < byteLength && a(keep) == 0) {
+      keep += 1
+    }
+
+    // allocate new array and copy relevant part of input array
+    val intLength = ((byteLength - keep) + 3) >>> 2
+    val result = Array.ofDim[Int](intLength)
+    var b = byteLength - 1
+    var i = intLength - 1
+    while (i >= 0) {
+      result(i) = a(b) & 0xff
+      b -= 1
+      val bytesRemaining = b - keep + 1
+      val bytesToTransfer = math.min(3, bytesRemaining)
+      var j = 8
+      while (j <= (bytesToTransfer << 3)) {
+        result(i) |= ((a(b) & 0xff) << j)
+        b -= 1
+        j += 8
+      }
+      i -= 1
+    }
+
+    result
+  }
+
+  /**
+   * Parses a part of a char array as an unsigned decimal number.
+   *
+   * @param s		A char array representing the number in decimal.
+   * @param from	The index (inclusive) where we start parsing.
+   * @param to		The index (exclusive) where we stop parsing.
+   * @return		The parsed number.
+   * @complexity	O(n)
+   */
+  private def parse(s: Array[Char], _from: Int, to: Int): Int = {
+    var from = _from
+    var res = s(from) - '0'
+    while ({ from += 1; from } < to) {
+      res = res * 10 + s(from) - '0'
+    }
+    res
+  }
+
+  /**
+   * Multiplies this number and then adds something to it.
+   * I.e. sets this = this*mul + add.
+   *
+   * @param mul	The value we multiply our number with, mul < 2^31.
+   * @param add	The value we add to our number, add < 2^31.
+   * @complexity	O(n)
+   */
+  private def mulAdd(mul: Int, add: Int) {
+    var carry = 0L
+    var i = 0
+    while (i < len) {
+      carry = mul * (mag(i) & MASK) + carry
+      mag(i) = carry.toInt
+      carry >>>= 32
+      i += 1
+    }
+    if (carry != 0) {
+      mag(len) = carry.toInt
+      len += 1
+    }
+    carry = (mag(0) & MASK) + add
+    mag(0) = carry.toInt
+    if ((carry >>> 32) != 0) {
+      var i = 1
+      while (i < len && { mag(i) += 1; mag(i) == 0 }) {
+        i += 1
+      }
+      if (i == len) {
+        mag(len) = 1 // TODO: realloc() for general case?
+        len += 1
+      }
+    }
+  }
+
+  /**
+   * Reallocates the magnitude array to one twice its size.
+   *
+   * @complexity	O(n)
+   */
+  private def realloc() {
+    val res = Array.ofDim[Int](mag.length * 2)
+    System.arraycopy(mag, 0, res, 0, len)
+    mag = res
+  }
+
+  /**
+   * Reallocates the magnitude array to one of the given size.
+   *
+   * @param newLen	The new size of the magnitude array.
+   * @complexity	O(n)
+   */
+  private def realloc(newLen: Int) {
+    val res = Array.ofDim[Int](newLen)
+    System.arraycopy(mag, 0, res, 0, len)
+    mag = res
+  }
+  /*** </General Helper> ***/
+
+  /*** <General functions> ***/
+  /**
+   * Creates a copy of this number.
+   *
+   * @return The BigInt copy.
+   * @complexity	O(n)
+   */
+  def copy() = {
+    val xs = Array.ofDim[Int](len)
+    System.arraycopy(mag, 0, xs, 0, len)
+    new BigInt(sign, xs, len)
+  }
+
+  /**
    * Tells whether this number is zero or not.
    *
    * @return true if this number is zero, false otherwise
    * @complexity	O(1)
    */
   def isZero: Boolean = len == 1 && mag(0) == 0
-  def isNegative: Boolean = sign < 0
-  def isPositive: Boolean = sign > 0
+  def isNegative: Boolean = sign < 0 && !isZero
+  def isPositive: Boolean = sign > 0 && !isZero
 
   /**
    * Sets this number to zero.
@@ -1461,52 +1620,60 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   private def setToZero() {
     mag(0) = 0
     len = 1
-    sign = 1 //Remove?
+    sign = 1 // remove?
   }
 
-  def max(value: BigInt): BigInt = if (compareTo(value) > 0) this else value
+  def max(that: BigInt): BigInt = if (compareTo(that) > 0) this else that
+  def min(that: BigInt): BigInt = if (compareTo(that) < 0) this else that
 
   /**
    * Compares the absolute value of this and the given number.
+   * this and that won't be changed, both safe.
    *
-   * @param a	The number to be compared with.
+   * @param that	The number to be compared with.
    * @return	-1 if the absolute value of this number is less, 0 if it's equal, 1 if it's greater.
    * @complexity	O(n)
    */
-  def compareAbsTo(a: BigInt): Int = {
-    if (len > a.len) return 1
-    if (len < a.len) return -1
-    var i = len - 1
-    while (i >= 0) {
-      if (mag(i) != a.mag(i)) {
-        if ((mag(i) & MASK) > (a.mag(i) & MASK)) {
-          return 1
-        } else {
-          return -1
+  def compareAbsTo(that: BigInt): Int = {
+    if (len > that.len) {
+      1
+    } else if (len < that.len) {
+      -1
+    } else {
+      var i = len - 1
+      while (i >= 0) {
+        if (mag(i) != that.mag(i)) {
+          if ((mag(i) & MASK) > (that.mag(i) & MASK)) {
+            return 1
+          } else {
+            return -1
+          }
         }
+        i -= 1
       }
-      i -= 1
+
+      0
     }
-    return 0
   }
 
   /**
    * Compares the value of this and the given number.
+   * this and that won't be changed, both safe.
    *
-   * @param a	The number to be compared with.
+   * @param that	The number to be compared with.
    * @return	-1 if the value of this number is less, 0 if it's equal, 1 if it's greater.
    * @complexity	O(n)
    */
-  override def compare(a: BigInt): Int = {
+  override def compare(that: BigInt): Int = {
     if (sign < 0) {
-      if (a.sign < 0 || a.isZero) {
-        -compareAbsTo(a)
+      if (that.sign < 0 || that.isZero) {
+        -compareAbsTo(that)
       } else {
         -1
       }
     } else {
-      if (a.sign > 0 || a.isZero) {
-        compareAbsTo(a)
+      if (that.sign > 0 || that.isZero) {
+        compareAbsTo(that)
       } else {
         1
       }
@@ -1523,7 +1690,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   def equals(a: BigInt): Boolean = {
     if (len != a.len) return false
     if (isZero && a.isZero) return true
-    if ((sign ^ a.sign) < 0) return false //In case definition of sign would change...
+    if ((sign ^ a.sign) < 0) return false // in case definition of sign would change...
     var i = 0
     while (i < len) {
       if (mag(i) != a.mag(i)) {
@@ -1537,16 +1704,19 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   /**
    * {@inheritDoc}
    */
-  override def equals(o: Any): Boolean = { //Todo: Equality on other Number objects?
-    if (o.isInstanceOf[BigInt]) return equals(o.asInstanceOf[BigInt])
-    return false
+  override def equals(o: Any): Boolean = { // TODO: Equality on other Number objects?
+    if (o.isInstanceOf[BigInt]) {
+      equals(o.asInstanceOf[BigInt])
+    } else {
+      false
+    }
   }
 
   /**
    * {@inheritDoc}
    */
   override def hashCode(): Int = {
-    var hash = 0 //Todo: Opt and improve.
+    var hash = 0 // TODO: Opt and improve.
     var i = 0
     while (i < len) {
       hash = (31 * hash + (mag(i) & MASK)).toInt
@@ -1609,14 +1779,14 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     val s = java.lang.Integer.numberOfLeadingZeros(mag(len - 1))
     if (len == 1 && s >= 8) return sign * mag(0)
 
-    var bits = mag(len - 1) //Mask out the 24 MSBits.
+    var bits = mag(len - 1) // mask out the 24 MSBits.
     if (s <= 8) bits >>>= 8 - s
     else bits = bits << s - 8 | mag(len - 2) >>> 32 - (s - 8) //s-8==additional bits we need.
-    bits = (bits ^ (1L << 23)).toInt //The leading bit is implicit, cancel it out.
+    bits = (bits ^ (1L << 23)).toInt // the leading bit is implicit, cancel it out.
 
     val exp = (((32 - s + 32L * (len - 1)) - 1 + 127) & 0xFF).toInt
-    bits |= exp << 23 //Add exponent.
-    bits |= sign & (1 << 31) //Add sign-bit.
+    bits |= exp << 23 // add exponent.
+    bits |= sign & (1 << 31) // add sign-bit.
 
     return java.lang.Float.intBitsToFloat(bits)
   }
@@ -1649,11 +1819,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
 
   /*** </Number Override> ***/
 
-  def abs(): this.type = {
+  def abs(): BigInt = {
     if (sign >= 0) this else this.negate()
   }
 
-  def negate(): this.type = {
+  def negate(): BigInt = {
     sign = -sign
     this
   }
@@ -1667,9 +1837,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @amortized	O(1)
    */
   private def uaddMag(a: Int) {
-    val tmp = (mag(0) & MASK) + (a & MASK)
-    mag(0) = tmp.toInt
-    if ((tmp >>> 32) != 0) {
+    val dif = (mag(0) & MASK) + (a & MASK)
+    mag(0) = dif.toInt
+    if ((dif >>> 32) != 0) {
       var i = 1
       while (i < len && { mag(i) += 1; mag(i) == 0 }) {
         i += 1
@@ -1697,12 +1867,16 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     mag(0) = dif.toInt
     if ((dif >> 32) != 0) {
       var i = 1
-      while (mag(i) == 0) {
+      while (i < len && mag(i) == 0) {
         mag(i) -= 1
         i += 1
       }
-      mag(i) -= 1
-      if (mag(i) == 0 && i + 1 == len) len -= 1
+      if (i < len) {
+        mag(i) -= 1
+        if (mag(i) == 0 && i + 1 == len) {
+          len -= 1
+        }
+      }
     }
   }
 
@@ -1718,10 +1892,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       if (len > 1 || (mag(0) & MASK) > (a & MASK)) {
         usubMag(a)
         return
+      } else {
+        sign = 1
+        mag(0) = a - mag(0)
+        return
       }
-      sign = 1
-      mag(0) = a - mag(0)
-      return
     }
 
     uaddMag(a)
@@ -1754,11 +1929,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mul	The amount to multiply (treated as unsigned).
    * @complexity	O(n)
    */
-  def umul(mul: Int) { //mul is interpreted as unsigned
+  def umul(mul: Int) { // mul is interpreted as unsigned
     if (mul == 0) {
       setToZero()
       return
-    } //To be removed?
+    } // to be removed?
 
     var carry = 0L
     val m = mul & MASK
@@ -1788,7 +1963,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     else return unsafeUdiv(div)
   }
 
-  // Assumes div > 0.
+  // assumes div > 0.
   private def unsafeUdiv(div: Int): Int = {
     val d = div & MASK
     var rem = 0L
@@ -1805,7 +1980,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     return rem.toInt
   }
 
-  // Assumes div < 0.
+  // assumes div < 0.
   private def safeUdiv(div: Int): Int = {
     val d = div & MASK
     val hbit = Long.MinValue
@@ -1837,7 +2012,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     if (mod < 0) safeUrem(mod) else unsafeUrem(mod)
   }
 
-  // Assumes mod > 0.
+  // assumes mod > 0.
   private def unsafeUrem(mod: Int) {
     var rem = 0L
     var d = mod & MASK
@@ -1852,7 +2027,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     if (mag(0) == 0) sign = 1
   }
 
-  // Assumes mod < 0.
+  // assumes mod < 0.
   private def safeUrem(mod: Int) {
     val d = mod & MASK
     val hbit = Long.MinValue
@@ -1912,7 +2087,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
         mag(len) = 1
         len += 1
       }
-    } else if (len == 2 && mag(1) == 0) len -= 1
+    } else if (len == 2 && mag(1) == 0) {
+      len -= 1
+    }
   }
 
   /**
@@ -1938,9 +2115,13 @@ final class BigInt private () extends Number with Ordered[BigInt] {
         i += 1
       }
       mag(i) -= 1
-      if (mag(i) == 0 && i + 1 == len) len -= 1
+      if (mag(i) == 0 && i + 1 == len) {
+        len -= 1
+      }
     }
-    if (len == 2 && mag(1) == 0) len -= 1
+    if (len == 2 && mag(1) == 0) {
+      len -= 1
+    }
   }
 
   /**
@@ -1950,15 +2131,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @complexity	O(n)
    * @amortized	O(1)
    */
-  def uadd(a: Long) { //Refactor? Similar to usub.
+  def uadd(a: Long): BigInt = { // refactor? Similar to usub.
     if (sign < 0) {
       val ah = a >>> 32
       val al = a & MASK
       if (len > 2 || len == 2 && ((mag(1) & MASK) > ah || (mag(1) & MASK) == ah && (mag(0) & MASK) >= al) || ah == 0 && (mag(0) & MASK) >= al) {
         usubMag(a)
-        return
+        return this
       }
-      if (mag.length == 1) realloc(2)
+      if (mag.length == 1) {
+        realloc(2)
+      }
       if (len == 1) {
         mag(len) = 0
         len += 1
@@ -1971,7 +2154,10 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       //dif>>32 != 0 should be impossible
       if (dif == 0) len -= 1
       sign = 1
-    } else uaddMag(a)
+    } else {
+      uaddMag(a)
+    }
+    this
   }
 
   /**
@@ -1981,15 +2167,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @complexity	O(n)
    * @amortized	O(1)
    */
-  def usub(a: Long) { //Fix parameter name
+  def usub(a: Long): BigInt = { //Fix parameter name
     if (sign > 0) {
       val ah = a >>> 32
       val al = a & MASK
       if (len > 2 || len == 2 && ((mag(1) & MASK) > ah || (mag(1) & MASK) == ah && (mag(0) & MASK) >= al) || ah == 0 && (mag(0) & MASK) >= al) {
         usubMag(a)
-        return
+        return this
       }
-      if (mag.length == 1) realloc(2)
+      if (mag.length == 1) {
+        realloc(2)
+      }
       if (len == 1) {
         mag(len) = 0
         len += 1
@@ -2002,7 +2190,10 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       //dif>>32 != 0 should be impossible
       if (dif == 0) len -= 1
       sign = -1
-    } else uaddMag(a)
+    } else {
+      uaddMag(a)
+    }
+    this
   }
 
   /**
@@ -2011,12 +2202,14 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mul	The amount to multiply (treated as unsigned).
    * @complexity	O(n)
    */
-  def umul(mul: Long) {
+  def umul(mul: Long): BigInt = {
     if (mul == 0) {
       setToZero()
-      return
+      return this
     }
-    if (len + 2 >= mag.length) realloc(2 * len + 1)
+    if (len + 2 >= mag.length) {
+      realloc(2 * len + 1)
+    }
 
     val mh = mul >>> 32
     val ml = mul & MASK
@@ -2025,7 +2218,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     var tmp = 0L
     var i = 0
     while (i < len) {
-      carry = carry + next //Could this overflow?
+      carry = carry + next // could this overflow?
       tmp = (mag(i) & MASK) * ml
       next = (mag(i) & MASK) * mh
       mag(i) = (tmp + carry).toInt
@@ -2038,7 +2231,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     mag(len) = (carry >>> 32).toInt
     len += 1
 
-    while (len > 1 && mag(len - 1) == 0) len -= 1
+    while (len > 1 && mag(len - 1) == 0) {
+      len -= 1
+    }
+
+    this
   }
 
   /**
@@ -2048,7 +2245,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @return		The absolute value of the remainder as an unsigned long.
    * @complexity	O(n)
    */
-  def udiv(value: Long): Long = { //Adaption of general div to long.
+  def udiv(value: Long): Long = { // adaption of general div to long.
     if (value == (value & MASK)) {
       return udiv(value.toInt) & MASK
     }
@@ -2076,7 +2273,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       u1 = u0
       u0 = if (s > 0 && j > 0) (mag(j) << s | mag(j - 1) >>> 32 - s) & MASK else (mag(j) << s) & MASK
 
-      var k = (u2 << 32) + u1 //Unsigned division is a pain in the ass! ='(
+      var k = (u2 << 32) + u1 // unsigned division is a pain in the ass! ='(
       var qhat = (k >>> 1) / dh << 1
       var t = k - qhat * dh
       if (t + hbit >= dh + hbit) {
@@ -2093,7 +2290,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
         }
       }
 
-      // Multiply and subtract. Unfolded loop.
+      // multiply and subtract. Unfolded loop.
       var p = qhat * dl
       t = u0 - (p & MASK)
       u0 = t & MASK
@@ -2105,9 +2302,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       t = u2 - k
       u2 = t & MASK
 
-      mag(j) = qhat.toInt // Store quotient digit. If we subtracted too much, add back.
+      mag(j) = qhat.toInt // store quotient digit. If we subtracted too much, add back.
       if (t < 0) {
-        mag(j) -= 1 //Unfolded loop.
+        mag(j) -= 1 // unfolded loop.
         t = u0 + dl
         u0 = t & MASK
         t >>>= 32
@@ -2136,15 +2333,16 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mod	The amount to modulo with (treated as unsigned).
    * @complexity	O(n)
    */
-  def urem(mod: Long) {
-    val rem = udiv(mod) //todo: opt?
+  def urem(mod: Long): BigInt = {
+    val rem = udiv(mod) // TODO: opt?
     len = 2
     mag(0) = rem.toInt
     if (rem == (rem & MASK)) {
       len -= 1
-      return
+      return this
     } //if(dig[0]==0) sign = 1
     mag(1) = (rem >>> 32).toInt
+    this
   }
   /*** </Unsigned Long Num> ***/
 
@@ -2155,8 +2353,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param add	The amount to add.
    * @complexity	O(n)
    */
-  def add(add: Int) { //Has not amortized O(1) due to the risk of alternating +1 -1 on continuous sequence of 1-set bits.
+  def add(add: Int): BigInt = { //Has not amortized O(1) due to the risk of alternating +1 -1 on continuous sequence of 1-set bits.
     if (add < 0) usub(-add) else uadd(add)
+    this
   }
 
   /**
@@ -2165,8 +2364,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param sub	The amount to subtract.
    * @complexity	O(n)
    */
-  def sub(sub: Int) {
+  def subtract(sub: Int): BigInt = {
     if (sub < 0) uadd(-sub) else usub(sub)
+    this
   }
 
   /**
@@ -2175,14 +2375,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mul	The amount to multiply with.
    * @complexity	O(n)
    */
-  def mul(mul: Int) {
-    if (isZero) return //Remove?
+  def multiply(mul: Int): BigInt = {
+    if (isZero) {
+      return this // remove?
+    }
     if (mul < 0) {
       sign = -sign
       umul(-mul)
     } else {
       umul(mul)
     }
+    this
   }
 
   /**
@@ -2192,13 +2395,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @complexity	O(n)
    * @return		the signed remainder.
    */
-  def div(div: Int): Int = {
-    if (isZero) return 0 //Remove?
-    if (div < 0) {
-      sign = -sign
-      return -sign * udiv(-div)
+  def divide(div: Int): Int = {
+    if (isZero) {
+      0 // remove?
+    } else {
+      if (div < 0) {
+        sign = -sign
+        -sign * udiv(-div)
+      } else {
+        sign * udiv(div)
+      }
     }
-    return sign * udiv(div)
   }
 
   // --- Long SubSection ---
@@ -2208,8 +2415,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param add	The amount to add.
    * @complexity	O(n)
    */
-  def add(add: Long) {
+  def add(add: Long): BigInt = {
     if (add < 0) usub(-add) else uadd(add)
+    this
   }
 
   /**
@@ -2218,8 +2426,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param sub	The amount to subtract.
    * @complexity	O(n)
    */
-  def sub(sub: Long) {
+  def subtract(sub: Long): BigInt = {
     if (sub < 0) uadd(-sub) else usub(sub)
+    this
   }
 
   /**
@@ -2228,14 +2437,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mul	The amount to multiply with.
    * @complexity	O(n)
    */
-  def mul(mul: Long) {
-    if (isZero) return //remove?
+  def multiply(mul: Long): BigInt = {
+    if (isZero) {
+      return this // remove?
+    }
     if (mul < 0) {
       sign = -sign
       umul(-mul)
     } else {
       umul(mul)
     }
+    this
   }
 
   /**
@@ -2245,13 +2457,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @complexity	O(n)
    * @return		the signed remainder.
    */
-  def div(div: Long): Long = {
-    if (isZero) return 0L //Remove?
-    if (div < 0) {
-      sign = -sign
-      return -sign * udiv(-div)
+  def divide(div: Long): Long = {
+    if (isZero) {
+      0L //Remove?
+    } else {
+      if (div < 0) {
+        sign = -sign
+        -sign * udiv(-div)
+      } else {
+        sign * udiv(div)
+      }
     }
-    return sign * udiv(div)
   }
 
   /*** </Signed Small Num> ***/
@@ -2275,7 +2491,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       ulen = vlen
       vlen = len
     }
-    if (vlen > mag.length) realloc(vlen + 1)
+    if (vlen > mag.length) {
+      realloc(vlen + 1)
+    }
 
     var carry = 0L
     var i = 0
@@ -2314,7 +2532,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     val vlen = len
     val v = mag //ulen <= vlen
 
-    //Assumes vlen=len and v=dig
+    // assumes vlen=len and v=dig
     var dif = 0L
     var i = 0
     while (i < ulen) {
@@ -2342,7 +2560,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param a	The number to add.
    * @complexity	O(n)
    */
-  def add(a: BigInt): this.type = {
+  def add(a: BigInt): BigInt = {
     if (sign == a.sign) {
       addMag(a.mag, a.len)
       return this
@@ -2355,7 +2573,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
 
     val v = a.mag
     val vlen = a.len
-    if (mag.length < vlen) realloc(vlen + 1)
+    if (mag.length < vlen) {
+      realloc(vlen + 1)
+    }
 
     sign = -sign
     var dif = 0L
@@ -2388,7 +2608,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param a	The number to subtract.
    * @complexity	O(n)
    */
-  def sub(a: BigInt): this.type = { //Fix naming.
+  def subtract(a: BigInt): BigInt = { // fix naming.
     if (sign != a.sign) {
       addMag(a.mag, a.len)
       return this
@@ -2438,7 +2658,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mul	The number to multiply with.
    * @complexity	O(n^2) - O(n log n)
    */
-  def mul(mul: BigInt): this.type = {
+  def multiply(mul: BigInt): BigInt = {
     if (isZero) {
       return this
     } else if (mul.isZero) {
@@ -2464,10 +2684,10 @@ final class BigInt private () extends Number with Ordered[BigInt] {
         this
       }
     } else if (len < 128 || mul.len < 128 || len.toLong * mul.len < 1000000) {
-      smallMul(mul) //Remove overhead?
+      smallMul(mul) // remove overhead?
       this
     } else if (math.max(len, mul.len) < 20000) {
-      karatsuba(mul, false) //Tune thresholds and remove hardcode.
+      karatsuba(mul, false) // tune thresholds and remove hardcode.
       this
     } else {
       karatsuba(mul, true)
@@ -2482,11 +2702,13 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mul	The number to multiply with.
    * @complexity	O(n^2)
    */
-  def smallMul(mul: BigInt) {
-    if (isZero) return //Remove?
+  def smallMul(mul: BigInt): BigInt = {
+    if (isZero) {
+      return this // remove?
+    }
     if (mul.isZero) {
       setToZero()
-      return
+      return this
     }
 
     sign *= mul.sign
@@ -2502,11 +2724,14 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       vlen = len
     }
 
-    val res = naiveMul(u, ulen, v, vlen) //Todo remove function overhead.
+    val res = naiveMul(u, ulen, v, vlen) // TODO remove function overhead.
 
     mag = res
     len = res.length
-    if (res(len - 1) == 0) len -= 1
+    if (res(len - 1) == 0) {
+      len -= 1
+    }
+    this
   }
 
   /**
@@ -2528,8 +2753,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @complexity		O(n^1.585)
    */
   def karatsuba(mul: BigInt, parallel: Boolean) { //Not fully tested on small numbers... Fix naming?
-    if (mul.mag.length < len) mul.realloc(len)
-    else if (mag.length < mul.len) realloc(mul.len)
+    if (mul.mag.length < len) {
+      mul.realloc(len)
+    } else if (mag.length < mul.len) {
+      realloc(mul.len)
+    }
 
     if (mul.len < len) {
       var i = mul.len
@@ -2575,7 +2803,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param div	The number to divide with.
    * @complexity	O(n^2)
    */
-  def div(value: BigInt): this.type = {
+  def divide(value: BigInt): BigInt = {
     if (value.len == 1) {
       sign *= value.sign
       udiv(value.mag(0))
@@ -2593,7 +2821,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     }
 
     val q = Array.ofDim[Int](len - value.len + 1)
-    if (len == mag.length) realloc(len + 1) //We need an extra slot.
+    if (len == mag.length) {
+      realloc(len + 1) // we need an extra slot.
+    }
     div(mag, value.mag, len, value.len, q)
 
     mag = q
@@ -2611,7 +2841,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param div	The number to use in the division causing the remainder.
    * @complexity	O(n^2)
    */
-  def rem(value: BigInt): this.type = {
+  def remainder(value: BigInt): BigInt = {
     // -7/-3 = 2, 2*-3 + -1
     // -7/3 = -2, -2*3 + -1
     // 7/-3 = -2, -2*-3 + 1
@@ -2621,24 +2851,25 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       return this
     }
 
-    var tmp = compareAbsTo(value)
+    val tmp = compareAbsTo(value)
     if (tmp < 0) {
-      return this
-    }
-    if (tmp == 0) {
+      this
+    } else if (tmp == 0) {
       setToZero()
-      return this
-    }
+      this
+    } else {
+      val q = Array.ofDim[Int](len - value.len + 1)
+      if (len == mag.length) {
+        realloc(len + 1) // we need an extra slot.
+      }
+      div(mag, value.mag, len, value.len, q)
 
-    val q = Array.ofDim[Int](len - value.len + 1)
-    if (len == mag.length) realloc(len + 1) //We need an extra slot.
-    div(mag, value.mag, len, value.len, q)
-
-    len = value.len
-    while (mag(len - 1) == 0) {
-      len -= 1
+      len = value.len
+      while (len > 1 && mag(len - 1) == 0) { // added len > 1 by dcaoyuan
+        len -= 1
+      }
+      this
     }
-    this
   }
 
   /**
@@ -2648,11 +2879,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param div
    */
   @throws(classOf[ArithmeticException])
-  def mod(div: BigInt): this.type = {
+  def mod(div: BigInt): BigInt = {
     if (div.isZero || div.isNegative) {
       throw new ArithmeticException("Divisor must be > 0")
     }
-    rem(div)
+    remainder(div)
     if (sign < 0) {
       add(div)
     }
@@ -2690,7 +2921,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     }
 
     val q = Array.ofDim[Int](len - value.len + 1)
-    if (len == mag.length) realloc(len + 1) //We need an extra slot.
+    if (len == mag.length) {
+      realloc(len + 1) // we need an extra slot.
+    }
     div(mag, value.mag, len, value.len, q)
 
     val r = mag
@@ -2739,7 +2972,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     // digit on the dividend, we do that unconditionally.
 
     s = java.lang.Integer.numberOfLeadingZeros(v(n - 1))
-    if (s > 0) { //In Java (x<<32)==(x<<0) so...
+    if (s > 0) { // in Java (x<<32)==(x<<0) so...
       var i = n - 1
       while (i > 0) {
         v(i) = (v(i) << s) | (v(i - 1) >>> 32 - s)
@@ -2762,15 +2995,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
 
     j = m - n
     while (j >= 0) { //Main loop
-      // Compute estimate qhat of q[j].
-      k = u(j + n) * b + (u(j + n - 1) & MASK) //Unsigned division is a pain in the ass! ='(
+      // compute estimate qhat of q[j].
+      k = u(j + n) * b + (u(j + n - 1) & MASK) // unsigned division is a pain in the ass! ='(
       qhat = (k >>> 1) / dh << 1
       t = k - qhat * dh
-      if (t + hbit >= dh + hbit) qhat += 1 // qhat = (u[j+n]*b + u[j+n-1])/v[n-1]
+      if (t + hbit >= dh + hbit) {
+        qhat += 1 // qhat = (u[j+n]*b + u[j+n-1])/v[n-1]
+      }
       rhat = k - qhat * dh
 
       var break = false
-      while (!break && (qhat + hbit >= b + hbit || qhat * dl + hbit > b * rhat + (u(j + n - 2) & MASK) + hbit)) { //Unsigned comparison.
+      while (!break && (qhat + hbit >= b + hbit || qhat * dl + hbit > b * rhat + (u(j + n - 2) & MASK) + hbit)) { // unsigned comparison.
         qhat = qhat - 1
         rhat = rhat + dh
         if (rhat + hbit >= b + hbit) {
@@ -2778,7 +3013,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
         }
       }
 
-      // Multiply and subtract.
+      // multiply and subtract.
       k = 0
       var i = 0
       while (i < n) {
@@ -2791,7 +3026,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       t = (u(j + n) & MASK) - k
       u(j + n) = t.toInt
 
-      q(j) = qhat.toInt // Store quotient digit. If we subtracted too much, add back.
+      q(j) = qhat.toInt // store quotient digit. If we subtracted too much, add back.
       if (t < 0) {
         q(j) = q(j) - 1
         k = 0
@@ -2808,15 +3043,15 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     }
 
     if (s > 0) {
-      //Unnormalize v[].
-      i = 0
+      // unnormalize v[].
+      var i = 0
       while (i < n - 1) {
         v(i) = v(i) >>> s | v(i + 1) << 32 - s
         i += 1
       }
       v(n - 1) >>>= s
 
-      //Unnormalize u[].
+      // unnormalize u[].
       i = 0
       while (i < m) {
         u(i) = u(i) >>> s | u(i + 1) << 32 - s
@@ -2835,18 +3070,26 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @complexity	O(n^2)
    */
   override def toString(): String = {
-    if (isZero) return "0"
+    if (len == 0) { // !!! len should not be 0, if happen, some where wrong.
+      return "?"
+    }
+    if (isZero) {
+      return "0"
+    }
+
+    // backup mag in len
+    val cpy = Array.ofDim[Int](len)
+    System.arraycopy(mag, 0, cpy, 0, len)
 
     var top = len * 10 + 1
     val buf = Array.fill[Char](top)('0')
-    val cpy = java.util.Arrays.copyOf(mag, len)
     var break = false
     while (!break) {
       var j = top
       var tmp = toStringDiv()
       while (tmp > 0) {
         top -= 1
-        buf(top) = (buf(top) + tmp % 10).toChar //TODO: Optimize.
+        buf(top) = (buf(top) + tmp % 10).toChar // TODO: optimize.
         tmp /= 10
       }
 
@@ -2860,16 +3103,20 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       top -= 1
       buf(top) = '-'
     }
+
+    // restore mag and len
     System.arraycopy(cpy, 0, mag, 0, cpy.length)
     len = cpy.length
-    return new String(buf, top, buf.length - top)
+
+    new String(buf, top, buf.length - top)
   }
 
   // Divides the number by 10^13 and returns the remainder.
   // Does not change the sign of the number.
   private def toStringDiv(): Long = {
-    val pow5 = 1220703125
-    val pow2 = 1 << 13
+    val pow5 = 1220703125L
+    val pow2 = (1 << 13).toLong
+
     var nextq = 0
     var rem = 0L
     var i = len - 1
@@ -2887,15 +3134,19 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     rem = rem % pow5
     // Applies the Chinese Remainder Theorem.
     // -67*5^13 + 9983778*2^13 = 1
-    val pow10 = pow5 * pow2.toLong
+    val pow10 = pow5 * pow2
     rem = (rem - pow5 * (mod2 - rem) % pow10 * 67) % pow10
-    if (rem < 0) rem += pow10
+    if (rem < 0) {
+      rem += pow10
+    }
     if (mag(len - 1) == 0 && len > 1) {
       len -= 1
-      if (mag(len - 1) == 0 && len > 1)
+      if (mag(len - 1) == 0 && len > 1) {
         len -= 1
+      }
     }
-    return rem
+
+    rem
   }
   /*** </Output> ***/
 
@@ -2914,7 +3165,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    */
   private def smallShiftLeft(shift: Int, first: Int) {
     var res = mag
-    if ((mag(len - 1) << shift >>> shift) != mag(len - 1)) { //Overflow?
+    if ((mag(len - 1) << shift >>> shift) != mag(len - 1)) { // overflow?
       len += 1
       if (len > mag.length) {
         res = Array.ofDim[Int](len + 1) //realloc(len+1)
@@ -2992,7 +3243,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param shift	The amount to shift.
    * @complexity	O(n)
    */
-  def shiftLeft(shift: Int): this.type = {
+  def shiftLeft(shift: Int): BigInt = {
     val bigShift = shift >>> 5
     val smallShift = shift & 31
     if (bigShift > 0) {
@@ -3010,7 +3261,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param shift	The amount to shift.
    * @complexity	O(n)
    */
-  def shiftRight(shift: Int): this.type = {
+  def shiftRight(shift: Int): BigInt = {
     val bigShift = shift >>> 5
     val smallShift = shift & 31
     if (bigShift > 0) {
@@ -3032,16 +3283,26 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   def testBit(bit: Int): Boolean = {
     val bigBit = bit >>> 5
     val smallBit = bit & 31
-    if (bigBit >= len) return sign < 0
-    if (sign > 0) return (mag(bigBit) & 1 << smallBit) != 0
-    var j = 0
-    while (j <= bigBit && mag(j) == 0) {
-      j += 1
+    if (bigBit >= len) {
+      return sign < 0
     }
-    if (j > bigBit) return false
-    if (j < bigBit) return (mag(bigBit) & 1 << smallBit) == 0
-    j = -mag(bigBit)
-    return (j & 1 << smallBit) != 0
+    if (sign > 0) {
+      (mag(bigBit) & 1 << smallBit) != 0
+    } else {
+      var j = 0
+      while (j <= bigBit && mag(j) == 0) {
+        j += 1
+      }
+
+      if (j > bigBit) {
+        false
+      } else if (j < bigBit) {
+        (mag(bigBit) & 1 << smallBit) == 0
+      } else {
+        j = -mag(bigBit)
+        (j & 1 << smallBit) != 0
+      }
+    }
   }
 
   /**
@@ -3050,7 +3311,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param bit	The index of the bit to set.
    * @complexity	O(n)
    */
-  def setBit(bit: Int) {
+  def setBit(bit: Int): BigInt = {
     val bigBit = bit >>> 5
     val smallBit = bit & 31
     if (sign > 0) {
@@ -3065,8 +3326,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
         // len = bigBit+1
       }
       mag(bigBit) |= 1 << smallBit
+      this
     } else {
-      if (bigBit >= len) return
+      if (bigBit >= len) {
+        return this
+      }
       var j = 0
       while (j <= bigBit && mag(j) == 0) {
         j += 1
@@ -3079,19 +3343,24 @@ final class BigInt private () extends Number with Ordered[BigInt] {
         }
         mag(j) = ~(-mag(j))
         if (j == len - 1 && mag(len - 1) == 0) len -= 1
-        return
+        return this
       }
       if (j < bigBit) {
         mag(bigBit) &= ~(1 << smallBit)
-        while (mag(len - 1) == 0) len -= 1
-        return
+        while (mag(len - 1) == 0) {
+          len -= 1
+        }
+        return this
       }
-      j = Integer.lowestOneBit(mag(j)) // more efficient than numberOfTrailingZeros
+      j = java.lang.Integer.lowestOneBit(mag(j)) // more efficient than numberOfTrailingZeros
       val k = 1 << smallBit
-      if (k - j > 0) mag(bigBit) &= ~k // Unsigned compare.
-      else {
+      if (k - j > 0) {
+        mag(bigBit) &= ~k // unsigned compare.
+        this
+      } else {
         mag(bigBit) ^= ((j << 1) - 1) ^ (k - 1)
         mag(bigBit) |= k
+        this
       }
     }
   }
@@ -3102,43 +3371,48 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param bit	The index of the bit to clear.
    * @complexity	O(n)
    */
-  def clearBit(bit: Int) {
+  def clearBit(bit: Int): BigInt = {
     val bigBit = bit >>> 5
     val smallBit = bit & 31
     if (sign > 0) {
       if (bigBit < len) {
         mag(bigBit) &= ~(1 << smallBit)
-        while (mag(len - 1) == 0 && len > 1) len -= 1
+        while (mag(len - 1) == 0 && len > 1) {
+          len -= 1
+        }
       }
+      this
     } else {
       if (bigBit >= mag.length) {
         realloc(bigBit + 1)
         len = bigBit + 1
         mag(bigBit) |= 1 << smallBit
-        return
+        return this
       } else if (bigBit >= len) {
         while (len <= bigBit) {
           mag(len) = 0
           len += 1
         }
         mag(bigBit) |= 1 << smallBit
-        return
+        return this
       }
       var j = 0
       while (j <= bigBit && mag(j) == 0) {
         j += 1
       }
-      if (j > bigBit) return
-      if (j < bigBit) {
+      if (j > bigBit) {
+        return this
+      } else if (j < bigBit) {
         mag(bigBit) |= 1 << smallBit
-        return
+        return this
       }
       j = java.lang.Integer.lowestOneBit(mag(j)) // more efficient than numberOfTrailingZeros
       var k = 1 << smallBit
-      if (j - k > 0) return // Unsigned compare
-      if (j - k < 0) {
+      if (j - k > 0) {
+        return this // unsigned compare
+      } else if (j - k < 0) {
         mag(bigBit) |= k
-        return
+        return this
       }
       j = mag(bigBit)
       if (j == (-1 ^ k - 1)) {
@@ -3148,17 +3422,22 @@ final class BigInt private () extends Number with Ordered[BigInt] {
           mag(j) = 0
           j += 1
         }
-        if (j == mag.length) realloc(j + 2)
+        if (j == mag.length) {
+          realloc(j + 2)
+        }
 
         if (j == len) {
           len += 1
           mag(len) = 1
-          return
+          this
+        } else {
+          mag(j) = -(~mag(j))
+          this
         }
-        mag(j) = -(~mag(j))
       } else {
         j = java.lang.Integer.lowestOneBit(j ^ (-1 ^ k - 1))
         mag(bigBit) ^= j | (j - 1) ^ (k - 1)
+        this
       }
     }
   }
@@ -3169,7 +3448,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param bit	The index of the bit to flip.
    * @complexity	O(n)
    */
-  def flipBit(bit: Int) {
+  def flipBit(bit: Int): BigInt = {
     val bigBit = bit >>> 5
     val smallBit = bit & 31
     breakable {
@@ -3194,7 +3473,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
           mag(bigBit) ^= 1 << smallBit
           break
         }
-        if (j > bigBit) { // TODO: Refactor with setBit?
+        if (j > bigBit) { // TODO: refactor with setBit?
           mag(bigBit) = -1 << smallBit
           while (mag(j) == 0) {
             mag(j) = -1
@@ -3204,17 +3483,16 @@ final class BigInt private () extends Number with Ordered[BigInt] {
           if (j == len - 1 && mag(len - 1) == 0) {
             len -= 1
           }
-          return
+          return this
         }
         j = java.lang.Integer.lowestOneBit(mag(j)) // more efficient than numberOfTrailingZeros
         val k = 1 << smallBit
         if (j - k > 0) {
           mag(bigBit) ^= ((j << 1) - 1) ^ (k - 1)
-          return
-        }
-        if (j - k < 0) {
+          return this
+        } else if (j - k < 0) {
           mag(bigBit) ^= k
-          return
+          return this
         }
         j = mag(bigBit)
         if (j == (-1 ^ k - 1)) { // TODO: Refactor with clearBit?
@@ -3224,11 +3502,13 @@ final class BigInt private () extends Number with Ordered[BigInt] {
             mag(j) = 0
             j += 1
           }
-          if (j == mag.length) realloc(j + 2)
+          if (j == mag.length) {
+            realloc(j + 2)
+          }
           if (j == len) {
             mag(len) = 1
             len += 1
-            return
+            return this
           }
           mag(j) = -(~mag(j))
         } else {
@@ -3238,7 +3518,10 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       }
     } // end of breakable
 
-    while (mag(len - 1) == 0 && len > 1) len -= 1
+    while (mag(len - 1) == 0 && len > 1) {
+      len -= 1
+    }
+    this
   }
 
   /**
@@ -3247,7 +3530,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mask	The number to bitwise-and with.
    * @complexity	O(n)
    */
-  def and(mask: BigInt): this.type = {
+  def and(mask: BigInt): BigInt = {
     if (sign > 0) {
       if (mask.sign > 0) {
         if (mask.len < len) {
@@ -3379,7 +3662,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
         if (j <= mlen && mag(j - 1) == 0) {
           if (j < mlen) {
             mag(j) = -(~(mag(j) | mask.mag(j)))
-            while ({ j += 1; j < mlen } && mag(j - 1) == 0) { //// HERE
+            while ({ j += 1; j < mlen } && mag(j - 1) == 0) {
               mag(j) = -(~(mag(j) | mask.mag(j))) // -(~dig[j]&~mask.dig[j])
             }
           }
@@ -3420,11 +3703,13 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mask	The number to bitwise-or with.
    * @complexity	O(n)
    */
-  def or(mask: BigInt): this.type = {
+  def or(mask: BigInt): BigInt = {
     if (sign > 0) {
       if (mask.sign > 0) {
         if (mask.len > len) {
-          if (mask.len > mag.length) realloc(mask.len + 1)
+          if (mask.len > mag.length) {
+            realloc(mask.len + 1)
+          }
           System.arraycopy(mask.mag, len, mag, len, mask.len - len)
           var i = 0
           while (i < len) {
@@ -3442,7 +3727,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
           this
         }
       } else {
-        if (mask.len > mag.length) realloc(mask.len + 1)
+        if (mask.len > mag.length) {
+          realloc(mask.len + 1)
+        }
         if (mask.len > len) { System.arraycopy(mask.mag, len, mag, len, mask.len - len) }
         val mLen = math.min(mask.len, len)
         var a = mag(0)
@@ -3565,10 +3852,12 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mask	The number to bitwise-xor with.
    * @complexity	O(n)
    */
-  def xor(mask: BigInt): this.type = {
+  def xor(mask: BigInt): BigInt = {
     if (sign > 0) {
       if (mask.len > len) {
-        if (mask.len > mag.length) realloc(mask.len + 2)
+        if (mask.len > mag.length) {
+          realloc(mask.len + 2)
+        }
         System.arraycopy(mask.mag, len, mag, len, mask.len - len)
       }
       val mlen = math.min(len, mask.len)
@@ -3614,7 +3903,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
               mag(j) = 0
               j += 1
             }
-            if (blen == mag.length) realloc(blen + 2) // len==blen
+            if (blen == mag.length) {
+              realloc(blen + 2) // len==blen
+            }
             if (j == blen) {
               mag(blen) = 1
               len = blen + 1
@@ -3641,7 +3932,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       }
     } else {
       if (mask.len > len) {
-        if (mask.len > mag.length) realloc(mask.len + 2)
+        if (mask.len > mag.length) {
+          realloc(mask.len + 2)
+        }
         System.arraycopy(mask.mag, len, mag, len, mask.len - len)
       }
       val mlen = math.min(len, mask.len)
@@ -3743,7 +4036,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @param mask	The number to bitwise-and-not with.
    * @complexity	O(n)
    */
-  def andNot(mask: BigInt): this.type = {
+  def andNot(mask: BigInt): BigInt = {
     val mlen = math.min(len, mask.len)
     if (sign > 0) {
       if (mask.sign > 0) {
@@ -3767,7 +4060,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       }
     } else {
       if (mask.len > len) {
-        if (mask.len > mag.length) realloc(mask.len + 2)
+        if (mask.len > mag.length) {
+          realloc(mask.len + 2)
+        }
         System.arraycopy(mask.mag, len, mag, len, mask.len - len)
       }
       if (mask.sign > 0) {
@@ -3789,7 +4084,9 @@ final class BigInt private () extends Number with Ordered[BigInt] {
             if (j < blen) {
               mag(j) = -(~mag(j))
             } else {
-              if (blen >= mag.length) realloc(blen + 2)
+              if (blen >= mag.length) {
+                realloc(blen + 2)
+              }
               mag(blen) = 1
               len = blen + 1
               return this
@@ -3856,7 +4153,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    *
    * @complexity	O(n)
    */
-  def not(): this.type = {
+  def not(): BigInt = {
     if (sign > 0) {
       sign = -1
       uaddMag(1)
@@ -3868,27 +4165,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   }
   /*** </BitOperations> ***/
 
-  def toBigInteger = new BigInteger(sign, toByteArray)
-
-  /**
-   * TODO -- currently use BigInteger's algorithm
-   */
-  def pow(exponent: Int): this.type = {
-    val res = toBigInteger.pow(exponent)
-    val bytes = res.toByteArray
-    assign(res.signum, bytes, bytes.length)
-    this
-  }
-
-  /**
-   * TODO -- currently use BigInteger's algorithm
-   */
-  def modPow(exponent: BigInt, m: BigInt): this.type = {
-    val res = toBigInteger.modPow(exponent.toBigInteger, m.toBigInteger)
-    val bytes = res.toByteArray
-    assign(res.signum, bytes, bytes.length)
-    this
-  }
+  def toBigInteger = new BigInteger(toByteArray)
 
   /**
    * Returns the number of bits in the minimal two's-complement
@@ -3901,18 +4178,18 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    *         representation of this BigInteger, <i>excluding</i> a sign bit.
    */
   def bitLength: Int = bitLength(toBigEndianMag)
-  private def bitLength(xs: Array[Int]): Int = {
+  private def bitLength(bigEndianMag: Array[Int]): Int = {
     if (len == 0) {
       0 // offset by one to initialize
     } else {
-      // Calculate the bit length of the magnitude
-      val magBitLength = ((len - 1) << 5) + bitLengthForInt(xs(0))
+      // calculate the bit length of the magnitude
+      val magBitLength = ((len - 1) << 5) + bitLengthForInt(bigEndianMag(0))
       if (sign < 0) {
-        // Check if magnitude is a power of two
-        var pow2 = java.lang.Integer.bitCount(xs(0)) == 1
+        // check if magnitude is a power of two
+        var pow2 = java.lang.Integer.bitCount(bigEndianMag(0)) == 1
         var i = 1
         while (i < len && pow2) {
-          pow2 = xs(i) == 0
+          pow2 = bigEndianMag(i) == 0
           i += 1
         }
 
@@ -3925,27 +4202,29 @@ final class BigInt private () extends Number with Ordered[BigInt] {
 
   private def bitLengthForInt(n: Int): Int = 32 - java.lang.Integer.numberOfLeadingZeros(n)
 
-  /* Returns an int of sign bits */
-  private def signInt(): Int = if (sign < 0) -1 else 0
-
   /**
    * Returns the specified int of the little-endian two's complement
    * representation (int 0 is the least significant).  The int number can
    * be arbitrarily high (values are logically preceded by infinitely many
    * sign ints).
    */
-  private def getInt(xs: Array[Int], n: Int, firstNonzeroIntNum: Int): Int = {
+  private def getInt(bigEndianMag: Array[Int], n: Int, firstNonzeroIntNum: Int): Int = {
     if (n < 0) {
-      return 0
+      0
+    } else if (n >= len) {
+      signInt()
+    } else {
+      val magInt = bigEndianMag(len - n - 1)
+      if (sign >= 0) {
+        magInt
+      } else {
+        if (n <= firstNonzeroIntNum) -magInt else ~magInt
+      }
     }
-    if (n >= len) {
-      return signInt()
-    }
-
-    val magInt = xs(len - n - 1)
-
-    if (sign >= 0) magInt else (if (n <= firstNonzeroIntNum) -magInt else ~magInt)
   }
+
+  /* Returns an int of sign bits */
+  private def signInt(): Int = if (sign < 0) -1 else 0
 
   /**
    * Returns the index of the int that contains the first nonzero int in the
@@ -3974,7 +4253,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    *         this BigInteger.
    * @see    #BigInteger(byte[])
    */
-  def toByteArray(): Array[Byte] = {
+  def toByteArray: Array[Byte] = {
     val bigEndian = toBigEndianMag
     val byteLen = bitLength(bigEndian) / 8 + 1
     val byteArray = Array.ofDim[Byte](byteLen)
@@ -4004,6 +4283,119 @@ final class BigInt private () extends Number with Ordered[BigInt] {
     val res = Array.ofDim[Int](len)
     System.arraycopy(mag, 0, res, 0, len)
     reverse(res)
+  }
+
+  private def reverse[T](xs: Array[T]) = {
+    var i = 0
+    while (i < xs.length / 2) {
+      val tmp = xs(i)
+      xs(i) = xs(xs.length - i - 1)
+      xs(xs.length - i - 1) = tmp
+      i += 1
+    }
+    xs
+  }
+
+  /**
+   * TODO -- currently use BigInteger's algorithm
+   */
+  def pow(exponent: Int): BigInt = {
+    val res = toBigInteger.pow(exponent)
+    assign(res.toByteArray)
+    this
+  }
+
+  /**
+   * TODO -- currently use BigInteger's algorithm
+   */
+  def modPow(exponent: BigInt, m: BigInt): BigInt = {
+    val res = toBigInteger.modPow(exponent.toBigInteger, m.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  // -- methods used to compare/correct this BigInt's algotithm 
+
+  def j_remainder(v: BigInt) = {
+    val res = toBigInteger.remainder(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_mod(v: BigInt) = {
+    val res = toBigInteger.mod(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_add(v: BigInt) = {
+    val res = toBigInteger.add(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_subtract(v: BigInt) = {
+    val res = toBigInteger.subtract(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_multiply(v: BigInt) = {
+    val res = toBigInteger.multiply(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_divide(v: BigInt) = {
+    val res = toBigInteger.divide(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_and(v: BigInt) = {
+    val res = toBigInteger.and(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_or(v: BigInt) = {
+    val res = toBigInteger.or(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_xor(v: BigInt) = {
+    val res = toBigInteger.xor(v.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_shiftLeft(v: Int) = {
+    val res = toBigInteger.shiftLeft(v)
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
+  }
+
+  def j_testBit(v: Int): Boolean = {
+    toBigInteger.testBit(v)
+  }
+
+  def j_not = {
+    val res = toBigInteger.not()
+    val bytes = res.toByteArray
+    assign(res.toByteArray)
+    this
   }
 
 }

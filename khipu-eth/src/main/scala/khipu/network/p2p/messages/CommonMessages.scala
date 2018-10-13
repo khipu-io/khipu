@@ -1,6 +1,5 @@
 package khipu.network.p2p.messages
 
-import java.math.BigInteger
 import khipu.Hash
 import khipu.crypto
 import khipu.crypto.ECDSASignature
@@ -17,6 +16,7 @@ import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
 import khipu.rlp.RLPSerializable
 import khipu.rlp.RLPValue
+import khipu.vm.UInt256
 
 object CommonMessages {
   object Status {
@@ -26,19 +26,19 @@ object CommonMessages {
       override def code: Int = Status.code
       override def toRLPEncodable: RLPEncodeable = {
         import msg._
-        RLPList(protocolVersion, networkId, totalDifficulty, bestHash, genesisHash)
+        RLPList(protocolVersion, networkId, rlp.toRLPEncodable(totalDifficulty), bestHash, genesisHash)
       }
     }
 
     implicit final class StatusDec(val bytes: Array[Byte]) {
       def toStatus: Status = rlp.rawDecode(bytes) match {
         case RLPList(protocolVersion, networkId, totalDifficulty, bestHash, genesisHash) =>
-          Status(protocolVersion, networkId, totalDifficulty, bestHash, genesisHash)
+          Status(protocolVersion, networkId, rlp.toUInt256(totalDifficulty), bestHash, genesisHash)
         case _ => throw new RuntimeException("Cannot decode Status")
       }
     }
   }
-  final case class Status(protocolVersion: Int, networkId: Int, totalDifficulty: BigInteger, bestHash: Hash, genesisHash: Hash) extends Message {
+  final case class Status(protocolVersion: Int, networkId: Int, totalDifficulty: UInt256, bestHash: Hash, genesisHash: Hash) extends Message {
     override def code: Int = Status.code
     override def toString: String = {
       s"""Status {
@@ -59,11 +59,11 @@ object CommonMessages {
         import signedTx._
         import signedTx.tx._
         RLPList(
-          nonce,
-          gasPrice,
+          rlp.toRLPEncodable(nonce),
+          rlp.toRLPEncodable(gasPrice),
           gasLimit,
           receivingAddress.map(_.toArray).getOrElse(Array.emptyByteArray): Array[Byte],
-          value,
+          rlp.toRLPEncodable(value),
           payload,
           ECDSASignature.getEncodeV(signature.v, chainId).fold(x => x, y => y),
           signature.r,
@@ -86,7 +86,7 @@ object CommonMessages {
         val chainId = ECDSASignature.extractChainIdFromV(v)
 
         SignedTransaction(
-          Transaction(nonce, gasPrice, gasLimit, receivingAddressOpt, value, payload),
+          Transaction(rlp.toUInt256(nonce), rlp.toUInt256(gasPrice), gasLimit, receivingAddressOpt, rlp.toUInt256(value), payload),
           r,
           s,
           realV,
@@ -129,7 +129,7 @@ object CommonMessages {
             RLPList(block.body.transactionList.map(_.toRLPEncodable): _*),
             RLPList(block.body.uncleNodesList.map(_.toRLPEncodable): _*)
           ),
-          totalDifficulty
+          rlp.toRLPEncodable(totalDifficulty)
         )
       }
     }
@@ -149,13 +149,13 @@ object CommonMessages {
                 uncleNodesList.items.map(_.toBlockHeader)
               )
             ),
-            totalDifficulty
+            rlp.toUInt256(totalDifficulty)
           )
         case _ => throw new RuntimeException("Cannot decode NewBlock")
       }
     }
   }
-  final case class NewBlock(block: Block, totalDifficulty: BigInteger, txInParallel: Int = 0) extends Message {
+  final case class NewBlock(block: Block, totalDifficulty: UInt256, txInParallel: Int = 0) extends Message {
     override def code: Int = NewBlock.code
     override def toString: String = {
       s"""NewBlock {

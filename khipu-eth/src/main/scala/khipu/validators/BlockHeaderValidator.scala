@@ -159,8 +159,8 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    */
   //FIXME: Simple PoW validation without using DAG [EC-88]
   private def validatePoW(blockHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
-    val powBoundary = UInt256.MODULUS divide blockHeader.difficulty
-    val powValue = new BigInteger(1, calculatePoWValue(blockHeader).toArray)
+    val powBoundary = UInt256.Modulus / blockHeader.difficulty
+    val powValue = UInt256(new BigInteger(1, calculatePoWValue(blockHeader).toArray))
     if (powValue.compareTo(powBoundary) <= 0) {
       Right(blockHeader)
     } else {
@@ -168,7 +168,7 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
     }
   }
 
-  private def calculatePoWValue(blockHeader: BlockHeader) = {
+  private def calculatePoWValue(blockHeader: BlockHeader): Array[Byte] = {
     val nonceReverted = blockHeader.nonce.reverse
     val hashBlockWithoutNonce = crypto.kec256(BlockHeader.getEncodedWithoutNonce(blockHeader))
     val seedHash = crypto.kec512(hashBlockWithoutNonce ++ nonceReverted.toArray[Byte])
@@ -196,7 +196,7 @@ object BlockHeaderError {
   case object HeaderParentNotFoundError extends BlockHeaderError
   case object HeaderExtraDataError extends BlockHeaderError
   case object HeaderTimestampError extends BlockHeaderError
-  final case class HeaderDifficultyError(header: BigInteger, calculated: BigInteger) extends BlockHeaderError
+  final case class HeaderDifficultyError(header: UInt256, calculated: UInt256) extends BlockHeaderError
   case object HeaderGasUsedError extends BlockHeaderError
   case object HeaderGasLimitError extends BlockHeaderError
   case object HeaderNumberError extends BlockHeaderError

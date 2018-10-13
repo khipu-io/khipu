@@ -85,7 +85,7 @@ final class BlockGenerator(
   private def prepareTransactions(transactions: Seq[SignedTransaction], blockGasLimit: Long) = {
     val sortedTransactions = transactions.groupBy(_.sender).values.toList.flatMap { txsFromSender =>
       val ordered = txsFromSender
-        .sortBy(_.tx.gasPrice.negate)
+        .sortBy(-_.tx.gasPrice)
         .sortBy(_.tx.nonce)
         .foldLeft(Vector[SignedTransaction]()) {
           case (txs, tx) =>

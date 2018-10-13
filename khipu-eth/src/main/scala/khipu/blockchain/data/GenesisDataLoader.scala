@@ -32,9 +32,11 @@ object GenesisDataLoader {
     def deserializeByteString(jv: JValue): ByteString = jv match {
       case JString(s) =>
         val noPrefix = s.replace("0x", "")
-        val inp =
-          if (noPrefix.length % 2 == 0) noPrefix
-          else "0" ++ noPrefix
+        val inp = if (noPrefix.length % 2 == 0) {
+          noPrefix
+        } else {
+          "0" ++ noPrefix
+        }
         Try(ByteString(khipu.hexDecode(inp))) match {
           case Success(bs) => bs
           case Failure(ex) => throw new RuntimeException("Cannot parse hex string: " + s)
@@ -45,9 +47,11 @@ object GenesisDataLoader {
     def deserializeHash(jv: JValue): Hash = jv match {
       case JString(s) =>
         val noPrefix = s.replace("0x", "")
-        val inp =
-          if (noPrefix.length % 2 == 0) noPrefix
-          else "0" ++ noPrefix
+        val inp = if (noPrefix.length % 2 == 0) {
+          noPrefix
+        } else {
+          "0" ++ noPrefix
+        }
         Try(Hash(khipu.hexDecode(inp))) match {
           case Success(bs) => bs
           case Failure(ex) => throw new RuntimeException("Cannot parse hex string: " + s)
@@ -104,7 +108,7 @@ class GenesisDataLoader(
               customGenesis.close()
             }
           case Failure(ex) =>
-            log.error(s"Cannot load custom genesis data from: $customGenesisFile", ex)
+            log.error(ex, s"Cannot load custom genesis data from: $customGenesisFile")
             throw ex
         }
       case None =>
@@ -121,7 +125,7 @@ class GenesisDataLoader(
       case Success(_) =>
         log.debug("Genesis data successfully loaded")
       case Failure(ex) =>
-        log.error("Unable to load genesis data", ex)
+        log.error(ex, "Unable to load genesis data")
         throw ex
     }
   }
@@ -144,10 +148,9 @@ class GenesisDataLoader(
         val ephemNodeStorage = new ArchiveNodeStorage(nodeStorage)
         val mpt = MerklePatriciaTrie[Array[Byte], Account](rootHash, ephemNodeStorage)(trie.byteArraySerializable, Account.accountSerializer)
         val paddedAddress = address.reverse.padTo(addressLength, "0").reverse.mkString
-        mpt.put(
-          crypto.kec256(khipu.hexDecode(paddedAddress)),
-          Account(blockchainConfig.accountStartNonce, UInt256(new BigInteger(balance)), emptyTrieRootHash, emptyEvmHash)
-        ).persist().rootHash
+        val account = Account(blockchainConfig.accountStartNonce, UInt256(new BigInteger(balance)), emptyTrieRootHash, emptyEvmHash)
+
+        mpt.put(crypto.kec256(khipu.hexDecode(paddedAddress)), account).persist().rootHash
     }
 
     val header = BlockHeader(
@@ -158,7 +161,7 @@ class GenesisDataLoader(
       transactionsRoot = emptyTrieRootHash,
       receiptsRoot = emptyTrieRootHash,
       logsBloom = ByteString(zeros(bloomLength)),
-      difficulty = new BigInteger(genesisData.difficulty.replace("0x", ""), 16),
+      difficulty = UInt256(new BigInteger(genesisData.difficulty.replace("0x", ""), 16)),
       number = 0,
       gasLimit = new BigInteger(genesisData.gasLimit.replace("0x", ""), 16).longValue,
       gasUsed = 0,
@@ -175,7 +178,7 @@ class GenesisDataLoader(
         log.debug("Genesis data already in the database")
         Success(())
       case Some(existingGenesisHeader) =>
-        log.debug(s"existingGenesisHeader $existingGenesisHeader vs header ${header}, hash: ${existingGenesisHeader.hash} vs ${header.hash}")
+        log.error(s"existingGenesisHeader $existingGenesisHeader vs header ${header}, hash: ${existingGenesisHeader.hash} vs ${header.hash}")
         Failure(new RuntimeException("Genesis data present in the database does not match genesis block from file." +
           " Use different directory for running private blockchains."))
       case None =>

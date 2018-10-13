@@ -3,12 +3,12 @@ package khipu.blockchain.sync
 import akka.cluster.pubsub.DistributedPubSubMediator.Publish
 import akka.pattern.AskTimeoutException
 import akka.pattern.ask
-import java.math.BigInteger
 import java.util.concurrent.ThreadLocalRandom
 import khipu.BroadcastNewBlocks
 import khipu.blockchain.sync
 import khipu.blockchain.sync.HandshakedPeersService.BlacklistPeer
-import khipu.domain.{ Block, BlockHeader }
+import khipu.domain.Block
+import khipu.domain.BlockHeader
 import khipu.ledger.Ledger.BlockExecutionError
 import khipu.ledger.Ledger.BlockResult
 import khipu.ledger.Ledger.MissingNodeExecptionError
@@ -22,6 +22,7 @@ import khipu.store.datasource.KesqueDataSource
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
 import khipu.util
+import khipu.vm.UInt256
 import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.Future
@@ -37,7 +38,7 @@ object RegularSyncService {
   private case class ProcessBlockHeaders(peer: Peer, headers: List[BlockHeader])
   private case class ProcessBlockBodies(peer: Peer, bodies: List[PV62.BlockBody])
 
-  private case class ExecuteAndInsertBlocksAborted(parentTotalDifficulty: BigInteger, newBlocks: Vector[NewBlock], errors: Vector[BlockExecutionError]) extends Throwable with NoStackTrace
+  private case class ExecuteAndInsertBlocksAborted(parentTotalDifficulty: UInt256, newBlocks: Vector[NewBlock], errors: Vector[BlockExecutionError]) extends Throwable with NoStackTrace
 }
 trait RegularSyncService { _: SyncService =>
   import context.dispatcher
@@ -184,8 +185,8 @@ trait RegularSyncService { _: SyncService =>
           if (parent.hash == firstHeader.parentHash) {
             // we have same chain prefix
             val oldBranch = getPrevBlocks(headers)
-            val oldBranchTotalDifficulty = oldBranch.map(_.header.difficulty).foldLeft(BigInteger.ZERO)(_ add _)
-            val newBranchTotalDifficulty = headers.map(_.difficulty).foldLeft(BigInteger.ZERO)(_ add _)
+            val oldBranchTotalDifficulty = oldBranch.map(_.header.difficulty).foldLeft(UInt256.Zero)(_ + _)
+            val newBranchTotalDifficulty = headers.map(_.difficulty).foldLeft(UInt256.Zero)(_ + _)
 
             if (newBranchTotalDifficulty.compareTo(oldBranchTotalDifficulty) > 0) { // TODO what about == 0 ?
               val transactionsToAdd = oldBranch.flatMap(_.body.transactionList)
@@ -374,7 +375,7 @@ trait RegularSyncService { _: SyncService =>
    * @param newBlocks which, after adding the corresponding NewBlock msg for blocks, will be broadcasted
    * @return list of NewBlocks to broadcast (one per block successfully executed) and  errors if happened during execution
    */
-  private def executeAndInsertBlocks(blocks: Vector[Block], parentTd: BigInteger, isBatch: Boolean): Future[(BigInteger, Vector[NewBlock], Vector[BlockExecutionError])] = {
+  private def executeAndInsertBlocks(blocks: Vector[Block], parentTd: UInt256, isBatch: Boolean): Future[(UInt256, Vector[NewBlock], Vector[BlockExecutionError])] = {
     blocks.foldLeft(Future.successful(parentTd, Vector[NewBlock](), Vector[BlockExecutionError]())) {
       case (prevFuture, block) =>
         prevFuture flatMap {
@@ -401,12 +402,12 @@ trait RegularSyncService { _: SyncService =>
     }
   }
 
-  private def executeAndInsertBlock(block: Block, parentTd: BigInteger, isBatch: Boolean): Future[Either[BlockExecutionError, NewBlock]] = {
+  private def executeAndInsertBlock(block: Block, parentTd: UInt256, isBatch: Boolean): Future[Either[BlockExecutionError, NewBlock]] = {
     try {
       val start = System.currentTimeMillis
       ledger.executeBlock(block, validators) map {
         case Right(BlockResult(world, _, receipts, parallelCount, dbTimePercent)) =>
-          val newTd = parentTd add block.header.difficulty
+          val newTd = parentTd + block.header.difficulty
 
           val start1 = System.currentTimeMillis
           world.persist()
@@ -449,7 +450,7 @@ trait RegularSyncService { _: SyncService =>
     }
 
     if (peersToUse.nonEmpty) {
-      val candicates = peersToUse.toList.sortBy { case (_, td) => td.negate }.take(3).map(_._1).toArray
+      val candicates = peersToUse.toList.sortBy { case (_, td) => -td }.take(3).map(_._1).toArray
       Some(nextCandicate(candicates))
     } else {
       None
@@ -463,7 +464,7 @@ trait RegularSyncService { _: SyncService =>
     } -- nodeErrorPeers
 
     if (peersToUse.nonEmpty) {
-      val candicates = peersToUse.toList.sortBy { case (_, td) => td.negate }.take(3).map(_._1).toArray
+      val candicates = peersToUse.toList.sortBy { case (_, td) => -td }.take(3).map(_._1).toArray
       Some(nextCandicate(candicates))
     } else {
       None

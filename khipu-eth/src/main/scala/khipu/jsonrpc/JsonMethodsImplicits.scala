@@ -12,7 +12,8 @@ import khipu.jsonrpc.JsonSerializers.{ AddressJsonSerializer, OptionNoneToJNullS
 import khipu.jsonrpc.NetService._
 import khipu.jsonrpc.PersonalService._
 import khipu.jsonrpc.Web3Service.{ ClientVersionRequest, ClientVersionResponse, Sha3Request, Sha3Response }
-import khipu.util.BigIntUtil.BigIntAsUnsigned
+import khipu.util.BigIntUtil
+import khipu.vm.UInt256
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.{ DefaultFormats, Formats }
@@ -33,6 +34,9 @@ trait JsonMethodsImplicits {
 
   protected def encodeAsHex(input: BigInteger): JString =
     JString(s"0x${input.toString(16)}")
+
+  protected def encodeAsHex(input: UInt256): JString =
+    JString(s"0x${input.toHexString}")
 
   protected def encodeAsHex(input: Long): JString =
     JString(s"0x${BigInteger.valueOf(input).toString(16)}")
@@ -61,20 +65,20 @@ trait JsonMethodsImplicits {
   protected def extractHash(input: String): Either[JsonRpcError, Hash] =
     extractBytes(input, 32).map(x => Hash(x.toArray))
 
-  protected def extractQuantity(input: JValue): Either[JsonRpcError, BigInteger] =
+  protected def extractQuantity(input: JValue): Either[JsonRpcError, UInt256] =
     input match {
       case JInt(n) =>
-        Right(n.bigInteger)
+        Right(UInt256(n.bigInteger))
 
       case JString(s) =>
-        Try(new BigInteger(1, decode(s))).toEither.left.map(_ => InvalidParams())
+        Try(UInt256(new BigInteger(1, decode(s)))).toEither.left.map(_ => InvalidParams())
 
       case _ =>
         Left(InvalidParams("could not extract quantity"))
     }
 
   protected def extractTx(input: Map[String, JValue]): Either[JsonRpcError, TransactionRequest] = {
-    def optionalQuantity(name: String): Either[JsonRpcError, Option[BigInteger]] = input.get(name) match {
+    def optionalQuantity(name: String): Either[JsonRpcError, Option[UInt256]] = input.get(name) match {
       case Some(v) => extractQuantity(v).map(Some(_))
       case None    => Right(None)
     }
@@ -208,7 +212,7 @@ object JsonMethodsImplicits extends JsonMethodsImplicits {
   implicit val personal_sign = new Codec[SignRequest, SignResponse] {
     override def encodeJson(t: SignResponse): JValue = {
       import t.signature._
-      encodeAsHex(ByteString(r.toUnsignedByteArray ++ s.toUnsignedByteArray :+ v))
+      encodeAsHex(ByteString(BigIntUtil.toUnsignedByteArray(r) ++ BigIntUtil.toUnsignedByteArray(s) :+ v))
     }
 
     override def decodeJson(params: Option[JArray]): Either[JsonRpcError, SignRequest] =

@@ -100,7 +100,7 @@ object EvmConfig {
    *     140 - REVERT instruction in the Ethereum Virtual Machine</li>
    *     196 - Precompiled contracts for addition and scalar multiplication on the elliptic curve alt_bn128</li>
    *     197 - Precompiled contracts for optimal Ate pairing check on the elliptic curve alt_bn128</li>
-   *     198 - Precompiled contract for bigint modular exponentiation</li>
+   *     198 - Precompiled contract for big int modular exponentiation</li>
    *     211 - New opcodes: RETURNDATASIZE and RETURNDATACOPY</li>
    *     214 - New opcode STATICCALL</li>
    *     658 - Embedding transaction return data in receipts</li>

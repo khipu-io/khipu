@@ -1,12 +1,12 @@
 package khipu.domain
 
 import akka.util.ByteString
-import java.math.BigInteger
 import khipu.Hash
 import khipu.crypto
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.rlp
 import khipu.rlp.RLPList
+import khipu.vm.UInt256
 
 object BlockHeader {
   // 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347
@@ -28,7 +28,7 @@ final case class BlockHeader(
     transactionsRoot: Hash, // The SHA3 256-bit hash of the root node of the trie structure populated with each transaction in the transaction list portion, the trie is populate by [key, val] --> [rlp(index), rlp(tx_recipe)] of the block
     receiptsRoot:     Hash, // The SHA3 256-bit hash of the root node of the trie structure populated with each transaction recipe in the transaction recipes list portion, the trie is populate by [key, val] --> [rlp(index), rlp(tx_recipe)] of the block
     logsBloom:        ByteString,
-    difficulty:       BigInteger, // A scalar value corresponding to the difficulty level of this block. This can be calculated from the previous block’s difficulty level and the timestamp
+    difficulty:       UInt256, // A scalar value corresponding to the difficulty level of this block. This can be calculated from the previous block’s difficulty level and the timestamp
     number:           Long, // A scalar value equal to the number of ancestor blocks. The genesis block has a number of zero 
     gasLimit:         Long, // A scalar value equal to the current limit of gas expenditure per block
     gasUsed:          Long, // A scalar value equal to the total gas used in transactions in this bloc

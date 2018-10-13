@@ -1,7 +1,6 @@
 package khipu.domain
 
 import akka.util.ByteString
-import java.math.BigInteger
 import khipu.Hash
 import khipu.crypto
 import khipu.ledger.TrieStorage
@@ -16,7 +15,9 @@ import khipu.store.TransactionMappingStorage.TransactionLocation
 import khipu.store.trienode.ReadOnlyNodeStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
-import khipu.vm.{ Storage, UInt256, WorldState }
+import khipu.vm.Storage
+import khipu.vm.UInt256
+import khipu.vm.WorldState
 
 object Blockchain {
   /**
@@ -87,7 +88,7 @@ object Blockchain {
      * @param rootHash storage root hash
      * @param position storage position
      */
-    def getAccountStorageAt(rootHash: Hash, position: BigInteger): ByteString
+    def getAccountStorageAt(rootHash: Hash, position: UInt256): ByteString
 
     /**
      * Returns the receipts based on a block hash
@@ -115,7 +116,7 @@ object Blockchain {
      * @param blockhash
      * @return total difficulty if found
      */
-    def getTotalDifficultyByHash(blockhash: Hash): Option[BigInteger]
+    def getTotalDifficultyByHash(blockhash: Hash): Option[UInt256]
 
     def getTransactionLocation(txHash: Hash): Option[TransactionLocation]
 
@@ -140,7 +141,7 @@ object Blockchain {
     def saveBlockBody(blockHash: Hash, blockBody: BlockBody): Unit
     def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]): Unit
     def saveEvmcode(hash: Hash, evmCode: ByteString): Unit
-    def saveTotalDifficulty(blockhash: Hash, totalDifficulty: BigInteger): Unit
+    def saveTotalDifficulty(blockhash: Hash, totalDifficulty: UInt256): Unit
 
     /**
      * Returns a block hash given a block number
@@ -187,7 +188,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getEvmCodeByHash(hash: Hash): Option[ByteString] =
     evmCodeStorage.get(hash)
 
-  def getTotalDifficultyByHash(blockhash: Hash): Option[BigInteger] =
+  def getTotalDifficultyByHash(blockhash: Hash): Option[UInt256] =
     totalDifficultyStorage.get(blockhash)
 
   def saveBlockHeader(blockHeader: BlockHeader) {
@@ -208,7 +209,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def saveEvmcode(hash: Hash, evmCode: ByteString) =
     evmCodeStorage.put(hash, evmCode)
 
-  def saveTotalDifficulty(blockhash: Hash, td: BigInteger): Unit =
+  def saveTotalDifficulty(blockhash: Hash, td: UInt256): Unit =
     totalDifficultyStorage.put(blockhash, td)
 
   def getWorldState(blockNumber: Long, accountStartNonce: UInt256, stateRootHash: Option[Hash]): BlockWorldState =
@@ -253,11 +254,11 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   /**
    * API for outside query. Account storage can only be quered via MPT trie
    */
-  def getAccountStorageAt(accountStateRootHash: Hash, position: BigInteger): ByteString = {
+  def getAccountStorageAt(accountStateRootHash: Hash, position: UInt256): ByteString = {
     val storage = MerklePatriciaTrie(
       accountStateRootHash.bytes,
       storageNodeStorageFor(None)
-    )(trie.hashUInt256Serializable, trie.rlpUInt256Serializer).get(UInt256(position)).getOrElse(UInt256.Zero).bytes
+    )(trie.hashUInt256Serializable, trie.rlpUInt256Serializer).get(position).getOrElse(UInt256.Zero).bytes
 
     ByteString(storage)
   }

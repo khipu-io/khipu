@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.pattern.ask
 import akka.util.ByteString
-import java.math.BigInteger
 import khipu.Hash
 import khipu.domain.Account
 import khipu.domain.Address
@@ -77,7 +76,7 @@ object Ledger {
    * @return Upfront cost
    */
   private def calculateUpfrontCost(tx: Transaction): UInt256 =
-    calculateUpfrontGas(tx) + UInt256(tx.value)
+    calculateUpfrontGas(tx) + tx.value
 
   /**
    * v0 ≡ Tg (Tx gas limit) * Tp (Tx gas price). See YP equation number (68)
@@ -86,7 +85,7 @@ object Ledger {
    * @return Upfront cost
    */
   private def calculateUpfrontGas(tx: Transaction): UInt256 =
-    UInt256(BigInteger.valueOf(tx.gasLimit) multiply tx.gasPrice)
+    UInt256(tx.gasLimit) * tx.gasPrice
 
 }
 final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(implicit system: ActorSystem) extends Ledger.I {
@@ -178,7 +177,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
     val totalGasToRefund = calcTotalGasToRefund(gasLimit, result)
     val gasUsed = stx.tx.gasLimit - totalGasToRefund
-    val txFee = UInt256(gasUsed) * UInt256(stx.tx.gasPrice)
+    val txFee = UInt256(gasUsed) * stx.tx.gasPrice
 
     val elapsed = System.currentTimeMillis - start
     TxResult(stx, result.world, gasUsed, txFee, result.txLogs, result.addressesTouched, result.returnData, result.error, result.isRevert, result.parallelRaceConditions)
@@ -541,9 +540,9 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val gasLimit = stx.tx.gasLimit
     val totalGasToRefund = calcTotalGasToRefund(gasLimit, result)
     val gasUsed = stx.tx.gasLimit - totalGasToRefund
-    val gasPrice = UInt256(stx.tx.gasPrice)
-    val txFee = UInt256(gasUsed) * gasPrice
-    val refund = UInt256(totalGasToRefund) * gasPrice
+    val gasPrice = stx.tx.gasPrice
+    val txFee = gasPrice * gasUsed
+    val refund = gasPrice * totalGasToRefund
 
     if (blockchainConfig.isDebugTraceEnabled) {
       println(s"\nTx 0x${stx.hash} gasLimit: ${stx.tx.gasLimit} gasUsed $gasUsed, isRevert: ${result.isRevert}, error: ${result.error}")
@@ -607,7 +606,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val minerAddress = Address(block.header.beneficiary)
     val minerAccount = getAccountToPay(minerAddress)(world)
     val minerReward = blockRewardCalculator.calcBlockMinerReward(block.header.number, block.body.uncleNodesList.size)
-    val afterMinerReward = world.saveAccount(minerAddress, minerAccount.increaseBalance(UInt256(minerReward)))
+    val afterMinerReward = world.saveAccount(minerAddress, minerAccount.increaseBalance(minerReward))
     log.debug(s"Paying block ${block.header.number} reward of $minerReward to miner with account address $minerAddress")
 
     block.body.uncleNodesList.foldLeft(afterMinerReward) { (ws, ommer) =>
@@ -615,7 +614,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       val account = getAccountToPay(ommerAddress)(ws)
       val ommerReward = blockRewardCalculator.calcOmmerMinerReward(block.header.number, ommer.number)
       log.debug(s"Paying block ${block.header.number} reward of $ommerReward to ommer with account address $ommerAddress")
-      ws.saveAccount(ommerAddress, account.increaseBalance(UInt256(ommerReward)))
+      ws.saveAccount(ommerAddress, account.increaseBalance(ommerReward))
     }
   }
 
@@ -657,7 +656,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       (worldAtCheckpoint, txReceivingAddress, Program(world.getCode(txReceivingAddress).toArray))
     }
 
-    val worldAfterTransfer = worldBeforeTransfer.transfer(senderAddress, recipientAddress, UInt256(stx.tx.value))
+    val worldAfterTransfer = worldBeforeTransfer.transfer(senderAddress, recipientAddress, stx.tx.value)
     val initialAddressesToDelete = Set[Address]()
     val initialAddressesTouched = Set(recipientAddress)
 

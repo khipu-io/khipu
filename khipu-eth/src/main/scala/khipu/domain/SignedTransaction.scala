@@ -71,21 +71,21 @@ object SignedTransaction {
     val rlpValue = v match {
       case ECDSASignature.NegativePointSign | ECDSASignature.PositivePointSign =>
         RLPList(
-          tx.nonce,
-          tx.gasPrice,
+          rlp.toRLPEncodable(tx.nonce),
+          rlp.toRLPEncodable(tx.gasPrice),
           tx.gasLimit,
           tx.receivingAddress.fold(Array[Byte]())(_.toArray),
-          tx.value,
+          rlp.toRLPEncodable(tx.value),
           tx.payload
         )
 
       case _ =>
         RLPList(
-          tx.nonce,
-          tx.gasPrice,
+          rlp.toRLPEncodable(tx.nonce),
+          rlp.toRLPEncodable(tx.gasPrice),
           tx.gasLimit,
           tx.receivingAddress.fold(Array[Byte]())(_.toArray),
-          tx.value,
+          rlp.toRLPEncodable(tx.value),
           tx.payload,
           chainId.get,
           ValueForEmptyR,
@@ -104,21 +104,21 @@ object SignedTransaction {
     val rlpValue = chainId match {
       case None =>
         RLPList(
-          tx.nonce,
-          tx.gasPrice,
+          rlp.toRLPEncodable(tx.nonce),
+          rlp.toRLPEncodable(tx.gasPrice),
           tx.gasLimit,
           tx.receivingAddress.fold(Array[Byte]())(_.toArray),
-          tx.value,
+          rlp.toRLPEncodable(tx.value),
           tx.payload
         )
 
       case Some(cid) =>
         RLPList(
-          tx.nonce,
-          tx.gasPrice,
+          rlp.toRLPEncodable(tx.nonce),
+          rlp.toRLPEncodable(tx.gasPrice),
           tx.gasLimit,
           tx.receivingAddress.fold(Array[Byte]())(_.toArray),
-          tx.value,
+          rlp.toRLPEncodable(tx.value),
           tx.payload,
           cid,
           ValueForEmptyR,

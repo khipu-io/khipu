@@ -25,9 +25,9 @@ object ProgramContext {
       recipientAddress,
       stx.sender,
       stx.sender,
-      UInt256(stx.tx.gasPrice),
+      stx.tx.gasPrice,
       inputData,
-      UInt256(stx.tx.value),
+      stx.tx.value,
       program,
       blockHeader,
       callDepth = 0

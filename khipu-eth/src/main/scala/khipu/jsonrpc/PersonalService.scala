@@ -3,7 +3,6 @@ package khipu.jsonrpc
 import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.{ ByteString, Timeout }
-import java.math.BigInteger
 import khipu.Hash
 import khipu.crypto
 import khipu.crypto.ECDSASignature
@@ -15,6 +14,7 @@ import khipu.store.AppStateStorage
 import khipu.transactions.PendingTransactionsService
 import khipu.util.BlockchainConfig
 import khipu.util.TxPoolConfig
+import khipu.vm.UInt256
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -148,17 +148,17 @@ class PersonalService(
     implicit val timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
 
     val pendingTxsFuture = (pendingTransactionsService ? PendingTransactionsService.GetPendingTransactions).mapTo[PendingTransactionsService.PendingTransactionsResponse]
-    val latestPendingTxNonceFuture: Future[Option[BigInteger]] = pendingTxsFuture.map { pendingTxs =>
+    val latestPendingTxNonceFuture: Future[Option[UInt256]] = pendingTxsFuture.map { pendingTxs =>
       val senderTxsNonces = pendingTxs.pendingTransactions
         .collect { case ptx if ptx.stx.sender == wallet.address => ptx.stx.tx.nonce }
       Try(senderTxsNonces.max).toOption
     }
     latestPendingTxNonceFuture.map { maybeLatestPendingTxNonce =>
-      val maybeCurrentNonce = getCurrentAccount(request.from).map(_.nonce.n)
-      val maybeNextTxNonce = maybeLatestPendingTxNonce.map(_ add BigInteger.ONE) orElse maybeCurrentNonce
-      val tx = request.toTransaction(maybeNextTxNonce.getOrElse(blockchainConfig.accountStartNonce.n))
+      val maybeCurrentNonce = getCurrentAccount(request.from).map(_.nonce)
+      val maybeNextTxNonce = maybeLatestPendingTxNonce.map(_ + UInt256.Zero) orElse maybeCurrentNonce
+      val tx = request.toTransaction(maybeNextTxNonce.getOrElse(blockchainConfig.accountStartNonce))
 
-      val stx = if (appStateStorage.getBestBlockNumber() >= blockchainConfig.eip155BlockNumber) {
+      val stx = if (appStateStorage.getBestBlockNumber >= blockchainConfig.eip155BlockNumber) {
         wallet.signTx(tx, Some(blockchainConfig.chainId))
       } else {
         wallet.signTx(tx, None)
@@ -171,13 +171,11 @@ class PersonalService(
   }
 
   private def getCurrentAccount(address: Address): Option[Account] =
-    blockchain.getAccount(address, appStateStorage.getBestBlockNumber())
+    blockchain.getAccount(address, appStateStorage.getBestBlockNumber)
 
   private def getMessageToSign(message: ByteString) = {
     val prefixed: Array[Byte] =
-      0x19.toByte +:
-        s"Ethereum Signed Message:\n${message.length}".getBytes ++:
-        message.toArray[Byte]
+      0x19.toByte +: s"Ethereum Signed Message:\n${message.length}".getBytes ++: message.toArray[Byte]
 
     crypto.kec256(prefixed)
   }

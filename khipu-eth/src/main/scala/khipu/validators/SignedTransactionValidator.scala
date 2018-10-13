@@ -31,15 +31,20 @@ object SignedTransactionError {
   }
 }
 
-trait SignedTransactionValidator {
-  val secp256k1n = new BigInteger("115792089237316195423570985008687907852837564279074904382605163141518161494337")
-  val TWO = BigInteger.valueOf(2)
+object SignedTransactionValidator {
+  protected val MaxNonceValue = UInt256.Two.pow(8 * Transaction.NonceLength) - 1
+  protected val MaxGasValue = UInt256.Two.pow(8 * Transaction.GasLength) - 1
+  protected val MaxValue = UInt256.Two.pow(8 * Transaction.ValueLength) - 1
 
-  def validate(stx: SignedTransaction, senderAccount: Account, blockHeader: BlockHeader, upfrontGasCost: UInt256, accumGasUsed: Long): Either[SignedTransactionError, Unit]
+  // immutable BigInteger for ECDSASignature.r and ECDSASignature.s
+  protected val TWO = BigInteger.valueOf(2)
+  protected val MaxR = TWO.pow(8 * ECDSASignature.RLength) subtract BigInteger.ONE
+  protected val MaxS = TWO.pow(8 * ECDSASignature.SLength) subtract BigInteger.ONE
+  protected val Secp256k1n = new BigInteger("115792089237316195423570985008687907852837564279074904382605163141518161494337")
 }
-
-final class SignedTransactionValidatorImpl(blockchainConfig: BlockchainConfig) extends SignedTransactionValidator {
+final class SignedTransactionValidator(blockchainConfig: BlockchainConfig) {
   import SignedTransactionError._
+  import SignedTransactionValidator._
 
   /**
    * Initial tests of intrinsic validity stated in Section 6 of YP
@@ -69,29 +74,21 @@ final class SignedTransactionValidatorImpl(blockchainConfig: BlockchainConfig) e
    * @return Either the validated transaction or TransactionSyntaxError if an error was detected
    */
   private def checkSyntacticValidity(stx: SignedTransaction): Either[SignedTransactionError, Unit] = {
-    import stx.tx._
     import stx._
-    import Transaction._
 
-    val maxNonceValue = TWO.pow(8 * NonceLength) subtract BigInteger.ONE
-    val maxGasValue = TWO.pow(8 * GasLength) subtract BigInteger.ONE
-    val maxValue = TWO.pow(8 * ValueLength) subtract BigInteger.ONE
-    val maxR = TWO.pow(8 * ECDSASignature.RLength) subtract BigInteger.ONE
-    val maxS = TWO.pow(8 * ECDSASignature.SLength) subtract BigInteger.ONE
-
-    if (nonce.compareTo(maxNonceValue) > 0)
-      Left(TransactionSyntaxError(s"Invalid nonce: $nonce > $maxNonceValue"))
-    else if (BigInteger.valueOf(gasLimit).compareTo(maxGasValue) > 0)
-      Left(TransactionSyntaxError(s"Invalid gasLimit: $gasLimit > $maxGasValue"))
-    else if (gasPrice.compareTo(maxGasValue) > 0)
-      Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
-    else if (value.compareTo(maxValue) > 0)
-      Left(TransactionSyntaxError(s"Invalid value: $value > $maxValue"))
-    else if (signature.r.compareTo(maxR) > 0)
-      Left(TransactionSyntaxError(s"Invalid signatureRandom: ${signature.r} > $maxR"))
-    else if (signature.s.compareTo(maxS) > 0)
-      Left(TransactionSyntaxError(s"Invalid signature: ${signature.s} > $maxS"))
-    else
+    if (tx.nonce.compareTo(MaxNonceValue) > 0) {
+      Left(TransactionSyntaxError(s"Invalid nonce: ${tx.nonce} > $MaxNonceValue"))
+    } else if (UInt256(tx.gasLimit).compareTo(MaxGasValue) > 0) {
+      Left(TransactionSyntaxError(s"Invalid gasLimit: ${tx.gasLimit} > $MaxGasValue"))
+    } else if (tx.gasPrice.compareTo(MaxGasValue) > 0) {
+      Left(TransactionSyntaxError(s"Invalid gasPrice: ${tx.gasPrice} > $MaxGasValue"))
+    } else if (tx.value.compareTo(MaxValue) > 0) {
+      Left(TransactionSyntaxError(s"Invalid value: ${tx.value} > $MaxValue"))
+    } else if (signature.r.compareTo(MaxR) > 0) {
+      Left(TransactionSyntaxError(s"Invalid signatureRandom: ${signature.r} > $MaxR"))
+    } else if (signature.s.compareTo(MaxS) > 0) {
+      Left(TransactionSyntaxError(s"Invalid signature: ${signature.s} > $MaxS"))
+    } else
       Right(())
   }
 
@@ -109,14 +106,15 @@ final class SignedTransactionValidatorImpl(blockchainConfig: BlockchainConfig) e
     val beforeHomestead = blockNumber < blockchainConfig.homesteadBlockNumber
     val beforeEIP155 = blockNumber < blockchainConfig.eip155BlockNumber
 
-    val validR = r.compareTo(BigInteger.ZERO) > 0 && r.compareTo(secp256k1n) < 0
-    val validS = s.compareTo(BigInteger.ZERO) > 0 && s.compareTo(if (beforeHomestead) secp256k1n else secp256k1n divide TWO) < 0
+    val validR = r.compareTo(BigInteger.ZERO) > 0 && r.compareTo(Secp256k1n) < 0
+    val validS = s.compareTo(BigInteger.ZERO) > 0 && s.compareTo(if (beforeHomestead) Secp256k1n else Secp256k1n divide TWO) < 0
     val validSigningSchema = if (beforeEIP155) !stx.isChainSpecific else true
 
-    if (validR && validS && validSigningSchema)
+    if (validR && validS && validSigningSchema) {
       Right(())
-    else
+    } else {
       Left(TransactionSignatureError)
+    }
   }
 
   /**
@@ -127,10 +125,11 @@ final class SignedTransactionValidatorImpl(blockchainConfig: BlockchainConfig) e
    * @return Either the validated transaction or a TransactionNonceError
    */
   private def validateNonce(stx: SignedTransaction, senderNonce: UInt256): Either[SignedTransactionError, Unit] = {
-    if (senderNonce == UInt256(stx.tx.nonce))
+    if (senderNonce == stx.tx.nonce) {
       Right(())
-    else
-      Left(TransactionNonceError(UInt256(stx.tx.nonce), senderNonce))
+    } else {
+      Left(TransactionNonceError(stx.tx.nonce, senderNonce))
+    }
   }
 
   /**
@@ -144,10 +143,11 @@ final class SignedTransactionValidatorImpl(blockchainConfig: BlockchainConfig) e
     import stx.tx
     val config = EvmConfig.forBlock(blockHeaderNumber, blockchainConfig)
     val txIntrinsicGas = config.calcTransactionIntrinsicGas(tx.payload, tx.isContractCreation)
-    if (stx.tx.gasLimit >= txIntrinsicGas)
+    if (stx.tx.gasLimit >= txIntrinsicGas) {
       Right(())
-    else
+    } else {
       Left(TransactionNotEnoughGasForIntrinsicError(stx.tx.gasLimit, txIntrinsicGas))
+    }
   }
 
   /**
@@ -158,10 +158,11 @@ final class SignedTransactionValidatorImpl(blockchainConfig: BlockchainConfig) e
    * @return Either the validated transaction or a TransactionSenderCantPayUpfrontCostError
    */
   private def validateAccountHasEnoughGasToPayUpfrontCost(senderBalance: UInt256, upfrontCost: UInt256): Either[SignedTransactionError, Unit] = {
-    if (senderBalance >= upfrontCost)
+    if (senderBalance >= upfrontCost) {
       Right(())
-    else
+    } else {
       Left(TransactionSenderCantPayUpfrontCostError(upfrontCost, senderBalance))
+    }
   }
 
   /**
@@ -174,10 +175,11 @@ final class SignedTransactionValidatorImpl(blockchainConfig: BlockchainConfig) e
    * @return Either the validated transaction or a TransactionGasLimitTooBigError
    */
   private def validateBlockHasEnoughGasLimitForTx(stx: SignedTransaction, accumGasUsed: Long, blockGasLimit: Long): Either[SignedTransactionError, Unit] = {
-    if (stx.tx.gasLimit + accumGasUsed <= blockGasLimit)
+    if (stx.tx.gasLimit + accumGasUsed <= blockGasLimit) {
       Right(())
-    else
+    } else {
       Left(TransactionGasLimitTooBigError(stx.tx.gasLimit, accumGasUsed, blockGasLimit))
+    }
   }
 }
 

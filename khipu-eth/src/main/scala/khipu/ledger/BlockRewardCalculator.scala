@@ -1,7 +1,7 @@
 package khipu.ledger
 
-import java.math.BigInteger
 import khipu.util.BlockchainConfig
+import khipu.vm.UInt256
 
 /**
  * Calculates rewards for mining blocks and ommers.
@@ -14,67 +14,67 @@ final class BlockRewardCalculator(blockchainConfig: BlockchainConfig) {
   val eraDuration = config.eraDuration
 
   /** Rate at which block and ommer rewards are reduced in successive eras (numerator) */
-  val rewardReductionRateDenom: BigInteger = BigInteger.valueOf(BigDecimal(1 - config.rewardRedutionRate).precision * 10)
+  val rewardReductionRateDenom = UInt256(BigDecimal(1 - config.rewardRedutionRate).precision * 10)
   /** Rate at which block and ommer rewards are reduced in successive eras (denominator) */
-  val rewardReductionRateNumer: BigInteger = BigInteger.valueOf(((1 - config.rewardRedutionRate) * rewardReductionRateDenom.doubleValue).toInt)
+  val rewardReductionRateNumer = UInt256(((1 - config.rewardRedutionRate) * rewardReductionRateDenom.n.doubleValue).toInt)
 
   /** Reward to the block miner for inclusion of ommers as a fraction of block reward (numerator) */
-  val ommerInclusionRewardNumer: BigInteger = BigInteger.ONE
+  val ommerInclusionRewardNumer = UInt256.One
   /** Reward to the block miner for inclusion of ommers as a fraction of block reward (denominator) */
-  val ommerInclusionRewardDenom: BigInteger = BigInteger.valueOf(32)
+  val ommerInclusionRewardDenom = UInt256.ThirtyTwo
 
   /**
    * Reward to the miner of an included ommer as a fraction of block reward (numerator).
    * For era 2+
    */
-  val ommerMiningRewardNumer: BigInteger = BigInteger.ONE
+  val ommerMiningRewardNumer = UInt256.One
   /**
    * Reward to the miner of an included ommer as a fraction of block reward (denominator).
    * For era 2+
    */
-  val ommerMiningRewardDenom: BigInteger = BigInteger.valueOf(32)
+  val ommerMiningRewardDenom = UInt256.safe(32)
 
   /**
    * Reward to the miner of an included ommer as a fraction of block reward (max numerator).
    * Different in the first era
    */
-  val firstEraOmmerMiningRewardMaxNumer: BigInteger = BigInteger.valueOf(7)
+  val firstEraOmmerMiningRewardMaxNumer = UInt256.safe(7)
   /**
    * Reward to the miner of an included ommer as a fraction of block reward (denominator).
    * Different in the first era
    */
-  val firstEraOmmerMiningRewardDenom: BigInteger = BigInteger.valueOf(8)
+  val firstEraOmmerMiningRewardDenom = UInt256.safe(8)
 
   /** Base block reward in the first era */
-  def blockRewardOf(blockNumber: Long): BigInteger = if (blockNumber < blockchainConfig.byzantiumBlockNumber) {
+  def blockRewardOf(blockNumber: Long): UInt256 = if (blockNumber < blockchainConfig.byzantiumBlockNumber) {
     config.firstEraBlockReward
   } else {
     config.byzantiumBlockReward
   }
 
-  def calcBlockMinerReward(blockNumber: Long, ommersCount: Int): BigInteger = {
+  def calcBlockMinerReward(blockNumber: Long, ommersCount: Int): UInt256 = {
     val era = eraNumber(blockNumber)
     val eraMultiplier = rewardReductionRateNumer.pow(era)
     val eraDivisor = rewardReductionRateDenom.pow(era)
 
     val blockReward = blockRewardOf(blockNumber)
-    val baseReward = (blockReward multiply eraMultiplier) divide eraDivisor
+    val baseReward = (blockReward * eraMultiplier) / eraDivisor
     val ommersReward =
-      (blockReward multiply BigInteger.valueOf(ommersCount) multiply ommerInclusionRewardNumer multiply eraMultiplier) divide (ommerInclusionRewardDenom multiply eraDivisor)
-    baseReward add ommersReward
+      (blockReward * UInt256.safe(ommersCount) * ommerInclusionRewardNumer * eraMultiplier) / (ommerInclusionRewardDenom * eraDivisor)
+    baseReward + ommersReward
   }
 
-  def calcOmmerMinerReward(blockNumber: Long, ommerNumber: Long): BigInteger = {
+  def calcOmmerMinerReward(blockNumber: Long, ommerNumber: Long): UInt256 = {
     val era = eraNumber(blockNumber)
     val blockReward = blockRewardOf(blockNumber)
 
     if (era == 0) {
-      val numer = firstEraOmmerMiningRewardMaxNumer subtract BigInteger.valueOf(blockNumber - ommerNumber - 1)
-      (blockReward multiply numer) divide firstEraOmmerMiningRewardDenom
+      val numer = firstEraOmmerMiningRewardMaxNumer - UInt256(blockNumber - ommerNumber - 1)
+      (blockReward * numer) / firstEraOmmerMiningRewardDenom
     } else {
       val eraMultiplier = rewardReductionRateNumer.pow(era)
       val eraDivisor = rewardReductionRateDenom.pow(era)
-      (blockReward multiply ommerMiningRewardNumer multiply eraMultiplier) divide (ommerMiningRewardDenom multiply eraDivisor)
+      (blockReward * ommerMiningRewardNumer * eraMultiplier) / (ommerMiningRewardDenom * eraDivisor)
     }
   }
 

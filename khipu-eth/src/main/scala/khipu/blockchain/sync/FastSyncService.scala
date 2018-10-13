@@ -8,7 +8,6 @@ import akka.pattern.AskTimeoutException
 import akka.pattern.ask
 import akka.pattern.pipe
 import akka.util.ByteString
-import java.math.BigInteger
 import java.util.concurrent.ThreadLocalRandom
 import khipu.Hash
 import khipu.blockchain.sync
@@ -24,6 +23,7 @@ import khipu.network.rlpx.Peer
 import khipu.network.rlpx.RLPxStage
 import khipu.store.AppStateStorage
 import khipu.store.FastSyncStateStorage
+import khipu.vm.UInt256
 import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -98,7 +98,7 @@ object FastSyncService {
   final case class EnqueueBlockBodies(remainingHashes: List[Hash])
   final case class EnqueueReceipts(remainingHashes: List[Hash])
 
-  final case class SaveDifficulties(kvs: Map[Hash, BigInteger])
+  final case class SaveDifficulties(kvs: Map[Hash, UInt256])
   final case class SaveHeaders(kvs: Map[Hash, BlockHeader])
   final case class SaveBodies(kvs: Map[Hash, PV62.BlockBody], receivedHashes: List[Hash])
   final case class SaveReceipts(kvs: Map[Hash, Seq[Receipt]], receivedHashes: List[Hash])
@@ -508,7 +508,7 @@ trait FastSyncService { _: SyncService =>
       val peerToUse = peersToDownloadFrom collect {
         case (peer, PeerInfo(_, totalDifficulty, true, _)) if !workingPeers.contains(peer) => (peer, totalDifficulty)
       }
-      peerToUse.toList.sortBy { _._2.negate } map (_._1)
+      peerToUse.toList.sortBy { -_._2 } map (_._1)
     }
 
     private def isFullySynced =
@@ -694,7 +694,7 @@ trait FastSyncService { _: SyncService =>
           case Some(parentTotalDifficulty) =>
             // header is fetched and saved sequentially. TODO better logic
             blockchain.saveBlockHeader(header)
-            blockchain.saveTotalDifficulty(header.hash, parentTotalDifficulty add header.difficulty)
+            blockchain.saveTotalDifficulty(header.hash, parentTotalDifficulty + header.difficulty)
             true
           case None =>
             false

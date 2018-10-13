@@ -79,6 +79,7 @@ import khipu.jsonrpc.JsonRpcController.{ JsonDecoder, JsonEncoder }
 import khipu.jsonrpc.JsonRpcErrors.InvalidParams
 import khipu.jsonrpc.PersonalService.{ SendTransactionRequest, SendTransactionResponse, SignRequest }
 import org.json4s.{ Extraction, JsonAST }
+import khipu.vm.UInt256
 import org.json4s.JsonAST.{ JArray, JBool, JString, JValue, _ }
 import org.json4s.JsonDSL._
 
@@ -622,7 +623,7 @@ object EthJsonMethodsImplicits extends JsonMethodsImplicits {
     def toEitherOpt[A, B](opt: Option[Either[A, B]]): Either[A, Option[B]] =
       opt.map(_.right.map(Some.apply)).getOrElse(Right(None))
 
-    def optionalQuantity(input: JValue): Either[JsonRpcError, Option[BigInteger]] =
+    def optionalQuantity(input: JValue): Either[JsonRpcError, Option[UInt256]] =
       input match {
         case JNothing => Right(None)
         case o        => extractQuantity(o).map(Some(_))
@@ -639,8 +640,8 @@ object EthJsonMethodsImplicits extends JsonMethodsImplicits {
       from = from,
       to = to,
       gas = gas.map(_.longValue),
-      gasPrice = gasPrice.getOrElse(BigInteger.ZERO),
-      value = value.getOrElse(BigInteger.ZERO),
+      gasPrice = gasPrice.getOrElse(UInt256.Zero),
+      value = value.getOrElse(UInt256.Zero),
       data = data.getOrElse(ByteString(""))
     )
   }

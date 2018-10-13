@@ -69,7 +69,7 @@ object EthService {
   final case class UncleByBlockNumberAndIndexRequest(block: BlockParam, uncleIndex: Long)
   final case class UncleByBlockNumberAndIndexResponse(uncleBlockResponse: Option[BlockResponse])
 
-  final case class SubmitHashRateRequest(hashRate: BigInteger, id: Hash)
+  final case class SubmitHashRateRequest(hashRate: UInt256, id: Hash)
   final case class SubmitHashRateResponse(success: Boolean)
 
   final case class GetMiningRequest()
@@ -85,10 +85,10 @@ object EthService {
   final case class GetTransactionByBlockNumberAndIndexResponse(transactionResponse: Option[TransactionResponse])
 
   final case class GetHashRateRequest()
-  final case class GetHashRateResponse(hashRate: BigInteger)
+  final case class GetHashRateResponse(hashRate: UInt256)
 
   final case class GetGasPriceRequest()
-  final case class GetGasPriceResponse(price: BigInteger)
+  final case class GetGasPriceResponse(price: UInt256)
 
   final case class GetWorkRequest()
   final case class GetWorkResponse(powHeaderHash: Hash, dagSeed: ByteString, target: ByteString)
@@ -106,7 +106,7 @@ object EthService {
   sealed trait BlockParam
 
   object BlockParam {
-    final case class WithNumber(n: BigInteger) extends BlockParam
+    final case class WithNumber(n: UInt256) extends BlockParam
     case object Latest extends BlockParam
     case object Pending extends BlockParam
     case object Earliest extends BlockParam
@@ -116,8 +116,8 @@ object EthService {
     from:     Option[ByteString],
     to:       Option[ByteString],
     gas:      Option[Long],
-    gasPrice: BigInteger,
-    value:    BigInteger,
+    gasPrice: UInt256,
+    value:    UInt256,
     data:     ByteString
   )
   final case class CallRequest(tx: CallTx, block: BlockParam)
@@ -140,13 +140,13 @@ object EthService {
   final case class GetBlockTransactionCountByNumberResponse(result: Long)
 
   final case class GetBalanceRequest(address: Address, block: BlockParam)
-  final case class GetBalanceResponse(value: BigInteger)
+  final case class GetBalanceResponse(value: UInt256)
 
-  final case class GetStorageAtRequest(address: Address, position: BigInteger, block: BlockParam)
+  final case class GetStorageAtRequest(address: Address, position: UInt256, block: BlockParam)
   final case class GetStorageAtResponse(value: ByteString)
 
   final case class GetTransactionCountRequest(address: Address, block: BlockParam)
-  final case class GetTransactionCountResponse(value: BigInteger)
+  final case class GetTransactionCountResponse(value: UInt256)
 
   final case class ResolvedBlock(block: Block, pending: Boolean)
 
@@ -161,15 +161,15 @@ object EthService {
   final case class NewBlockFilterRequest()
   final case class NewPendingTransactionFilterRequest()
 
-  final case class NewFilterResponse(filterId: BigInteger)
+  final case class NewFilterResponse(filterId: UInt256)
 
-  final case class UninstallFilterRequest(filterId: BigInteger)
+  final case class UninstallFilterRequest(filterId: UInt256)
   final case class UninstallFilterResponse(success: Boolean)
 
-  final case class GetFilterChangesRequest(filterId: BigInteger)
+  final case class GetFilterChangesRequest(filterId: UInt256)
   final case class GetFilterChangesResponse(filterChanges: FilterChanges)
 
-  final case class GetFilterLogsRequest(filterId: BigInteger)
+  final case class GetFilterLogsRequest(filterId: UInt256)
   final case class GetFilterLogsResponse(filterLogs: FilterLogs)
 
   final case class GetLogsRequest(filter: Filter)
@@ -191,7 +191,7 @@ class EthService(
 
   def syncService = SyncService.proxy(system)
 
-  val hashRate: AtomicReference[Map[Hash, (BigInteger, Date)]] = new AtomicReference[Map[Hash, (BigInteger, Date)]](Map())
+  val hashRate: AtomicReference[Map[Hash, (UInt256, Date)]] = new AtomicReference[Map[Hash, (UInt256, Date)]](Map())
   val lastActive = new AtomicReference[Option[Date]](None)
 
   def pendingTransactionsService = PendingTransactionsService.proxy(system)
@@ -288,7 +288,7 @@ class EthService(
 
       val contractAddress = if (stx.tx.isContractCreation) {
         //do not subtract 1 from nonce because in transaction we have nonce of account before transaction execution
-        val hash = crypto.kec256(rlp.encode(RLPList(stx.sender.bytes, rlp.toRLPEncodable(UInt256(stx.tx.nonce)))))
+        val hash = crypto.kec256(rlp.encode(RLPList(stx.sender.bytes, rlp.toRLPEncodable(stx.tx.nonce))))
         Some(Address(hash))
       } else {
         None
@@ -389,8 +389,8 @@ class EthService(
 
   def submitHashRate(req: SubmitHashRateRequest): ServiceResponse[SubmitHashRateResponse] = {
     reportActive()
-    hashRate.updateAndGet(new UnaryOperator[Map[Hash, (BigInteger, Date)]] {
-      override def apply(t: Map[Hash, (BigInteger, Date)]): Map[Hash, (BigInteger, Date)] = {
+    hashRate.updateAndGet(new UnaryOperator[Map[Hash, (UInt256, Date)]] {
+      override def apply(t: Map[Hash, (UInt256, Date)]): Map[Hash, (UInt256, Date)] = {
         val now = new Date
         removeObsoleteHashrates(now, t + (req.id -> (req.hashRate, now)))
       }
@@ -409,10 +409,10 @@ class EthService(
         .flatMap(_.body.transactionList)
         .map(_.tx.gasPrice)
       if (gasPrice.nonEmpty) {
-        val avgGasPrice = gasPrice.foldLeft(BigInteger.ZERO)(_ add _) divide BigInteger.valueOf(gasPrice.length)
+        val avgGasPrice = gasPrice.foldLeft(UInt256.Zero)(_ + _) / UInt256(gasPrice.length)
         Right(GetGasPriceResponse(avgGasPrice))
       } else {
-        Right(GetGasPriceResponse(BigInteger.ZERO))
+        Right(GetGasPriceResponse(UInt256.Zero))
       }
     }
   }
@@ -436,17 +436,17 @@ class EthService(
   }
 
   def getHashRate(req: GetHashRateRequest): ServiceResponse[GetHashRateResponse] = {
-    val hashRates: Map[Hash, (BigInteger, Date)] = hashRate.updateAndGet(new UnaryOperator[Map[Hash, (BigInteger, Date)]] {
-      override def apply(t: Map[Hash, (BigInteger, Date)]): Map[Hash, (BigInteger, Date)] = {
+    val hashRates: Map[Hash, (UInt256, Date)] = hashRate.updateAndGet(new UnaryOperator[Map[Hash, (UInt256, Date)]] {
+      override def apply(t: Map[Hash, (UInt256, Date)]): Map[Hash, (UInt256, Date)] = {
         removeObsoleteHashrates(new Date, t)
       }
     })
 
     //sum all reported hashRates
-    Future.successful(Right(GetHashRateResponse(hashRates.mapValues { case (hr, _) => hr }.values.foldLeft(BigInteger.ZERO)(_ add _))))
+    Future.successful(Right(GetHashRateResponse(hashRates.mapValues { case (hr, _) => hr }.values.foldLeft(UInt256.Zero)(_ + _))))
   }
 
-  private def removeObsoleteHashrates(now: Date, rates: Map[Hash, (BigInteger, Date)]): Map[Hash, (BigInteger, Date)] = {
+  private def removeObsoleteHashrates(now: Date, rates: Map[Hash, (UInt256, Date)]): Map[Hash, (UInt256, Date)] = {
     rates.filter {
       case (_, (_, reported)) =>
         Duration.between(reported.toInstant, now.toInstant).toMillis < miningConfig.activeTimeout.toMillis
@@ -466,7 +466,7 @@ class EthService(
             Right(GetWorkResponse(
               powHeaderHash = Hash(crypto.kec256(BlockHeader.getEncodedWithoutNonce(pb.block.header))),
               dagSeed = seedForBlock(pb.block.header.number),
-              target = ByteString((UInt256.MODULUS divide pb.block.header.difficulty).toByteArray)
+              target = ByteString((UInt256.Modulus / pb.block.header.difficulty).bigEndianMag)
             ))
           case Left(err) =>
             //log.error(s"unable to prepare block because of $err")
@@ -620,7 +620,7 @@ class EthService(
   def getBalance(req: GetBalanceRequest): ServiceResponse[GetBalanceResponse] = {
     Future {
       withAccount(req.address, req.block) { account =>
-        GetBalanceResponse(account.balance.n)
+        GetBalanceResponse(account.balance)
       }
     }
   }
@@ -636,7 +636,7 @@ class EthService(
   def getTransactionCount(req: GetTransactionCountRequest): ServiceResponse[GetTransactionCountResponse] = {
     Future {
       withAccount(req.address, req.block) { account =>
-        GetTransactionCountResponse(account.nonce.n)
+        GetTransactionCountResponse(account.nonce)
       }
     }
   }
@@ -742,7 +742,7 @@ class EthService(
     }
 
     gasLimit.flatMap { gl =>
-      val tx = Transaction(BigInteger.ZERO, req.tx.gasPrice, gl, toAddress, req.tx.value, req.tx.data)
+      val tx = Transaction(UInt256.Zero, req.tx.gasPrice, gl, toAddress, req.tx.value, req.tx.data)
       val fakeSignature = ECDSASignature(BigInteger.ZERO, BigInteger.ZERO, 0.toByte)
       // TODO chainId
       val stx = SignedTransaction(tx, fakeSignature, None, fromAddress)

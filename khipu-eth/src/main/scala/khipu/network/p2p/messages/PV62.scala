@@ -13,8 +13,6 @@ import khipu.rlp.RLPList
 import khipu.rlp.RLPSerializable
 import khipu.rlp.RLPValue
 
-import scala.language.implicitConversions
-
 object PV62 {
   object BlockHash {
     implicit final class BlockHashEnc(blockHash: BlockHash) extends RLPSerializable {
@@ -112,14 +110,14 @@ object PV62 {
         case RLPList(parentHash, ommersHash, beneficiary, stateRoot, transactionsRoot, receiptsRoot,
           logsBloom, difficulty, number, gasLimit, gasUsed, unixTimestamp, extraData, mixHash, nonce) =>
           BlockHeader(parentHash, ommersHash, beneficiary, stateRoot, transactionsRoot, receiptsRoot,
-            logsBloom, difficulty, number, gasLimit, gasUsed, unixTimestamp, extraData, mixHash, nonce)
+            logsBloom, rlp.toUInt256(difficulty), number, gasLimit, gasUsed, unixTimestamp, extraData, mixHash, nonce)
       }
 
     implicit final class BlockHeaderEnc(blockHeader: BlockHeader) extends RLPSerializable {
       override def toRLPEncodable: RLPEncodeable = {
         import blockHeader._
         RLPList(parentHash, ommersHash, beneficiary, stateRoot, transactionsRoot, receiptsRoot,
-          logsBloom, difficulty, number, gasLimit, gasUsed, unixTimestamp, extraData, mixHash, nonce)
+          logsBloom, rlp.toRLPEncodable(difficulty), number, gasLimit, gasUsed, unixTimestamp, extraData, mixHash, nonce)
       }
     }
 

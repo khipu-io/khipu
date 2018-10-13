@@ -329,7 +329,7 @@ case object XOR extends BinaryOp(0x18) with ConstGas[(UInt256, UInt256)] {
 case object BYTE extends BinaryOp(0x1a) with ConstGas[(UInt256, UInt256)] {
   override protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(a, b) = state.stack.pop(2)
-    if (a.compareTo(UInt256.MAX_INT) > 0) {
+    if (a.compareTo(UInt256.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (a, b)
@@ -454,7 +454,7 @@ case object NUMBER extends ConstOp(0x43) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.number)
 }
 case object DIFFICULTY extends ConstOp(0x44) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.difficulty)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.blockHeader.difficulty
 }
 case object GASLIMIT extends ConstOp(0x45) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.gasLimit)
@@ -648,7 +648,7 @@ case object MLOAD extends OpCode[UInt256](0x51, 1, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset) = state.stack.pop()
-    if (offset.compareTo(UInt256.MAX_INT) > 0) {
+    if (offset.compareTo(UInt256.MaxInt) > 0) {
       state.withError(ArithmeticException) // why MLOAD/MSTORE requires bounded offset
     }
     offset
@@ -671,7 +671,7 @@ case object MSTORE extends OpCode[(UInt256, UInt256)](0x52, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, value) = state.stack.pop(2)
-    if (offset.compareTo(UInt256.MAX_INT) > 0) {
+    if (offset.compareTo(UInt256.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (offset, value)
@@ -944,7 +944,7 @@ case object CREATE extends OpCode[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_create
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(endowment, inOffset, inSize) = state.stack.pop(3)
-    if (inOffset.compareTo(UInt256.MAX_INT) > 0 || inSize.compareTo(UInt256.MAX_INT) > 0) {
+    if (inOffset.compareTo(UInt256.MaxInt) > 0 || inSize.compareTo(UInt256.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (endowment, inOffset, inSize)
@@ -1083,7 +1083,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
       val List(gas, target, inOffset, inSize, outOffset, outSize) = state.stack.pop(6)
       List(gas, target, UInt256.Zero, inOffset, inSize, outOffset, outSize)
     }
-    if (inOffset.compareTo(UInt256.MAX_INT) > 0 || inSize.compareTo(UInt256.MAX_INT) > 0 || outOffset.compareTo(UInt256.MAX_INT) > 0 || outOffset.compareTo(UInt256.MAX_INT) > 0) {
+    if (inOffset.compareTo(UInt256.MaxInt) > 0 || inSize.compareTo(UInt256.MaxInt) > 0 || outOffset.compareTo(UInt256.MaxInt) > 0 || outOffset.compareTo(UInt256.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (gas, target, callValue, inOffset, inSize, outOffset, outSize)
@@ -1322,7 +1322,7 @@ case object RETURN extends OpCode[(UInt256, UInt256)](0xf3, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, size) = state.stack.pop(2)
-    if (offset.compareTo(UInt256.MAX_INT) > 0 || size.compareTo(UInt256.MAX_INT) > 0) {
+    if (offset.compareTo(UInt256.MaxInt) > 0 || size.compareTo(UInt256.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (offset, size)
@@ -1344,7 +1344,7 @@ case object REVERT extends OpCode[(UInt256, UInt256)](0xfd, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, size) = state.stack.pop(2)
-    if (offset.compareTo(UInt256.MAX_INT) > 0 || size.compareTo(UInt256.MAX_INT) > 0) {
+    if (offset.compareTo(UInt256.MaxInt) > 0 || size.compareTo(UInt256.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (offset, size)

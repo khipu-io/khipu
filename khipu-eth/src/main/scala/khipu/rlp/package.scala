@@ -7,6 +7,7 @@ package object rlp {
 
   val EmptyRLPData = encode(RLPValue(Array[Byte]()))
   val EmptyRLPList = encode(RLPList())
+  val ZeroByteRLP = RLP.byteToByteArray(0: Byte)
 
   final case class RLPException(message: String) extends RuntimeException(message)
 
@@ -52,13 +53,13 @@ package object rlp {
   // --- utilities for UInt256
 
   def toRLPEncodable(value: UInt256): RLPEncodeable =
-    RLPValue(if (value.n.signum == 0) RLP.byteToByteArray(0: Byte) else value.nonZeroLeadingBytes)
+    RLPValue(if (value.isZero) ZeroByteRLP else value.nonZeroLeadingBytes)
 
   def toUInt256(bytes: ByteString): UInt256 = toUInt256(bytes.toArray)
   def toUInt256(bytes: Array[Byte]): UInt256 = toUInt256(rawDecode(bytes))
   def toUInt256(rLPEncodeable: RLPEncodeable): UInt256 = {
     rLPEncodeable match {
-      case RLPValue(bytes) => UInt256(bytes)
+      case RLPValue(bytes) => if (bytes.length == 0) UInt256.Zero else UInt256(bytes)
       case _               => throw RLPException("src is not an RLPValue")
     }
   }

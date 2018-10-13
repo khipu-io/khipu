@@ -2,9 +2,9 @@ package khipu.rlp
 
 import akka.util.ByteString
 import java.math.BigInteger
+import khipu.BigInt
 import khipu.Hash
 import khipu.rlp.RLPImplicits._
-import scala.language.implicitConversions
 
 object RLPImplicitConversions {
 
@@ -24,7 +24,9 @@ object RLPImplicitConversions {
 
   implicit def intFromEncodeable: (RLPEncodeable) => Int = fromEncodeable[Int]
 
-  implicit def bigIntFromEncodeable: (RLPEncodeable) => BigInteger = fromEncodeable[BigInteger]
+  implicit def bigIntegerFromEncodeable: (RLPEncodeable) => BigInteger = fromEncodeable[BigInteger]
+
+  implicit def bigIntFromEncodeable: (RLPEncodeable) => BigInt = fromEncodeable[BigInt]
 
   implicit def byteStringFromEncodeable: (RLPEncodeable) => ByteString = fromEncodeable[ByteString]
 

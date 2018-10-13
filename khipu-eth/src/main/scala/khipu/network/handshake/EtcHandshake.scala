@@ -1,7 +1,6 @@
 package khipu.network.handshake
 
 import akka.util.ByteString
-import java.math.BigInteger
 import khipu.NodeStatus
 import khipu.ServerStatus
 import khipu.domain.Blockchain
@@ -15,6 +14,7 @@ import khipu.network.p2p.messages.Versions
 import khipu.network.p2p.messages.WireProtocol.{ Capability, Disconnect, Hello }
 import khipu.network.rlpx.PeerConfiguration
 import khipu.store.AppStateStorage
+import khipu.vm.UInt256
 import scala.concurrent.duration._
 
 /**
@@ -93,11 +93,11 @@ object EtcHandshake {
 
   final case class PeerInfo(
       remoteStatus:    Status,
-      totalDifficulty: BigInteger,
+      totalDifficulty: UInt256,
       forkAccepted:    Boolean,
       maxBlockNumber:  Long
   ) {
-    def withTotalDifficulty(totalDifficulty: BigInteger): PeerInfo = copy(totalDifficulty = totalDifficulty)
+    def withTotalDifficulty(totalDifficulty: UInt256): PeerInfo = copy(totalDifficulty = totalDifficulty)
     def withForkAccepted(forkAccepted: Boolean): PeerInfo = copy(forkAccepted = forkAccepted)
     def withMaxBlockNumber(maxBlockNumber: Long): PeerInfo = copy(maxBlockNumber = maxBlockNumber)
 

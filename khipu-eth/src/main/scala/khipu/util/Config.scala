@@ -225,7 +225,7 @@ object BlockchainConfig {
 
       val daoForkBlockNumber = blockchainConfig.getLong("dao-fork-block-number")
       val daoForkBlockHash = ByteString(khipu.hexDecode(blockchainConfig.getString("dao-fork-block-hash")))
-      val accountStartNonce = UInt256(BigInteger.valueOf(blockchainConfig.getInt("account-start-nonce")))
+      val accountStartNonce = UInt256(blockchainConfig.getInt("account-start-nonce"))
 
       val chainId = khipu.hexDecode(blockchainConfig.getString("chain-id")).head
 
@@ -278,16 +278,16 @@ object MonetaryPolicyConfig {
     MonetaryPolicyConfig(
       mpConfig.getLong("era-duration"),
       mpConfig.getDouble("reward-reduction-rate"),
-      new BigInteger(mpConfig.getString("first-era-block-reward")),
-      new BigInteger(mpConfig.getString("byzantium-block-reward"))
+      UInt256(new BigInteger(mpConfig.getString("first-era-block-reward"))),
+      UInt256(new BigInteger(mpConfig.getString("byzantium-block-reward")))
     )
   }
 }
 final case class MonetaryPolicyConfig(
     eraDuration:          Long,
     rewardRedutionRate:   Double,
-    firstEraBlockReward:  BigInteger,
-    byzantiumBlockReward: BigInteger
+    firstEraBlockReward:  UInt256,
+    byzantiumBlockReward: UInt256
 ) {
   require(
     rewardRedutionRate >= 0.0 && rewardRedutionRate <= 1.0,

@@ -3,10 +3,6 @@ package khipu.util
 import java.math.BigInteger
 
 object BigIntUtil {
-  implicit final class BigIntAsUnsigned(val srcBigInteger: BigInteger) extends AnyVal {
-    def toUnsignedByteArray: Array[Byte] = BigIntUtil.toUnsignedByteArray(srcBigInteger)
-  }
-
   def toUnsignedByteArray(n: BigInteger): Array[Byte] = {
     val bytes = n.toByteArray
     if (bytes(0) == 0) {

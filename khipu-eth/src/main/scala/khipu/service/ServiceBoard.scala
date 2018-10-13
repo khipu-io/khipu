@@ -39,7 +39,6 @@ import khipu.validators.BlockHeaderValidator
 import khipu.validators.BlockValidator
 import khipu.validators.OmmersValidator
 import khipu.validators.SignedTransactionValidator
-import khipu.validators.SignedTransactionValidatorImpl
 import khipu.validators.Validators
 import org.apache.kafka.common.record.CompressionType
 import org.spongycastle.crypto.params.ECPublicKeyParameters
@@ -188,7 +187,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     val blockValidator: BlockValidator = BlockValidator
     val blockHeaderValidator: BlockHeaderValidator.I = new BlockHeaderValidator(blockchainConfig)
     val ommersValidator: OmmersValidator.I = new OmmersValidator(blockchainConfig)
-    val signedTransactionValidator: SignedTransactionValidator = new SignedTransactionValidatorImpl(blockchainConfig)
+    val signedTransactionValidator = new SignedTransactionValidator(blockchainConfig)
   }
 
   val ledger: Ledger.I = new Ledger(blockchain, blockchainConfig)(system)

@@ -2,12 +2,10 @@ package khipu.rlp
 
 import akka.util.ByteString
 import java.math.BigInteger
+import khipu.BigInt
 import khipu.Hash
 import khipu.rlp.RLP._
 import khipu.util.BigIntUtil
-import khipu.util.BigIntUtil.BigIntAsUnsigned
-import scala.annotation.switch
-import scala.language.implicitConversions
 
 object RLPImplicits {
 
@@ -15,7 +13,7 @@ object RLPImplicits {
     override def encode(obj: Byte): RLPValue = RLPValue(byteToByteArray(obj))
     override def decode(rlp: RLPEncodeable): Byte = rlp match {
       case RLPValue(bytes) =>
-        (bytes.length: @switch) match {
+        (bytes.length: @scala.annotation.switch) match {
           case 0 => 0.toByte
           case 1 => (bytes(0) & 0xFF).toByte
           case _ => throw RLPException("src doesn't represent a byte")
@@ -28,7 +26,7 @@ object RLPImplicits {
     override def encode(obj: Short): RLPValue = RLPValue(shortToBigEndianMinLength(obj))
     override def decode(rlp: RLPEncodeable): Short = rlp match {
       case RLPValue(bytes) =>
-        (bytes.length: @switch) match {
+        (bytes.length: @scala.annotation.switch) match {
           case 0 => 0.toShort
           case 1 => (bytes(0) & 0xFF).toShort
           case 2 => (((bytes(0) & 0xFF) << 8) + (bytes(1) & 0xFF)).toShort
@@ -46,8 +44,18 @@ object RLPImplicits {
     }
   }
 
+  implicit val bigIntEncDec = new RLPEncoder[BigInt] with RLPDecoder[BigInt] {
+    override def encode(obj: BigInt): RLPValue = RLPValue(
+      if (obj.isZero) byteToByteArray(0) else BigIntUtil.toUnsignedByteArray(obj.toBigInteger)
+    )
+    override def decode(rlp: RLPEncodeable): BigInt = rlp match {
+      case RLPValue(bytes) => new BigInt(bytes.foldLeft[BigInteger](BigInteger.ZERO) { (rec, byte) => (rec shiftLeft 8) add BigInteger.valueOf(byte & 0xFF) }) // TODO rewrite for BigInt
+      case _               => throw RLPException("src is not an RLPValue")
+    }
+  }
+
   //Used for decoding and encoding positive (or 0) BigInts
-  implicit val bigIntEncDec = new RLPEncoder[BigInteger] with RLPDecoder[BigInteger] {
+  implicit val bigIntegerEncDec = new RLPEncoder[BigInteger] with RLPDecoder[BigInteger] {
     override def encode(obj: BigInteger): RLPValue = RLPValue(
       if (obj.compareTo(BigInteger.ZERO) == 0) byteToByteArray(0) else BigIntUtil.toUnsignedByteArray(obj)
     )
@@ -59,9 +67,9 @@ object RLPImplicits {
 
   //Used for decoding and encoding positive (or 0) longs
   implicit val longEncDec = new RLPEncoder[Long] with RLPDecoder[Long] {
-    override def encode(obj: Long): RLPValue = bigIntEncDec.encode(BigInteger.valueOf(obj))
+    override def encode(obj: Long): RLPValue = bigIntegerEncDec.encode(BigInteger.valueOf(obj))
     override def decode(rlp: RLPEncodeable): Long = rlp match {
-      case RLPValue(bytes) if bytes.length <= 8 => bigIntEncDec.decode(rlp).longValue
+      case RLPValue(bytes) if bytes.length <= 8 => bigIntegerEncDec.decode(rlp).longValue
       case _                                    => throw RLPException("src is not an RLPValue")
     }
   }

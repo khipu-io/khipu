@@ -1,7 +1,7 @@
 package khipu.domain
 
 import akka.util.ByteString
-import java.math.BigInteger
+import khipu.vm.UInt256
 
 object Transaction {
 
@@ -9,17 +9,17 @@ object Transaction {
   val GasLength = 32
   val ValueLength = 32
 
-  def apply(nonce: BigInteger, gasPrice: BigInteger, gasLimit: Long, receivingAddress: Address, value: BigInteger, payload: ByteString): Transaction =
+  def apply(nonce: UInt256, gasPrice: UInt256, gasLimit: Long, receivingAddress: Address, value: UInt256, payload: ByteString): Transaction =
     Transaction(nonce, gasPrice, gasLimit, Some(receivingAddress), value, payload)
 
 }
 
 final case class Transaction(
-    nonce:            BigInteger,
-    gasPrice:         BigInteger,
+    nonce:            UInt256,
+    gasPrice:         UInt256,
     gasLimit:         Long,
     receivingAddress: Option[Address],
-    value:            BigInteger,
+    value:            UInt256,
     payload:          ByteString
 ) {
 
