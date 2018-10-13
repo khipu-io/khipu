@@ -28,6 +28,8 @@
 
 package khipu
 
+import java.math.BigInteger
+import java.util.Arrays
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.ExecutorService
@@ -67,6 +69,17 @@ object BigInt {
   // --- simple test
   def main(args: Array[String]) {
     import TEST._
+
+    val s = "246313781983713469235139859013498018470170100003957203570275438387"
+    val x = new BigInt(s)
+    val y = x.toBigInteger
+    val z = new BigInteger(s)
+    val h = new BigInt(z)
+
+    assert(x.bitLength == y.bitLength && x.bitLength == z.bitLength, s"$x, $y should be same bitLength")
+    assert(Arrays.equals(x.toByteArray, z.toByteArray), s"$x, $y should be same toByteArray")
+    assert(x.toString == y.toString && x.toString == z.toString && x.toString == h.toString, s"$x, $y, $z, $h should be same")
+
     constructorTest()
     addTest()
     subTest()
@@ -89,8 +102,6 @@ object BigInt {
   }
 
   private object TEST {
-    import java.math.BigInteger
-
     private val rnd = new java.util.Random()
     private def getRndNumber(len: Int): Array[Char] = {
       val sign = rnd.nextInt(2)
@@ -358,7 +369,7 @@ object BigInt {
         val s = getRndNumber(1 + i * 10)
         var facit = new BigInteger(new String(s))
         val dividend = new BigInt(s)
-        while (!dividend.isZero()) {
+        while (!dividend.isZero) {
           val d = rnd.nextLong()
           if (d != 0) {
             val div = Array.ofDim[Byte](8)
@@ -366,8 +377,8 @@ object BigInt {
             var j = 7
             while (j >= 0) {
               div(j) = (tmp & 0xFF).toByte
-              j -= 1
               tmp >>>= 8
+              j -= 1
             }
             val divb = new BigInteger(1, div)
             val facitBefore = facit
@@ -390,18 +401,18 @@ object BigInt {
     def testLongZeroAdd() {
       var a = new BigInt(0)
       a.add(0L)
-      assertEquals("add(0L)", true, a.isZero())
+      assertEquals("add(0L)", true, a.isZero)
       a.uadd(0L)
-      assertEquals("uadd(0L)", true, a.isZero())
+      assertEquals("uadd(0L)", true, a.isZero)
       a.add(-1L)
       a.add(2L)
       a.add(-1L)
-      assertEquals("-1L + 2L + -1L = 0", true, a.isZero())
+      assertEquals("-1L + 2L + -1L = 0", true, a.isZero)
       a.usub(7L)
       a.sub(-8L)
-      assertEquals("-7L - -8L != 0", false, a.isZero())
+      assertEquals("-7L - -8L != 0", false, a.isZero)
       a.sub(1L)
-      assertEquals("1 - 1L = 0", true, a.isZero())
+      assertEquals("1 - 1L = 0", true, a.isZero)
     }
 
     def testDivAndRem() {
@@ -468,12 +479,12 @@ object BigInt {
       assertEquals("Test bit", true, a.testBit(1337))
       assertEquals("Test bit", false, a.testBit(1336))
       b.clearBit(1337)
-      assertEquals("Clear bit", true, b.isZero())
+      assertEquals("Clear bit", true, b.isZero)
       assertEquals("Test bit", false, b.testBit(1337))
       b.flipBit(1337)
       assertEquals("Flip bit", a.toString, b.toString)
       b.flipBit(1337)
-      assertEquals("Flip bit", true, b.isZero())
+      assertEquals("Flip bit", true, b.isZero)
       b = new BigInt("24973592847598349867938576938752986459872649249832748")
       var facit = new BigInteger("24973592847598349867938576938752986459872649249832748")
       b.flipBit(77)
@@ -494,6 +505,7 @@ object BigInt {
         var bit = rnd.nextInt(600)
         a.assign(s)
         facit = new BigInteger(new String(s))
+        facit.bitLength
         assertEquals("Random test", facit.testBit(bit), a.testBit(bit))
         bit = rnd.nextInt(600)
         facit = facit.setBit(bit)
@@ -520,7 +532,7 @@ object BigInt {
     def testAnd() {
       var a = new BigInt(1L << 47)
       a.and(new BigInt(0L))
-      assertEquals("And with 0", true, a.isZero())
+      assertEquals("And with 0", true, a.isZero)
       var i = 0
       while (i < 1024) {
         val s = getRndNumber(1 + rnd.nextInt(64))
@@ -598,7 +610,7 @@ object BigInt {
       b.shiftLeft(47)
       assertEquals("Xor with 0", b.toString, a.toString)
       a.xor(b)
-      assertEquals("Double xor is zero", true, a.isZero())
+      assertEquals("Double xor is zero", true, a.isZero)
       var i = 0
       while (i < 1024) {
         var s = getRndNumber(1 + rnd.nextInt(64))
@@ -624,7 +636,7 @@ object BigInt {
       b.shiftLeft(47)
       assertEquals("AndNot with 0", b.toString, a.toString)
       a.andNot(b)
-      assertEquals("Self andNot is zero", true, a.isZero())
+      assertEquals("Self andNot is zero", true, a.isZero)
       var i = 0
       while (i < 1024) {
         val s = getRndNumber(1 + rnd.nextInt(64))
@@ -659,7 +671,7 @@ object BigInt {
       a.not()
       assertEquals("~0 = ", "-1", a.toString())
       a.not()
-      assertEquals("~~0", true, a.isZero())
+      assertEquals("~~0", true, a.isZero)
       var i = 0
       while (i < 1024) {
         val s = getRndNumber(1 + rnd.nextInt(64))
@@ -708,6 +720,20 @@ object BigInt {
    * Used to cast a (base 2^32) digit to a long without getting unwanted sign extension.
    */
   private val MASK = (1L << 32) - 1
+
+  def pow(a: BigInt, _b: Long): BigInt = {
+    var b = _b
+    val res = new BigInt(1)
+    val bitPow = a.copy
+    while (b > 0) {
+      if ((b & 1) != 0) {
+        res.mul(bitPow)
+      }
+      bitPow.mul(bitPow)
+      b >>>= 1
+    }
+    res
+  }
 
   /*** <Mul Helper> ***/
   /**
@@ -999,7 +1025,7 @@ object BigInt {
  * @author Simon Klein
  * @version 0.7
  */
-final class BigInt private () extends Number with Comparable[BigInt] {
+final class BigInt private () extends Number with Ordered[BigInt] {
   import BigInt._
 
   /**
@@ -1014,13 +1040,24 @@ final class BigInt private () extends Number with Comparable[BigInt] {
   private var len: Int = _
 
   /**
-   * The digits of the number, i.e., the magnitude array.
+   * The digits of the number, i.e., the magnitude array, in little endian order
    */
-  private var mag: Array[Int] = Array[Int]()
+  private var mag = Array[Int]()
 
-  def this(_sign: Int, _mag: Array[Int], _len: Int) = {
+  /**
+   * Creates a BigInt from the given parameters. The input-array will be used as
+   * is and not be copied.
+   *
+   * @param sign	The sign of the number.
+   * @param v	The magnitude of the number, the first position gives the least
+   * significant 32 bits.
+   * @param len	The (first) number of entries of v that are considered part of
+   * the number.
+   * @complexity	O(1)
+   */
+  def this(sign: Int, v: Array[Int], len: Int) = {
     this()
-    assign(_sign, _mag, _len)
+    assign(sign, v, len)
   }
 
   /**
@@ -1038,7 +1075,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
     while (vlen > 1 && v(vlen - 1) == 0) {
       vlen -= 1
     }
-    val dig = Array.ofDim[Int]((vlen + 3) / 4)
+    mag = Array.ofDim[Int]((vlen + 3) / 4)
     assign(sign, v, vlen)
   }
 
@@ -1116,6 +1153,23 @@ final class BigInt private () extends Number with Comparable[BigInt] {
   def this(s: Array[Char]) = {
     this()
     assign(s)
+  }
+
+  def this(v: BigInteger) = {
+    this()
+    val bytes = reverse(v.toByteArray)
+    assign(v.signum, bytes, bytes.length)
+  }
+
+  private def reverse[T](xs: Array[T]) = {
+    var i = 0
+    while (i < xs.length / 2) {
+      val tmp = xs(i)
+      xs(i) = xs(xs.length - i - 1)
+      xs(xs.length - i - 1) = tmp
+      i += 1
+    }
+    xs
   }
 
   /*** <General Helper> ***/
@@ -1204,7 +1258,9 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @complexity	O(n)
    */
   def copy() = {
-    new BigInt(sign, java.util.Arrays.copyOf(mag, len), len)
+    val xs = Array.ofDim[Int](len)
+    System.arraycopy(mag, 0, xs, 0, len)
+    new BigInt(sign, xs, len)
   }
 
   /**
@@ -1393,9 +1449,9 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @return true if this number is zero, false otherwise
    * @complexity	O(1)
    */
-  def isZero(): Boolean = {
-    len == 1 && mag(0) == 0
-  }
+  def isZero: Boolean = len == 1 && mag(0) == 0
+  def isNegative: Boolean = sign < 0
+  def isPositive: Boolean = sign > 0
 
   /**
    * Sets this number to zero.
@@ -1407,6 +1463,8 @@ final class BigInt private () extends Number with Comparable[BigInt] {
     len = 1
     sign = 1 //Remove?
   }
+
+  def max(value: BigInt): BigInt = if (compareTo(value) > 0) this else value
 
   /**
    * Compares the absolute value of this and the given number.
@@ -1439,17 +1497,20 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @return	-1 if the value of this number is less, 0 if it's equal, 1 if it's greater.
    * @complexity	O(n)
    */
-  def compareTo(a: BigInt): Int = {
+  override def compare(a: BigInt): Int = {
     if (sign < 0) {
-      if (a.sign < 0 || a.isZero()) {
-        return -compareAbsTo(a)
+      if (a.sign < 0 || a.isZero) {
+        -compareAbsTo(a)
+      } else {
+        -1
       }
-      return -1
+    } else {
+      if (a.sign > 0 || a.isZero) {
+        compareAbsTo(a)
+      } else {
+        1
+      }
     }
-    if (a.sign > 0 || a.isZero()) {
-      return compareAbsTo(a)
-    }
-    return 1
   }
 
   /**
@@ -1461,7 +1522,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    */
   def equals(a: BigInt): Boolean = {
     if (len != a.len) return false
-    if (isZero() && a.isZero()) return true
+    if (isZero && a.isZero) return true
     if ((sign ^ a.sign) < 0) return false //In case definition of sign would change...
     var i = 0
     while (i < len) {
@@ -1587,6 +1648,15 @@ final class BigInt private () extends Number with Comparable[BigInt] {
   }
 
   /*** </Number Override> ***/
+
+  def abs(): this.type = {
+    if (sign >= 0) this else this.negate()
+  }
+
+  def negate(): this.type = {
+    sign = -sign
+    this
+  }
 
   /*** <Unsigned Int Num> ***/
   /**
@@ -2106,7 +2176,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @complexity	O(n)
    */
   def mul(mul: Int) {
-    if (isZero()) return //Remove?
+    if (isZero) return //Remove?
     if (mul < 0) {
       sign = -sign
       umul(-mul)
@@ -2123,7 +2193,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @return		the signed remainder.
    */
   def div(div: Int): Int = {
-    if (isZero()) return 0 //Remove?
+    if (isZero) return 0 //Remove?
     if (div < 0) {
       sign = -sign
       return -sign * udiv(-div)
@@ -2159,7 +2229,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @complexity	O(n)
    */
   def mul(mul: Long) {
-    if (isZero()) return //remove?
+    if (isZero) return //remove?
     if (mul < 0) {
       sign = -sign
       umul(-mul)
@@ -2176,13 +2246,14 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @return		the signed remainder.
    */
   def div(div: Long): Long = {
-    if (isZero()) return 0L //Remove?
+    if (isZero) return 0L //Remove?
     if (div < 0) {
       sign = -sign
       return -sign * udiv(-div)
     }
     return sign * udiv(div)
   }
+
   /*** </Signed Small Num> ***/
 
   /*** <Big Num Helper> ***/
@@ -2271,15 +2342,15 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param a	The number to add.
    * @complexity	O(n)
    */
-  def add(a: BigInt) {
+  def add(a: BigInt): this.type = {
     if (sign == a.sign) {
       addMag(a.mag, a.len)
-      return
+      return this
     }
     if (compareAbsTo(a) >= 0) {
       subMag(a.mag, a.len)
       //if(len==1 && dig[0]==0) sign = 1
-      return
+      return this
     }
 
     val v = a.mag
@@ -2308,6 +2379,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
       if (mag(i) == 0 && i + 1 == len) len -= 1
     }
     //if(i==vlen) should be impossible
+    this
   }
 
   /**
@@ -2316,20 +2388,22 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param a	The number to subtract.
    * @complexity	O(n)
    */
-  def sub(a: BigInt) { //Fix naming.
+  def sub(a: BigInt): this.type = { //Fix naming.
     if (sign != a.sign) {
       addMag(a.mag, a.len)
-      return
+      return this
     }
     if (compareAbsTo(a) >= 0) {
       subMag(a.mag, a.len)
       //if(len==1 && dig[0]==0) sign = 1
-      return
+      return this
     }
 
     val v = a.mag
     val vlen = a.len
-    if (mag.length < vlen) realloc(vlen + 1)
+    if (mag.length < vlen) {
+      realloc(vlen + 1)
+    }
 
     sign = -sign
     var dif = 0L
@@ -2353,6 +2427,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
       if (mag(i) == 0 && i + 1 == len) len -= 1
     }
     //if(i==vlen) should be impossible
+    this
   }
 
   // --- Multiplication SubSection ---
@@ -2363,25 +2438,41 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param mul	The number to multiply with.
    * @complexity	O(n^2) - O(n log n)
    */
-  def mul(mul: BigInt) {
-    if (isZero()) return
-    else if (mul.isZero()) setToZero()
-    else if (mul.len <= 2 || len <= 2) {
+  def mul(mul: BigInt): this.type = {
+    if (isZero) {
+      return this
+    } else if (mul.isZero) {
+      setToZero()
+      this
+    } else if (mul.len <= 2 || len <= 2) {
       sign *= mul.sign
-      if (mul.len == 1) umul(mul.mag(0))
-      else if (len == 1) {
+      if (mul.len == 1) {
+        umul(mul.mag(0))
+        this
+      } else if (len == 1) {
         val tmp = mag(0)
         assign(mul.mag, mul.len)
         umul(tmp)
-      } else if (mul.len == 2) umul(mul.mag(1).toLong << 32 | (mul.mag(0) & MASK))
-      else {
+        this
+      } else if (mul.len == 2) {
+        umul(mul.mag(1).toLong << 32 | (mul.mag(0) & MASK))
+        this
+      } else {
         val tmp = mag(1).toLong << 32 | (mag(0) & MASK)
         assign(mul.mag, mul.len)
         umul(tmp)
+        this
       }
-    } else if (len < 128 || mul.len < 128 || len.toLong * mul.len < 1000000) smallMul(mul) //Remove overhead?
-    else if (math.max(len, mul.len) < 20000) karatsuba(mul, false) //Tune thresholds and remove hardcode.
-    else karatsuba(mul, true)
+    } else if (len < 128 || mul.len < 128 || len.toLong * mul.len < 1000000) {
+      smallMul(mul) //Remove overhead?
+      this
+    } else if (math.max(len, mul.len) < 20000) {
+      karatsuba(mul, false) //Tune thresholds and remove hardcode.
+      this
+    } else {
+      karatsuba(mul, true)
+      this
+    }
   }
 
   /**
@@ -2392,8 +2483,8 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @complexity	O(n^2)
    */
   def smallMul(mul: BigInt) {
-    if (isZero()) return //Remove?
-    if (mul.isZero()) {
+    if (isZero) return //Remove?
+    if (mul.isZero) {
       setToZero()
       return
     }
@@ -2484,21 +2575,21 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param div	The number to divide with.
    * @complexity	O(n^2)
    */
-  def div(value: BigInt) {
+  def div(value: BigInt): this.type = {
     if (value.len == 1) {
       sign *= value.sign
       udiv(value.mag(0))
-      return
+      return this
     }
 
     var tmp = compareAbsTo(value)
     if (tmp < 0) {
       setToZero()
-      return
+      return this
     }
     if (tmp == 0) {
       uassign(1, sign * value.sign)
-      return
+      return this
     }
 
     val q = Array.ofDim[Int](len - value.len + 1)
@@ -2511,6 +2602,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
       len -= 1
     }
     sign *= value.sign
+    this
   }
 
   /**
@@ -2519,21 +2611,23 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param div	The number to use in the division causing the remainder.
    * @complexity	O(n^2)
    */
-  def rem(value: BigInt) {
+  def rem(value: BigInt): this.type = {
     // -7/-3 = 2, 2*-3 + -1
     // -7/3 = -2, -2*3 + -1
     // 7/-3 = -2, -2*-3 + 1
     // 7/3 = 2, 2*3 + 1
     if (value.len == 1) {
       urem(value.mag(0))
-      return
+      return this
     }
 
     var tmp = compareAbsTo(value)
-    if (tmp < 0) return
+    if (tmp < 0) {
+      return this
+    }
     if (tmp == 0) {
       setToZero()
-      return
+      return this
     }
 
     val q = Array.ofDim[Int](len - value.len + 1)
@@ -2544,6 +2638,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
     while (mag(len - 1) == 0) {
       len -= 1
     }
+    this
   }
 
   /**
@@ -2553,14 +2648,15 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param div
    */
   @throws(classOf[ArithmeticException])
-  def mod(div: BigInt) {
-    if (div.compareTo(new BigInt(0)) <= 0) {
-      throw new ArithmeticException("Divisor must be > 0");
+  def mod(div: BigInt): this.type = {
+    if (div.isZero || div.isNegative) {
+      throw new ArithmeticException("Divisor must be > 0")
     }
     rem(div)
     if (sign < 0) {
       add(div)
     }
+    this
   }
 
   /**
@@ -2739,7 +2835,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @complexity	O(n^2)
    */
   override def toString(): String = {
-    if (isZero()) return "0"
+    if (isZero) return "0"
 
     var top = len * 10 + 1
     val buf = Array.fill[Char](top)('0')
@@ -2896,7 +2992,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param shift	The amount to shift.
    * @complexity	O(n)
    */
-  def shiftLeft(shift: Int) {
+  def shiftLeft(shift: Int): this.type = {
     val bigShift = shift >>> 5
     val smallShift = shift & 31
     if (bigShift > 0) {
@@ -2905,6 +3001,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
     if (smallShift > 0) {
       smallShiftLeft(smallShift, bigShift)
     }
+    this
   }
 
   /**
@@ -2913,7 +3010,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param shift	The amount to shift.
    * @complexity	O(n)
    */
-  def shiftRight(shift: Int) {
+  def shiftRight(shift: Int): this.type = {
     val bigShift = shift >>> 5
     val smallShift = shift & 31
     if (bigShift > 0) {
@@ -2922,6 +3019,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
     if (smallShift > 0) {
       smallShiftRight(smallShift)
     }
+    this
   }
 
   /**
@@ -3149,7 +3247,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param mask	The number to bitwise-and with.
    * @complexity	O(n)
    */
-  def and(mask: BigInt) {
+  def and(mask: BigInt): this.type = {
     if (sign > 0) {
       if (mask.sign > 0) {
         if (mask.len < len) {
@@ -3197,6 +3295,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
       while (mag(len - 1) == 0 && len > 1) {
         len -= 1
       }
+      this
     } else {
       val mlen = math.min(len, mask.len)
       if (mask.sign > 0) {
@@ -3240,6 +3339,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
         while (mag(len - 1) == 0 && len > 1) {
           len -= 1
         }
+        this
       } else {
         if (mask.len > len) {
           if (mask.len > mag.length) {
@@ -3297,7 +3397,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
               }
               mag(blen) = 1
               len = blen + 1
-              return
+              return this
             }
             j += 1
           }
@@ -3309,6 +3409,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
         if (mask.len > len) {
           len = mask.len
         }
+        this
       }
     }
   }
@@ -3319,7 +3420,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param mask	The number to bitwise-or with.
    * @complexity	O(n)
    */
-  def or(mask: BigInt) {
+  def or(mask: BigInt): this.type = {
     if (sign > 0) {
       if (mask.sign > 0) {
         if (mask.len > len) {
@@ -3331,12 +3432,14 @@ final class BigInt private () extends Number with Comparable[BigInt] {
             i += 1
           }
           len = mask.len
+          this
         } else {
           var i = 0
           while (i < mask.len) {
             mag(i) |= mask.mag(i)
             i += 1
           }
+          this
         }
       } else {
         if (mask.len > mag.length) realloc(mask.len + 1)
@@ -3381,6 +3484,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
         while (mag(len - 1) == 0) {
           len -= 1
         }
+        this
       }
     } else {
       val mLen = math.min(mask.len, len)
@@ -3451,6 +3555,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
       while (mag(len - 1) == 0) {
         len -= 1
       }
+      this
     }
   }
 
@@ -3460,7 +3565,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param mask	The number to bitwise-xor with.
    * @complexity	O(n)
    */
-  def xor(mask: BigInt) {
+  def xor(mask: BigInt): this.type = {
     if (sign > 0) {
       if (mask.len > len) {
         if (mask.len > mag.length) realloc(mask.len + 2)
@@ -3527,8 +3632,12 @@ final class BigInt private () extends Number with Comparable[BigInt] {
       }
       if (mask.len > len) {
         len = mask.len
+        this
       } else {
-        while (mag(len - 1) == 0 && len > 1) len -= 1
+        while (mag(len - 1) == 0 && len > 1) {
+          len -= 1
+        }
+        this
       }
     } else {
       if (mask.len > len) {
@@ -3618,8 +3727,12 @@ final class BigInt private () extends Number with Comparable[BigInt] {
       }
       if (mask.len > len) {
         len = mask.len
+        this
       } else {
-        while (mag(len - 1) == 0 && len > 1) len -= 1
+        while (mag(len - 1) == 0 && len > 1) {
+          len -= 1
+        }
+        this
       }
     }
   }
@@ -3630,7 +3743,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    * @param mask	The number to bitwise-and-not with.
    * @complexity	O(n)
    */
-  def andNot(mask: BigInt) {
+  def andNot(mask: BigInt): this.type = {
     val mlen = math.min(len, mask.len)
     if (sign > 0) {
       if (mask.sign > 0) {
@@ -3679,7 +3792,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
               if (blen >= mag.length) realloc(blen + 2)
               mag(blen) = 1
               len = blen + 1
-              return
+              return this
             }
             j += 1
           }
@@ -3731,7 +3844,10 @@ final class BigInt private () extends Number with Comparable[BigInt] {
         sign = 1
       }
     }
-    while (mag(len - 1) == 0 && len > 1) len -= 1
+    while (mag(len - 1) == 0 && len > 1) {
+      len -= 1
+    }
+    this
   }
 
   /**
@@ -3740,7 +3856,7 @@ final class BigInt private () extends Number with Comparable[BigInt] {
    *
    * @complexity	O(n)
    */
-  def not() {
+  def not(): this.type = {
     if (sign > 0) {
       sign = -1
       uaddMag(1)
@@ -3748,6 +3864,146 @@ final class BigInt private () extends Number with Comparable[BigInt] {
       sign = 1
       usubMag(1)
     }
+    this
   }
   /*** </BitOperations> ***/
+
+  def toBigInteger = new BigInteger(sign, toByteArray)
+
+  /**
+   * TODO -- currently use BigInteger's algorithm
+   */
+  def pow(exponent: Int): this.type = {
+    val res = toBigInteger.pow(exponent)
+    val bytes = res.toByteArray
+    assign(res.signum, bytes, bytes.length)
+    this
+  }
+
+  /**
+   * TODO -- currently use BigInteger's algorithm
+   */
+  def modPow(exponent: BigInt, m: BigInt): this.type = {
+    val res = toBigInteger.modPow(exponent.toBigInteger, m.toBigInteger)
+    val bytes = res.toByteArray
+    assign(res.signum, bytes, bytes.length)
+    this
+  }
+
+  /**
+   * Returns the number of bits in the minimal two's-complement
+   * representation of this BigInteger, <i>excluding</i> a sign bit.
+   * For positive BigIntegers, this is equivalent to the number of bits in
+   * the ordinary binary representation.  (Computes
+   * {@code (ceil(log2(this < 0 ? -this : this+1)))}.)
+   *
+   * @return number of bits in the minimal two's-complement
+   *         representation of this BigInteger, <i>excluding</i> a sign bit.
+   */
+  def bitLength: Int = bitLength(toBigEndianMag)
+  private def bitLength(xs: Array[Int]): Int = {
+    if (len == 0) {
+      0 // offset by one to initialize
+    } else {
+      // Calculate the bit length of the magnitude
+      val magBitLength = ((len - 1) << 5) + bitLengthForInt(xs(0))
+      if (sign < 0) {
+        // Check if magnitude is a power of two
+        var pow2 = java.lang.Integer.bitCount(xs(0)) == 1
+        var i = 1
+        while (i < len && pow2) {
+          pow2 = xs(i) == 0
+          i += 1
+        }
+
+        if (pow2) magBitLength - 1 else magBitLength
+      } else {
+        magBitLength
+      }
+    }
+  }
+
+  private def bitLengthForInt(n: Int): Int = 32 - java.lang.Integer.numberOfLeadingZeros(n)
+
+  /* Returns an int of sign bits */
+  private def signInt(): Int = if (sign < 0) -1 else 0
+
+  /**
+   * Returns the specified int of the little-endian two's complement
+   * representation (int 0 is the least significant).  The int number can
+   * be arbitrarily high (values are logically preceded by infinitely many
+   * sign ints).
+   */
+  private def getInt(xs: Array[Int], n: Int, firstNonzeroIntNum: Int): Int = {
+    if (n < 0) {
+      return 0
+    }
+    if (n >= len) {
+      return signInt()
+    }
+
+    val magInt = xs(len - n - 1)
+
+    if (sign >= 0) magInt else (if (n <= firstNonzeroIntNum) -magInt else ~magInt)
+  }
+
+  /**
+   * Returns the index of the int that contains the first nonzero int in the
+   * little-endian binary representation of the magnitude (int 0 is the
+   * least significant). If the magnitude is zero, return value is undefined.
+   */
+  private def firstNonzeroIntNum(xs: Array[Int]): Int = {
+    var i = len - 1
+    while (i >= 0 && xs(i) == 0) { // Search for the first nonzero int
+      i -= 1
+    }
+    len - i - 1
+  }
+
+  /**
+   * Returns a byte array containing the two's-complement
+   * representation of this BigInteger.  The byte array will be in
+   * <i>big-endian</i> byte-order: the most significant byte is in
+   * the zeroth element.  The array will contain the minimum number
+   * of bytes required to represent this BigInteger, including at
+   * least one sign bit, which is {@code (ceil((this.bitLength() +
+   * 1)/8))}.  (This representation is compatible with the
+   * {@link #BigInteger(byte[]) (byte[])} constructor.)
+   *
+   * @return a byte array containing the two's-complement representation of
+   *         this BigInteger.
+   * @see    #BigInteger(byte[])
+   */
+  def toByteArray(): Array[Byte] = {
+    val bigEndian = toBigEndianMag
+    val byteLen = bitLength(bigEndian) / 8 + 1
+    val byteArray = Array.ofDim[Byte](byteLen)
+
+    val fn = firstNonzeroIntNum(bigEndian)
+    var i = byteLen - 1
+    var bytesCopied = 4
+    var nextInt = 0
+    var intIndex = 0
+    while (i >= 0) {
+      if (bytesCopied == 4) {
+        nextInt = getInt(bigEndian, intIndex, fn)
+        intIndex += 1
+        bytesCopied = 1
+      } else {
+        nextInt >>>= 8
+        bytesCopied += 1
+      }
+      byteArray(i) = nextInt.toByte
+      i -= 1
+    }
+
+    byteArray
+  }
+
+  private def toBigEndianMag = {
+    val res = Array.ofDim[Int](len)
+    System.arraycopy(mag, 0, res, 0, len)
+    reverse(res)
+  }
+
 }
