@@ -75,10 +75,22 @@ object BigInt {
       "246313781983713469235139859013498018470170100003957203570275438387",
       "-246313781983713469235139859013498018470170100003957203570275438387"
     ) foreach { s =>
+        val zero = new BigInt(0)
         val x = new BigInt(s)
         val y = x.toBigInteger
         val z = new BigInteger(s)
         val h = new BigInt(z)
+
+        val x0 = x.copy.abs
+        val x1 = x.copy.negate
+        if (x == 0) {
+          assert(x0 == x, s"$x0 should == $x")
+          assert(x1 == x, s"$x1 should == $x")
+        } else if (x > zero) {
+          assert(x1 < x, s"$x1 should < $x")
+        } else {
+          assert(x1 > x, s"$x1 should > $x")
+        }
 
         println(x.toByteArray.mkString("(", ",", ")"))
 
@@ -1673,17 +1685,29 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @complexity	O(n)
    */
   override def compare(that: BigInt): Int = {
-    if (sign < 0) {
-      if (that.sign < 0 || that.isZero) {
-        -compareAbsTo(that)
+    if (that.isZero) {
+      if (this.isZero) {
+        0
       } else {
-        -1
+        if (sign < 0) {
+          -1
+        } else {
+          1
+        }
       }
     } else {
-      if (that.sign > 0 || that.isZero) {
-        compareAbsTo(that)
+      if (sign < 0) {
+        if (that.sign < 0) {
+          -compareAbsTo(that)
+        } else {
+          -1
+        }
       } else {
-        1
+        if (that.sign > 0) {
+          compareAbsTo(that)
+        } else {
+          1
+        }
       }
     }
   }
@@ -1695,28 +1719,37 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @return	true if the two numbers are equal, false otherwise.
    * @complexity	O(n)
    */
-  def equals(a: BigInt): Boolean = {
-    if (len != a.len) return false
-    if (isZero && a.isZero) return true
-    if ((sign ^ a.sign) < 0) return false // in case definition of sign would change...
-    var i = 0
-    while (i < len) {
-      if (mag(i) != a.mag(i)) {
-        return false
+  private def internal_equals(a: BigInt): Boolean = {
+    if (isZero && a.isZero) {
+      true
+    } else if (len != a.len) {
+      false
+    } else if ((sign ^ a.sign) < 0) {
+      false // in case definition of sign would change...
+    } else {
+      var i = 0
+      while (i < len) {
+        if (mag(i) != a.mag(i)) {
+          return false
+        }
+        i += 1
       }
-      i += 1
+
+      true
     }
-    return true
   }
 
   /**
    * {@inheritDoc}
    */
-  override def equals(o: Any): Boolean = { // TODO: Equality on other Number objects?
-    if (o.isInstanceOf[BigInt]) {
-      equals(o.asInstanceOf[BigInt])
-    } else {
-      false
+  override def equals(that: Any): Boolean = {
+    that match {
+      case that: BigInt => this.internal_equals(that)
+      case that: Byte   => this.internal_equals(new BigInt(that))
+      case that: Short  => this.internal_equals(new BigInt(that))
+      case that: Int    => this.internal_equals(new BigInt(that))
+      case that: Long   => this.internal_equals(new BigInt(that))
+      case other        => false
     }
   }
 
