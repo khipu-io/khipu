@@ -95,7 +95,7 @@ object RLPImplicits {
     override def decode(rlp: RLPEncodeable): ByteString = ByteString(byteArrayEncDec.decode(rlp))
   }
 
-  implicit val hashncDec = new RLPEncoder[Hash] with RLPDecoder[Hash] {
+  implicit val hashEncDec = new RLPEncoder[Hash] with RLPDecoder[Hash] {
     override def encode(obj: Hash): RLPEncodeable = byteArrayEncDec.encode(obj.bytes)
     override def decode(rlp: RLPEncodeable): Hash = Hash(byteArrayEncDec.decode(rlp))
   }
