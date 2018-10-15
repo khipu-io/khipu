@@ -1,18 +1,21 @@
 import akka.util.ByteString
-import java.io.File
-import java.io.PrintWriter
-import java.net.InetSocketAddress
-import java.security.SecureRandom
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.domain.SignedTransaction
 import khipu.network.p2p.messages.CommonMessages.NewBlock
+import java.io.File
+import java.io.PrintWriter
+import java.net.InetSocketAddress
+import java.security.SecureRandom
 import org.spongycastle.crypto.AsymmetricCipherKeyPair
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 import org.spongycastle.util.encoders.Hex
 import scala.io.Source
 
 package object khipu {
+
+  type UInt256 = UInt256_biginteger.UInt256
+  val UInt256 = UInt256_biginteger.UInt256
 
   def loadAsymmetricCipherKeyPair(filePath: String, secureRandom: SecureRandom): AsymmetricCipherKeyPair = {
     val file = new File(filePath)
