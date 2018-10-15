@@ -4,8 +4,8 @@ import khipu.Deleted
 import khipu.Log
 import khipu.Original
 import khipu.Updated
+import khipu.UInt256
 import khipu.vm.Storage
-import khipu.vm.UInt256
 import khipu.trie.MerklePatriciaTrie
 
 /**

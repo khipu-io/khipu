@@ -2,11 +2,11 @@ package khipu.domain
 
 import akka.util.ByteString
 import khipu.Hash
+import khipu.UInt256
 import khipu.crypto
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.rlp
 import khipu.rlp.RLPList
-import khipu.vm.UInt256
 
 object BlockHeader {
   // 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347

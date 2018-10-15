@@ -11,6 +11,7 @@ import java.util.function.UnaryOperator
 import java.util.Date
 import java.util.concurrent.atomic.AtomicReference
 import khipu.Hash
+import khipu.UInt256
 import khipu.domain.Account
 import khipu.domain.Address
 import khipu.domain.Block
@@ -35,7 +36,6 @@ import khipu.ommers.OmmersPool
 import khipu.rlp
 import khipu.rlp.RLPList
 import khipu.rlp.RLPImplicitConversions._
-import khipu.vm.UInt256
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success, Try }

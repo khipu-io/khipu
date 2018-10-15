@@ -1,7 +1,7 @@
 package khipu.ledger
 
+import khipu.UInt256
 import khipu.util.BlockchainConfig
-import khipu.vm.UInt256
 
 /**
  * Calculates rewards for mining blocks and ommers.

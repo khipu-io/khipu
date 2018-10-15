@@ -2,6 +2,7 @@ package khipu.tools
 
 import akka.actor.ActorSystem
 import khipu.Hash
+import khipu.UInt256
 import khipu.domain.Account
 import khipu.domain.Blockchain
 import khipu.rlp
@@ -14,7 +15,6 @@ import khipu.trie.ByteArraySerializable
 import khipu.trie.ExtensionNode
 import khipu.trie.LeafNode
 import khipu.trie.MerklePatriciaTrie.MPTException
-import khipu.vm.UInt256
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord

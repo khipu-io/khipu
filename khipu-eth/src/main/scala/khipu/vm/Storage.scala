@@ -1,5 +1,7 @@
 package khipu.vm
 
+import khipu.UInt256
+
 /**
  * Account's storage representation. Implementation should be immutable and only keep track of changes to the storage
  */

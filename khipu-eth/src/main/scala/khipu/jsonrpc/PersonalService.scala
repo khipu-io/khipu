@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.{ ByteString, Timeout }
 import khipu.Hash
+import khipu.UInt256
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.domain.{ Account, Address, Blockchain }
@@ -14,7 +15,6 @@ import khipu.store.AppStateStorage
 import khipu.transactions.PendingTransactionsService
 import khipu.util.BlockchainConfig
 import khipu.util.TxPoolConfig
-import khipu.vm.UInt256
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global

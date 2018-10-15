@@ -1,7 +1,8 @@
 package khipu.vm
 
 import akka.util.ByteString
-import khipu.domain.{ Address, TxLogEntry }
+import khipu.domain.Address
+import khipu.domain.TxLogEntry
 
 /**
  * Represenation of the result of execution of a contract

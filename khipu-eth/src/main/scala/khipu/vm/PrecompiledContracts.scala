@@ -1,7 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
-import java.math.BigInteger
+import khipu.UInt256
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.crypto.zksnark.BN128Fp
@@ -11,6 +11,7 @@ import khipu.crypto.zksnark.PairingCheck
 import khipu.domain.Address
 import khipu.util.BigIntUtil
 import khipu.util.BytesUtil
+import java.math.BigInteger
 import scala.util.Try
 
 object PrecompiledContracts {

@@ -1,7 +1,7 @@
 package khipu.domain
 
+import khipu.UInt256
 import khipu.util.BlockchainConfig
-import khipu.vm.UInt256
 
 object DifficultyCalculator {
   private val FrontierTimestampDiffLimit = -99

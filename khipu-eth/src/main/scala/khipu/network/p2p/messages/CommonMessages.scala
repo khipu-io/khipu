@@ -1,6 +1,7 @@
 package khipu.network.p2p.messages
 
 import khipu.Hash
+import khipu.UInt256
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.domain.Address
@@ -16,7 +17,6 @@ import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
 import khipu.rlp.RLPSerializable
 import khipu.rlp.RLPValue
-import khipu.vm.UInt256
 
 object CommonMessages {
   object Status {

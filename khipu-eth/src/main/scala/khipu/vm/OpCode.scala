@@ -1,10 +1,10 @@
 package khipu.vm
 
 import akka.util.ByteString
+import khipu.UInt256
 import khipu.crypto
 import khipu.domain.Address
 import khipu.domain.TxLogEntry
-import khipu.vm.UInt256._
 
 object OpCodes {
 

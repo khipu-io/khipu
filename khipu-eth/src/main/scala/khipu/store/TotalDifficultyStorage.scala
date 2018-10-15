@@ -2,9 +2,9 @@ package khipu.store
 
 import kesque.TVal
 import khipu.Hash
+import khipu.UInt256
 import khipu.store.datasource.KesqueDataSource
 import khipu.util.SimpleMap
-import khipu.vm.UInt256
 
 /**
  * This class is used to store the total difficulty of blocks, by using:

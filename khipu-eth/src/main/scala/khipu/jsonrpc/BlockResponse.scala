@@ -2,9 +2,9 @@ package khipu.jsonrpc
 
 import akka.util.ByteString
 import khipu.Hash
+import khipu.UInt256
 import khipu.domain.{ Block, BlockHeader }
 import khipu.network.p2p.messages.PV62.BlockBody
-import khipu.vm.UInt256
 
 object BlockResponse {
   def apply(

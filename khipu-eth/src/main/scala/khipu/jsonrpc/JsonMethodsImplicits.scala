@@ -3,6 +3,7 @@ package khipu.jsonrpc
 import akka.util.ByteString
 import java.math.BigInteger
 import khipu.Hash
+import khipu.UInt256
 import khipu.crypto.ECDSASignature
 import khipu.domain.Address
 import khipu.jsonrpc.EthService.BlockParam
@@ -13,7 +14,6 @@ import khipu.jsonrpc.NetService._
 import khipu.jsonrpc.PersonalService._
 import khipu.jsonrpc.Web3Service.{ ClientVersionRequest, ClientVersionResponse, Sha3Request, Sha3Response }
 import khipu.util.BigIntUtil
-import khipu.vm.UInt256
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.{ DefaultFormats, Formats }

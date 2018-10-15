@@ -1,7 +1,9 @@
 package khipu.vm
 
 import akka.util.ByteString
-import khipu.domain.{ Address, TxLogEntry }
+import khipu.UInt256
+import khipu.domain.Address
+import khipu.domain.TxLogEntry
 
 object ProgramState {
   trait ParallelRace

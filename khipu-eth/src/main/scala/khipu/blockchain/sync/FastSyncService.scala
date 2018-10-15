@@ -10,6 +10,7 @@ import akka.pattern.pipe
 import akka.util.ByteString
 import java.util.concurrent.ThreadLocalRandom
 import khipu.Hash
+import khipu.UInt256
 import khipu.blockchain.sync
 import khipu.blockchain.sync.HandshakedPeersService.BlacklistPeer
 import khipu.crypto
@@ -23,7 +24,6 @@ import khipu.network.rlpx.Peer
 import khipu.network.rlpx.RLPxStage
 import khipu.store.AppStateStorage
 import khipu.store.FastSyncStateStorage
-import khipu.vm.UInt256
 import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.Future

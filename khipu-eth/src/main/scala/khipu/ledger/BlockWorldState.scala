@@ -5,6 +5,7 @@ import khipu.Deleted
 import khipu.Hash
 import khipu.Original
 import khipu.Updated
+import khipu.UInt256
 import khipu.crypto
 import khipu.domain.Account
 import khipu.domain.Address
@@ -14,7 +15,6 @@ import khipu.store.EvmCodeStorage
 import khipu.store.trienode.NodeKeyValueStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
-import khipu.vm.UInt256
 import khipu.vm.WorldState
 
 /**

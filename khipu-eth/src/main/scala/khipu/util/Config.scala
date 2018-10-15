@@ -4,6 +4,7 @@ import akka.util.ByteString
 import com.typesafe.config.{ ConfigFactory, Config => TypesafeConfig }
 import java.math.BigInteger
 import java.net.InetSocketAddress
+import khipu.UInt256
 import khipu.domain.Address
 import khipu.jsonrpc.JsonRpcController.JsonRpcConfig
 import khipu.jsonrpc.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
@@ -14,7 +15,6 @@ import khipu.store.datasource.LeveldbConfig
 import khipu.store.trienode.ArchivePruning
 import khipu.store.trienode.HistoryPruning
 import khipu.store.trienode.PruningMode
-import khipu.vm.UInt256
 import scala.concurrent.duration._
 import scala.util.Try
 

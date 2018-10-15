@@ -2,8 +2,9 @@ package khipu.jsonrpc
 
 import akka.util.ByteString
 import khipu.Hash
-import khipu.domain.{ BlockHeader, SignedTransaction }
-import khipu.vm.UInt256
+import khipu.UInt256
+import khipu.domain.BlockHeader
+import khipu.domain.SignedTransaction
 
 object TransactionResponse {
 

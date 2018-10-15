@@ -5,6 +5,7 @@ import akka.pattern.{ ask, pipe }
 import akka.util.ByteString
 import akka.util.Timeout
 import khipu.Hash
+import khipu.UInt256
 import khipu.domain.Address
 import khipu.domain.Block
 import khipu.domain.Blockchain
@@ -17,7 +18,6 @@ import khipu.store.AppStateStorage
 import khipu.transactions.PendingTransactionsService
 import khipu.util.FilterConfig
 import khipu.util.TxPoolConfig
-import khipu.vm.UInt256
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

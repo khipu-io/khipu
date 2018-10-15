@@ -1,9 +1,9 @@
 package khipu.jsonrpc
 
 import akka.util.ByteString
+import khipu.UInt256
 import khipu.domain.Address
 import khipu.domain.Transaction
-import khipu.vm.UInt256
 
 final case class TransactionRequest(
     from:     Address,

@@ -3,6 +3,7 @@ package khipu.jsonrpc
 import akka.util.ByteString
 import java.math.BigInteger
 import khipu.Hash
+import khipu.UInt256
 import khipu.jsonrpc.EthService.BestBlockNumberRequest
 import khipu.jsonrpc.EthService.BestBlockNumberResponse
 import khipu.jsonrpc.EthService.BlockByBlockHashRequest
@@ -79,7 +80,6 @@ import khipu.jsonrpc.JsonRpcController.{ JsonDecoder, JsonEncoder }
 import khipu.jsonrpc.JsonRpcErrors.InvalidParams
 import khipu.jsonrpc.PersonalService.{ SendTransactionRequest, SendTransactionResponse, SignRequest }
 import org.json4s.{ Extraction, JsonAST }
-import khipu.vm.UInt256
 import org.json4s.JsonAST.{ JArray, JBool, JString, JValue, _ }
 import org.json4s.JsonDSL._
 

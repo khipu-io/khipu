@@ -1,13 +1,14 @@
 package khipu.validators
 
 import java.math.BigInteger
+import khipu.UInt256
 import khipu.crypto.ECDSASignature
 import khipu.domain.Account
 import khipu.domain.BlockHeader
 import khipu.domain.SignedTransaction
 import khipu.domain.Transaction
 import khipu.util.BlockchainConfig
-import khipu.vm.{ EvmConfig, UInt256 }
+import khipu.vm.EvmConfig
 
 sealed trait SignedTransactionError
 object SignedTransactionError {

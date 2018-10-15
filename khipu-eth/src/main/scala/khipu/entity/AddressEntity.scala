@@ -15,11 +15,11 @@ import khipu.ActiveCheckTick
 import khipu.ActiveCheckTickKey
 import khipu.Command
 import khipu.Hash
+import khipu.UInt256
 import khipu.domain.Account
 import khipu.ledger.TrieStorage
 import khipu.service.ServiceBoard
 import khipu.store.trienode.NodeKeyValueStorage
-import khipu.vm.UInt256
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.concurrent.duration._

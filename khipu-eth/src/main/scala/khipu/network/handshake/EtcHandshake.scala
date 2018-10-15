@@ -3,6 +3,7 @@ package khipu.network.handshake
 import akka.util.ByteString
 import khipu.NodeStatus
 import khipu.ServerStatus
+import khipu.UInt256
 import khipu.domain.Blockchain
 import khipu.network.ForkResolver
 import khipu.network.p2p.Message
@@ -14,7 +15,6 @@ import khipu.network.p2p.messages.Versions
 import khipu.network.p2p.messages.WireProtocol.{ Capability, Disconnect, Hello }
 import khipu.network.rlpx.PeerConfiguration
 import khipu.store.AppStateStorage
-import khipu.vm.UInt256
 import scala.concurrent.duration._
 
 /**

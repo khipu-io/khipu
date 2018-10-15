@@ -5,6 +5,7 @@ import akka.event.Logging
 import akka.pattern.ask
 import akka.util.ByteString
 import khipu.Hash
+import khipu.UInt256
 import khipu.domain.Account
 import khipu.domain.Address
 import khipu.domain.Block
@@ -28,7 +29,6 @@ import khipu.vm.ProgramError
 import khipu.vm.ProgramResult
 import khipu.vm.ProgramState
 import khipu.vm.VM
-import khipu.vm.UInt256
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._

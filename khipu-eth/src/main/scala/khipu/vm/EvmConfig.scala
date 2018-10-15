@@ -1,12 +1,10 @@
 package khipu.vm
 
 import akka.util.ByteString
-import java.math.BigInteger
+import khipu.UInt256
 import khipu.util.BlockchainConfig
+import java.math.BigInteger
 
-// scalastyle:off number.of.methods
-// scalastyle:off number.of.types
-// scalastyle:off magic.number
 object EvmConfig {
 
   val MaxCallDepth: Int = 1024

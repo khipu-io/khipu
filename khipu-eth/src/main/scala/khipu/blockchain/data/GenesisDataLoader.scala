@@ -7,6 +7,7 @@ import java.io.FileNotFoundException
 import java.math.BigInteger
 import khipu.Hash
 import khipu.crypto
+import khipu.UInt256
 import khipu.domain.{ Account, Block, BlockHeader, Blockchain }
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.rlp
@@ -21,7 +22,6 @@ import khipu.trie
 import khipu.trie.MerklePatriciaTrie
 import khipu.util.BlockchainConfig
 import khipu.util.Config.DbConfig
-import khipu.vm.UInt256
 import org.json4s.{ CustomSerializer, DefaultFormats, JString, JValue }
 import scala.io.Source
 import scala.util.{ Failure, Success, Try }

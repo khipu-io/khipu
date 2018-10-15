@@ -5,6 +5,7 @@ import akka.pattern.AskTimeoutException
 import akka.pattern.ask
 import java.util.concurrent.ThreadLocalRandom
 import khipu.BroadcastNewBlocks
+import khipu.UInt256
 import khipu.blockchain.sync
 import khipu.blockchain.sync.HandshakedPeersService.BlacklistPeer
 import khipu.domain.Block
@@ -22,7 +23,6 @@ import khipu.store.datasource.KesqueDataSource
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
 import khipu.util
-import khipu.vm.UInt256
 import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.Future

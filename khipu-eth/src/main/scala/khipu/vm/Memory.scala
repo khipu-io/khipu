@@ -1,6 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
+import khipu.UInt256
 
 /**
  * Volatile memory with 256 bit address space.

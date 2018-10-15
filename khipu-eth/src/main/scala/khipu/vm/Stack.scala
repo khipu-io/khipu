@@ -1,5 +1,6 @@
 package khipu.vm
 
+import khipu.UInt256
 import scala.collection.mutable.ArrayBuffer
 
 object Stack {

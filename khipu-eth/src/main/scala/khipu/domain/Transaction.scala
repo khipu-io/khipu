@@ -1,7 +1,7 @@
 package khipu.domain
 
 import akka.util.ByteString
-import khipu.vm.UInt256
+import khipu.UInt256
 
 object Transaction {
 

@@ -1,7 +1,6 @@
 package khipu
 
 import akka.util.ByteString
-import khipu.vm.UInt256
 
 package object rlp {
 

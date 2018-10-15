@@ -1,11 +1,11 @@
 package khipu.domain
 
 import akka.util.ByteString
+import khipu.UInt256
 import khipu.crypto
 import khipu.util.BytesUtil
 import khipu.rlp
 import khipu.trie.ByteArrayEncoder
-import khipu.vm.UInt256
 
 object Address {
 

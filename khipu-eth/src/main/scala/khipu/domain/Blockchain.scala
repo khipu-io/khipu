@@ -2,6 +2,7 @@ package khipu.domain
 
 import akka.util.ByteString
 import khipu.Hash
+import khipu.UInt256
 import khipu.crypto
 import khipu.ledger.TrieStorage
 import khipu.ledger.BlockWorldState
@@ -16,7 +17,6 @@ import khipu.store.trienode.ReadOnlyNodeStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
 import khipu.vm.Storage
-import khipu.vm.UInt256
 import khipu.vm.WorldState
 
 object Blockchain {

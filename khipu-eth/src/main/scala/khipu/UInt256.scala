@@ -1,8 +1,7 @@
-package khipu.vm
+package khipu
 
 import akka.util.ByteString
 import java.math.BigInteger
-import khipu.Hash
 import khipu.util.BytesUtil
 
 /**
@@ -13,15 +12,15 @@ object UInt256 {
   val Size = 32 // size in bytes
   val SizeInBits = 256 // 32 * 8
 
-  private def ZERO = BigInteger.valueOf(0)
-  private def ONE = BigInteger.valueOf(1)
-  private def TWO = BigInteger.valueOf(2)
-  private def TEN = BigInteger.valueOf(10)
-  private def MAX_INT = BigInteger.valueOf(Int.MaxValue)
-  private def MAX_LONG = BigInteger.valueOf(Long.MaxValue)
-  private def THIRTY_ONE = BigInteger.valueOf(31)
-  private def THIRTY_TWO = BigInteger.valueOf(32)
-  private def TWO_FIVE_SIX = BigInteger.valueOf(256)
+  private val ZERO = BigInteger.valueOf(0)
+  private val ONE = BigInteger.valueOf(1)
+  private val TWO = BigInteger.valueOf(2)
+  private val TEN = BigInteger.valueOf(10)
+  private val MAX_INT = BigInteger.valueOf(Int.MaxValue)
+  private val MAX_LONG = BigInteger.valueOf(Long.MaxValue)
+  private val THIRTY_ONE = BigInteger.valueOf(31)
+  private val THIRTY_TWO = BigInteger.valueOf(32)
+  private val TWO_FIVE_SIX = BigInteger.valueOf(256)
 
   // --- Beware mutable MODULUS/MAX_VALUE/MAX_SIGNED_VALUE, use them with copy
   private val MODULUS = TWO.pow(SizeInBits)
@@ -90,15 +89,12 @@ object UInt256 {
   def wordsForBytes(n: Long): Long = if (n == 0) 0 else (n - 1) / Size + 1
 }
 
-// TODO: consider moving to util as Uint256, which follows Scala numeric conventions, and is used across the system for P_256 numbers (see YP 4.3) [EC-252]
 /**
  * Represents 256 bit unsigned integers with standard arithmetic, byte-wise operation and EVM-specific extensions
  * require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid UInt256 value: $n") --- already checked in apply(n: BigInteger)
  */
 final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
   import UInt256._
-
-  // ==== NOTE: n is mutable
 
   // EVM-specific arithmetic
   private lazy val signed = if (n.compareTo(MAX_SIGNED_VALUE) > 0) (n subtract MODULUS) else n
@@ -191,12 +187,14 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
       val idx = that.n.byteValue
       val negative = n testBit (idx * 8 + 7)
       val mask = (ONE shiftLeft ((idx + 1) * 8)) subtract ONE
-      val newN = if (negative) n or (MAX_VALUE xor mask) else n and mask
+      val newN = if (negative) {
+        n or (MAX_VALUE xor mask)
+      } else {
+        n and mask
+      }
       new UInt256(newN)
     }
   }
-
-  def compareTo(that: BigInteger): Int = n.compareTo(that)
 
   def compare(that: UInt256): Int = n.compareTo(that.n)
 

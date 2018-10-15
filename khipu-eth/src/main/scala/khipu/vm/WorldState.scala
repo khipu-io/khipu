@@ -1,6 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
+import khipu.UInt256
 import khipu.crypto
 import khipu.domain.Account
 import khipu.domain.Address

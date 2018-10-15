@@ -1,5 +1,7 @@
 package khipu.vm
 
+import khipu.UInt256
+
 /**
  * Marker trait for errors that may occur during program execution
  */
