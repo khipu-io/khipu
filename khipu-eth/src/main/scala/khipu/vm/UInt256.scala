@@ -49,22 +49,28 @@ object UInt256 {
   def apply(bytes: Hash): UInt256 = apply(bytes.bytes)
 
   // with bound limited
-  //def apply(n: BigInt): UInt256 = new UInt256(boundBigInt(n))
   def apply(n: BigInteger): UInt256 = new UInt256(boundBigInt(n))
-  def apply(bytes: Array[Byte]): UInt256 = {
-    require(bytes.length <= Size, s"Input byte array cannot be longer than $Size: ${bytes.length}")
-    new UInt256(new BigInteger(1, bytes))
+  def apply(bigEndianBytes: Array[Byte]): UInt256 = {
+    require(bigEndianBytes.length <= Size, s"Input byte array cannot be longer than $Size: ${bigEndianBytes.length}")
+    if (bigEndianBytes.length == 0) {
+      UInt256.Zero
+    } else {
+      new UInt256(new BigInteger(1, bigEndianBytes))
+    }
   }
 
   def safe(n: Int): UInt256 = new UInt256(BigInteger.valueOf(n))
   def safe(n: Long): UInt256 = new UInt256(BigInteger.valueOf(n))
-  //def safe(n: BigInt): UInt256 = new UInt256(n)
   def safe(n: BigInteger): UInt256 = new UInt256(n)
   def safe(bigEndianMag: Array[Byte]): UInt256 = safe(new BigInteger(1, bigEndianMag))
 
   private def boundBigInt(n: BigInteger): BigInteger = {
-    if (n.signum == 0) {
-      ZERO
+    if (n.signum > 0) {
+      if (n.compareTo(MODULUS) >= 0) {
+        n remainder MODULUS
+      } else {
+        n
+      }
     } else if (n.signum < 0) {
       val unsigned = (n remainder MODULUS) add MODULUS
       if (unsigned.compareTo(MODULUS) == 0) {
@@ -72,10 +78,8 @@ object UInt256 {
       } else {
         unsigned
       }
-    } else if (n.compareTo(MODULUS) >= 0) {
-      n remainder MODULUS
     } else {
-      n
+      ZERO
     }
   }
 

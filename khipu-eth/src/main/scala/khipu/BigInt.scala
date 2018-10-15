@@ -80,6 +80,8 @@ object BigInt {
         val z = new BigInteger(s)
         val h = new BigInt(z)
 
+        println(x.toByteArray.mkString("(", ",", ")"))
+
         assert(x.bitLength == y.bitLength && x.bitLength == z.bitLength, s"$x, $y should be same bitLength")
         assert(Arrays.equals(x.toByteArray, z.toByteArray), s"$x, $y should be same toByteArray")
         assert(x.toString == y.toString && x.toString == z.toString && x.toString == h.toString, s"$x, $y, $z, $h should be same")
@@ -120,14 +122,16 @@ object BigInt {
     private def getRndNumber(len: Int): Array[Char] = {
       val sign = rnd.nextInt(2)
       val num = Array.ofDim[Char](len + sign)
-      if (sign > 0) num(0) = '-'
+      if (sign > 0) {
+        num(0) = '-'
+      }
       num(sign) = ('1' + rnd.nextInt(9)).toChar
       var i = sign + 1
       while (i < len + sign) {
         num(i) = ('0' + rnd.nextInt(10)).toChar
         i += 1
       }
-      return num
+      num
     }
 
     def assertEquals(msg: String, a: Any, b: Any) = assert(a == b, s"$msg: $a != $b")
@@ -732,19 +736,23 @@ object BigInt {
     def testByteArray() {
       var i = 0
       while (i < 1024) {
-        val s = getRndNumber(1 + i * 10)
-        var facit = new BigInteger(new String(s))
-        val x = new BigInt(new String(s))
-        val y = x.toBigInteger
-        val z = new BigInt(y)
-        assert(facit.bitLength == x.bitLength, s"$i: bitLength equation of ${facit.bitLength}, ${x.bitLength}")
-        assert(Arrays.equals(facit.toByteArray, x.toByteArray), s"$i: ByteArray equation of ${facit}, ${x}")
+        var j = 0
+        while (j < 10) {
+          val s = getRndNumber(1 + i * 10)
+          var facit = new BigInteger(new String(s))
+          val x = new BigInt(new String(s))
+          val y = x.toBigInteger
+          val z = new BigInt(y)
+          assert(facit.bitLength == x.bitLength, s"$i: bitLength equation of ${facit.bitLength}, ${x.bitLength}")
+          assert(Arrays.equals(facit.toByteArray, x.toByteArray), s"$i: ByteArray equation of ${facit}, ${x}")
 
-        assert(x.bitLength == y.bitLength, s"$i: bitLength equation of x and x.toBigInteger $x, $y")
-        assert(y.bitLength == z.bitLength, s"$i: bitLength equation of x.toBigInteger and new BigInt(x.toBigInteger) $y, $z")
+          assert(x.bitLength == y.bitLength, s"$i: bitLength equation of x and x.toBigInteger $x, $y")
+          assert(y.bitLength == z.bitLength, s"$i: bitLength equation of x.toBigInteger and new BigInt(x.toBigInteger) $y, $z")
 
-        assert(Arrays.equals(x.toByteArray, y.toByteArray), s"$i: ByteArray equation x and x.toBigInteger $x, $y")
-        assert(Arrays.equals(y.toByteArray, z.toByteArray), s"$i: ByteArray equation x.toBigInteger and new BigInt(x.toBigInteger) $y, $z")
+          assert(Arrays.equals(x.toByteArray, y.toByteArray), s"$i: ByteArray equation x and x.toBigInteger $x, $y")
+          assert(Arrays.equals(y.toByteArray, z.toByteArray), s"$i: ByteArray equation x.toBigInteger and new BigInt(x.toBigInteger) $y, $z")
+          j += 1
+        }
 
         i += 1
       }
@@ -4179,7 +4187,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    */
   def bitLength: Int = bitLength(toBigEndianMag)
   private def bitLength(bigEndianMag: Array[Int]): Int = {
-    if (len == 0) {
+    if (len == 0 || isZero) { // len == 0 should not happen in BigInt
       0 // offset by one to initialize
     } else {
       // calculate the bit length of the magnitude
@@ -4193,14 +4201,20 @@ final class BigInt private () extends Number with Ordered[BigInt] {
           i += 1
         }
 
-        if (pow2) magBitLength - 1 else magBitLength
+        if (pow2) {
+          magBitLength - 1
+        } else {
+          magBitLength
+        }
       } else {
         magBitLength
       }
     }
   }
 
-  private def bitLengthForInt(n: Int): Int = 32 - java.lang.Integer.numberOfLeadingZeros(n)
+  private def bitLengthForInt(n: Int): Int = {
+    32 - java.lang.Integer.numberOfLeadingZeros(n)
+  }
 
   /**
    * Returns the specified int of the little-endian two's complement
@@ -4218,7 +4232,11 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       if (sign >= 0) {
         magInt
       } else {
-        if (n <= firstNonzeroIntNum) -magInt else ~magInt
+        if (n <= firstNonzeroIntNum) {
+          -magInt
+        } else {
+          ~magInt
+        }
       }
     }
   }
@@ -4280,9 +4298,13 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   }
 
   private def toBigEndianMag = {
-    val res = Array.ofDim[Int](len)
-    System.arraycopy(mag, 0, res, 0, len)
-    reverse(res)
+    if (len == 0) { // should not heppen in BigInt, but ..., anyway
+      Array(0)
+    } else {
+      val res = Array.ofDim[Int](len)
+      System.arraycopy(mag, 0, res, 0, len)
+      reverse(res)
+    }
   }
 
   private def reverse[T](xs: Array[T]) = {

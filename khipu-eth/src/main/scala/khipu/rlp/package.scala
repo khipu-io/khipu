@@ -7,7 +7,7 @@ package object rlp {
 
   val EmptyRLPData = encode(RLPValue(Array[Byte]()))
   val EmptyRLPList = encode(RLPList())
-  val ZeroByteRLP = RLP.byteToByteArray(0: Byte)
+  val ZeroByteRLP = RLP.byteToByteArray(0: Byte) // it's Array()
 
   final case class RLPException(message: String) extends RuntimeException(message)
 
