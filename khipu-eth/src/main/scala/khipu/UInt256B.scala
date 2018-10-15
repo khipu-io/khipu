@@ -12,8 +12,8 @@ object UInt256_bigint {
 
     private def ZERO = new BigInt(0)
     private def ONE = new BigInt(1)
-    private def TWO = new BigInt(2)
     private def TEN = new BigInt(10)
+    private def TWO = new BigInt(2)
     private def MAX_INT = new BigInt(Int.MaxValue)
     private def MAX_LONG = new BigInt(Long.MaxValue)
     private def THIRTY_ONE = new BigInt(31)
@@ -71,11 +71,11 @@ object UInt256_bigint {
           n
         }
       } else if (n.isNegative) {
-        val unsigned = (n.copy remainder MODULUS.copy) j_add MODULUS.copy
-        if (unsigned.compareTo(MODULUS) == 0) {
-          ZERO
+        val r = n.copy remainder MODULUS.copy
+        if (r.isZero) {
+          r
         } else {
-          unsigned
+          r j_add MODULUS.copy
         }
       } else {
         ZERO
@@ -153,7 +153,7 @@ object UInt256_bigint {
     def -(that: UInt256): UInt256 = UInt256(n.copy j_subtract that.n.copy)
     def *(that: UInt256): UInt256 = UInt256(n.copy multiply that.n.copy)
     def /(that: UInt256): UInt256 = new UInt256(n.copy divide that.n.copy)
-    def **(that: UInt256): UInt256 = UInt256(n.copy.modPow(that.n.copy, MODULUS.copy))
+    def **(that: UInt256): UInt256 = new UInt256(n.copy.modPow(that.n.copy, MODULUS.copy))
 
     def +(that: Int): UInt256 = UInt256(n.copy j_add new BigInt(that))
     def -(that: Int): UInt256 = UInt256(n.copy j_subtract new BigInt(that))

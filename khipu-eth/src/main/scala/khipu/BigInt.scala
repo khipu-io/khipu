@@ -1418,12 +1418,17 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    */
   private def assign(bigEndianMag: Array[Byte]) {
     if (bigEndianMag.length == 0) {
-      throw new NumberFormatException("Zero length BigInteger")
+      throw new NumberFormatException("Zero length big endian bytes")
     }
 
     if (bigEndianMag(0) < 0) {
       mag = reverse(makePositive(bigEndianMag))
-      sign = -1
+      if (mag.length == 0) {
+        mag = Array(0)
+        sign = 0
+      } else {
+        sign = -1
+      }
     } else {
       mag = reverse(stripLeadingZeroBytes(bigEndianMag))
       if (mag.length == 0) {
@@ -1628,7 +1633,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @return true if this number is zero, false otherwise
    * @complexity	O(1)
    */
-  def isZero: Boolean = len == 1 && mag(0) == 0
+  def isZero: Boolean = len == 1 && mag(0) == 0 || len == 0
   def isNegative: Boolean = sign < 0 && !isZero
   def isPositive: Boolean = sign > 0 && !isZero
 

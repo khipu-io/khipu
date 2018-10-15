@@ -10,10 +10,10 @@ object UInt256_biginteger {
     val Size = 32 // size in bytes
     val SizeInBits = 256 // 32 * 8
 
-    private val ZERO = BigInteger.valueOf(0)
-    private val ONE = BigInteger.valueOf(1)
+    private val ZERO = BigInteger.ZERO
+    private val ONE = BigInteger.ONE
+    private val TEN = BigInteger.TEN
     private val TWO = BigInteger.valueOf(2)
-    private val TEN = BigInteger.valueOf(10)
     private val MAX_INT = BigInteger.valueOf(Int.MaxValue)
     private val MAX_LONG = BigInteger.valueOf(Long.MaxValue)
     private val THIRTY_ONE = BigInteger.valueOf(31)
@@ -69,11 +69,11 @@ object UInt256_biginteger {
           n
         }
       } else if (n.signum < 0) {
-        val unsigned = (n remainder MODULUS) add MODULUS
-        if (unsigned.compareTo(MODULUS) == 0) {
-          ZERO
+        val r = n remainder MODULUS
+        if (r.signum == 0) {
+          r
         } else {
-          unsigned
+          r add MODULUS
         }
       } else {
         ZERO
@@ -149,7 +149,7 @@ object UInt256_biginteger {
     def -(that: UInt256): UInt256 = UInt256(n subtract that.n)
     def *(that: UInt256): UInt256 = UInt256(n multiply that.n)
     def /(that: UInt256): UInt256 = new UInt256(n divide that.n)
-    def **(that: UInt256): UInt256 = UInt256(n.modPow(that.n, MODULUS))
+    def **(that: UInt256): UInt256 = new UInt256(n.modPow(that.n, MODULUS))
 
     def +(that: Int): UInt256 = UInt256(n add BigInteger.valueOf(that))
     def -(that: Int): UInt256 = UInt256(n subtract BigInteger.valueOf(that))
@@ -198,12 +198,12 @@ object UInt256_biginteger {
 
     override def equals(that: Any): Boolean = {
       that match {
-        case that: UInt256    => n.compareTo(that.n) == 0
-        case that: BigInteger => n.compareTo(that) == 0
-        case that: Byte       => n.compareTo(BigInteger.valueOf(that)) == 0
-        case that: Short      => n.compareTo(BigInteger.valueOf(that)) == 0
-        case that: Int        => n.compareTo(BigInteger.valueOf(that)) == 0
-        case that: Long       => n.compareTo(BigInteger.valueOf(that)) == 0
+        case that: UInt256    => n == that.n
+        case that: BigInteger => n == that
+        case that: Byte       => n == BigInteger.valueOf(that)
+        case that: Short      => n == BigInteger.valueOf(that)
+        case that: Int        => n == BigInteger.valueOf(that)
+        case that: Long       => n == BigInteger.valueOf(that)
         case other            => other == n
       }
     }
