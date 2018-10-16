@@ -33,7 +33,7 @@ final class Memory private () {
     }
   }
 
-  def load(offset: Int): UInt256 = UInt256(doLoad(offset, UInt256.Size))
+  def load(offset: Int): UInt256 = UInt256(doLoad(offset, UInt256.SIZE))
   def load(offset: Int, size: Int): ByteString = ByteString(doLoad(offset, size.toInt))
 
   /**

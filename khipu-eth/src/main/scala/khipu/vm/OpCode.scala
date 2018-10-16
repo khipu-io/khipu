@@ -463,7 +463,7 @@ case object PC extends ConstOp(0x58) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.pc)
 }
 case object MSIZE extends ConstOp(0x59) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(UInt256.Size * UInt256.wordsForBytes(s.memory.size))
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(UInt256.SIZE * UInt256.wordsForBytes(s.memory.size))
 }
 case object GAS extends ConstOp(0x5a) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.gas - s.config.feeSchedule.G_base)
@@ -663,7 +663,7 @@ case object MLOAD extends OpCode[UInt256](0x51, 1, 1) {
 
   protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): Long = {
     val offset = params
-    state.config.calcMemCost(state.memory.size, offset.longValueSafe, UInt256.Size)
+    state.config.calcMemCost(state.memory.size, offset.longValueSafe, UInt256.SIZE)
   }
 }
 
@@ -685,7 +685,7 @@ case object MSTORE extends OpCode[(UInt256, UInt256)](0x52, 2, 0) {
 
   protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
     val (offset, _) = params
-    state.config.calcMemCost(state.memory.size, offset.longValueSafe, UInt256.Size)
+    state.config.calcMemCost(state.memory.size, offset.longValueSafe, UInt256.SIZE)
   }
 }
 

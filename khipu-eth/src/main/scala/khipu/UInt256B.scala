@@ -7,41 +7,40 @@ import khipu.util.BytesUtil
 object UInt256_bigint {
   object UInt256 {
 
-    val Size = 32 // size in bytes
-    val SizeInBits = 256 // 32 * 8
+    val SIZE = 32 // size in bytes
+    val SIZE_IN_BITS = 256 // 32 * 8
 
-    private def ZERO = new BigInt(0)
-    private def ONE = new BigInt(1)
-    private def TEN = new BigInt(10)
-    private def TWO = new BigInt(2)
-    private def MAX_INT = new BigInt(Int.MaxValue)
-    private def MAX_LONG = new BigInt(Long.MaxValue)
-    private def THIRTY_ONE = new BigInt(31)
-    private def THIRTY_TWO = new BigInt(32)
-    private def TWO_FIVE_SIX = new BigInt(256)
+    private val ZERO = new BigInt(0)
+    private val ONE = new BigInt(1)
+    private val TEN = new BigInt(10)
+    private val TWO = new BigInt(2)
+    private val MAX_INT = new BigInt(Int.MaxValue)
+    private val MAX_LONG = new BigInt(Long.MaxValue)
+    private val THIRTY_ONE = new BigInt(31)
+    private val THIRTY_TWO = new BigInt(32)
+    private val TWO_FIVE_SIX = new BigInt(256)
 
     // --- Beware mutable MODULUS/MAX_VALUE/MAX_SIGNED_VALUE, use them with copy
-    private val MODULUS = TWO.pow(SizeInBits)
-    private val MAX_VALUE = TWO.pow(SizeInBits) j_subtract ONE
-    private val MAX_SIGNED_VALUE = TWO.pow(SizeInBits - 1) j_subtract ONE
+    private val MODULUS = TWO.copy.pow(SIZE_IN_BITS)
+    private val MAX_VALUE = TWO.copy.pow(SIZE_IN_BITS) j_subtract ONE.copy
+    private val MAX_SIGNED_VALUE = TWO.copy.pow(SIZE_IN_BITS - 1) j_subtract ONE.copy
 
     // UInt256 value should be put behind MODULUS (will be used in UInt256 constructor) etc
 
-    val Modulus = UInt256.safe(TWO.pow(SizeInBits))
-    val SIZE = new UInt256(THIRTY_TWO)
+    def Modulus = UInt256.safe(MODULUS.copy)
 
-    val Zero: UInt256 = UInt256.safe(ZERO)
-    val One: UInt256 = UInt256.safe(ONE)
-    val Two: UInt256 = UInt256.safe(TWO)
-    val Ten: UInt256 = UInt256.safe(TEN)
-    val MaxInt: UInt256 = UInt256.safe(MAX_INT)
-    val MaxLong: UInt256 = UInt256.safe(MAX_LONG)
-    val ThirtyTwo: UInt256 = UInt256.safe(THIRTY_TWO)
-    val TwoFiveSix = UInt256.safe(TWO_FIVE_SIX)
+    def Zero: UInt256 = UInt256.safe(ZERO.copy)
+    def One: UInt256 = UInt256.safe(ONE.copy)
+    def Two: UInt256 = UInt256.safe(TWO.copy)
+    def Ten: UInt256 = UInt256.safe(TEN.copy)
+    def MaxInt: UInt256 = UInt256.safe(MAX_INT.copy)
+    def MaxLong: UInt256 = UInt256.safe(MAX_LONG.copy)
+    def ThirtyTwo: UInt256 = UInt256.safe(THIRTY_TWO.copy)
+    def TwoFiveSix = UInt256.safe(TWO_FIVE_SIX.copy)
 
-    def apply(b: Boolean): UInt256 = if (b) One else Zero
-    def apply(n: Long): UInt256 = new UInt256(new BigInt(n))
-    def apply(n: Int): UInt256 = new UInt256(new BigInt(n))
+    def apply(n: Int): UInt256 = UInt256.safe(n)
+    def apply(n: Long): UInt256 = UInt256.safe(n)
+    def apply(b: Boolean): UInt256 = if (b) UInt256.safe(ONE.copy) else UInt256.safe(ZERO.copy)
     def apply(bytes: ByteString): UInt256 = apply(bytes.toArray)
     def apply(bytes: Hash): UInt256 = apply(bytes.bytes)
 
@@ -49,7 +48,7 @@ object UInt256_bigint {
     def apply(n: BigInt): UInt256 = new UInt256(boundBigInt(n))
     def apply(n: BigInteger): UInt256 = new UInt256(boundBigInt(new BigInt(n)))
     def apply(bigEndianBytes: Array[Byte]): UInt256 = {
-      require(bigEndianBytes.length <= Size, s"Input byte array cannot be longer than $Size: ${bigEndianBytes.length}")
+      require(bigEndianBytes.length <= SIZE, s"Input byte array cannot be longer than $SIZE: ${bigEndianBytes.length}")
       if (bigEndianBytes.length == 0) {
         UInt256.Zero
       } else {
@@ -78,7 +77,7 @@ object UInt256_bigint {
           r j_add MODULUS.copy
         }
       } else {
-        ZERO
+        ZERO.copy
       }
     }
 
@@ -86,7 +85,7 @@ object UInt256_bigint {
      * Number of 32-byte UInt256s required to hold n bytes (~= math.ceil(n / 32))
      * We assume n is not neseccary to exceed Long.MaxValue, and use Long here
      */
-    def wordsForBytes(n: Long): Long = if (n == 0) 0 else (n - 1) / Size + 1
+    def wordsForBytes(n: Long): Long = if (n == 0) 0 else (n - 1) / SIZE + 1
   }
 
   /**
@@ -109,26 +108,30 @@ object UInt256_bigint {
       while (i < src.length && src(i) == 0) {
         i += 1
       }
-      val dest = Array.ofDim[Byte](src.length - i)
-      System.arraycopy(src, i, dest, 0, dest.length)
-      dest
+      if (i == 0) {
+        src
+      } else {
+        val dest = Array.ofDim[Byte](src.length - i)
+        System.arraycopy(src, i, dest, 0, dest.length)
+        dest
+      }
     }
 
     /**
-     * Converts a UInt256 to an Array[Byte].
+     * Converts an UInt256 to an Array[Byte].
      * Output Array[Byte] is padded with zeros from the left side up to UInt256.Size bytes.
      */
     lazy val bytes: Array[Byte] = {
       val src = bigEndianMag
-      if (src.length == Size) {
+      if (src.length == SIZE) {
         src
       } else {
-        val dest = Array.fill[Byte](Size)(0)
-        val len = math.min(src.length, Size)
+        val dst = Array.ofDim[Byte](SIZE) // filled by 0 by default
+        val len = math.min(src.length, SIZE)
         val srcOffset = math.max(0, src.length - len)
-        val destOffset = dest.length - len
-        System.arraycopy(src, srcOffset, dest, destOffset, len)
-        dest
+        val dstOffset = dst.length - len
+        System.arraycopy(src, srcOffset, dst, dstOffset, len)
+        dst
       }
     }
 
@@ -138,32 +141,43 @@ object UInt256_bigint {
      *
      * @return Size in bytes excluding the leading 0 bytes
      */
-    def byteSize: Int = if (n.isZero) 0 else (n.bitLength - 1) / 8 + 1
+    def byteSize: Int = {
+      if (n.isZero) {
+        0
+      } else {
+        (n.bitLength - 1) / 8 + 1
+      }
+    }
 
-    def getByte(that: UInt256): UInt256 =
-      if (that.n.compareTo(THIRTY_ONE) > 0) Zero else UInt256(bytes(that.n.intValue).toInt & 0xff)
+    def getByte(that: UInt256): UInt256 = {
+      if (that.n.compareTo(THIRTY_ONE.copy) > 0) {
+        Zero
+      } else {
+        UInt256.safe(bytes(that.n.intValue).toInt & 0xff)
+      }
+    }
 
     // standard arithmetic (note the use of new instead of apply where result is guaranteed to be within bounds)
-    def &(that: UInt256): UInt256 = new UInt256(n.copy j_and that.n.copy)
-    def |(that: UInt256): UInt256 = new UInt256(n.copy j_or that.n.copy)
-    def ^(that: UInt256): UInt256 = new UInt256(n.copy j_xor that.n.copy)
+    def &(that: UInt256): UInt256 = UInt256.safe(n.copy j_and that.n.copy)
+    def |(that: UInt256): UInt256 = UInt256.safe(n.copy j_or that.n.copy)
+    def ^(that: UInt256): UInt256 = UInt256.safe(n.copy j_xor that.n.copy)
     def unary_- : UInt256 = UInt256(n.copy.negate)
     def unary_~ : UInt256 = UInt256(n.copy.j_not)
     def +(that: UInt256): UInt256 = UInt256(n.copy j_add that.n.copy)
     def -(that: UInt256): UInt256 = UInt256(n.copy j_subtract that.n.copy)
     def *(that: UInt256): UInt256 = UInt256(n.copy multiply that.n.copy)
-    def /(that: UInt256): UInt256 = new UInt256(n.copy divide that.n.copy)
-    def **(that: UInt256): UInt256 = new UInt256(n.copy.modPow(that.n.copy, MODULUS.copy))
+    def /(that: UInt256): UInt256 = UInt256.safe(n.copy divide that.n.copy)
+    def **(that: UInt256): UInt256 = UInt256.safe(n.copy.modPow(that.n.copy, MODULUS.copy))
 
     def +(that: Int): UInt256 = UInt256(n.copy j_add new BigInt(that))
     def -(that: Int): UInt256 = UInt256(n.copy j_subtract new BigInt(that))
     def *(that: Int): UInt256 = UInt256(n.copy multiply that)
-    def /(that: Int): UInt256 = new UInt256(n.copy divide new BigInt(that))
+    def /(that: Int): UInt256 = UInt256.safe(n.copy divide new BigInt(that))
 
     def +(that: Long): UInt256 = UInt256(n.copy j_add new BigInt(that))
     def -(that: Long): UInt256 = UInt256(n.copy j_subtract new BigInt(that))
     def *(that: Long): UInt256 = UInt256(n.copy multiply that)
-    def /(that: Long): UInt256 = new UInt256(n.copy divide new BigInt(that))
+    def /(that: Long): UInt256 = UInt256.safe(n.copy divide new BigInt(that))
 
     def pow(that: Int): UInt256 = UInt256(n.copy pow that)
 
@@ -176,25 +190,25 @@ object UInt256_bigint {
     def sdiv(that: UInt256): UInt256 = if (that.n.isZero) Zero else UInt256(signed.copy divide that.signed.copy)
     def mod(that: UInt256): UInt256 = if (that.n.isZero) Zero else UInt256(n.copy j_mod that.n.copy)
     def smod(that: UInt256): UInt256 = if (that.n.isZero) Zero else UInt256(signed.copy remainder that.signed.copy.abs)
-    def addmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.isZero) Zero else new UInt256((n.copy j_add that.n.copy) remainder modulus.n.copy)
-    def mulmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.isZero) Zero else new UInt256((n.copy multiply that.n.copy) j_mod modulus.n.copy)
+    def addmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.isZero) Zero else UInt256.safe((n.copy j_add that.n.copy) remainder modulus.n.copy)
+    def mulmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.isZero) Zero else UInt256.safe((n.copy multiply that.n.copy) j_mod modulus.n.copy)
 
     def slt(that: UInt256): Boolean = signed.compareTo(that.signed) < 0
     def sgt(that: UInt256): Boolean = signed.compareTo(that.signed) > 0
 
     def signExtend(that: UInt256): UInt256 = {
-      if (that.n.isNegative || that.n.compareTo(THIRTY_ONE) > 0) {
+      if (that.n.isNegative || that.n.compareTo(THIRTY_ONE.copy) > 0) {
         this
       } else {
         val idx = that.n.byteValue
         val negative = n testBit (idx * 8 + 7)
-        val mask = (ONE shiftLeft ((idx + 1) * 8)) j_subtract ONE
+        val mask = (ONE.copy shiftLeft ((idx + 1) * 8)) j_subtract ONE.copy
         val newN = if (negative) {
           n.copy j_or (MAX_VALUE.copy j_xor mask.copy)
         } else {
           n.copy j_and mask.copy
         }
-        new UInt256(newN)
+        UInt256.safe(newN)
       }
     }
 
@@ -234,12 +248,12 @@ object UInt256_bigint {
      */
     def toLong: Long = n.longValue & Long.MaxValue
 
-    def toMaxInt: Int = if (n.compareTo(MAX_INT) <= 0) n.intValue & Int.MaxValue else Int.MaxValue
-    def toMaxLong: Long = if (n.compareTo(MAX_LONG) <= 0) n.longValue & Long.MaxValue else Long.MaxValue
+    def toMaxInt: Int = if (n.compareTo(MAX_INT.copy) <= 0) n.intValue & Int.MaxValue else Int.MaxValue
+    def toMaxLong: Long = if (n.compareTo(MAX_LONG.copy) <= 0) n.longValue & Long.MaxValue else Long.MaxValue
 
     // return a minimum negtive when value not in range. TODO a safe UInt and ULong for gas/memory calculation
-    def toUInt(): Int = if (n.compareTo(MAX_INT) <= 0) n.intValue & Int.MaxValue else Int.MinValue
-    def toULong(): Long = if (n.compareTo(MAX_LONG) <= 0) n.longValue & Long.MaxValue else Long.MinValue
+    def toUInt(): Int = if (n.compareTo(MAX_INT.copy) <= 0) n.intValue & Int.MaxValue else Int.MinValue
+    def toULong(): Long = if (n.compareTo(MAX_LONG.copy) <= 0) n.longValue & Long.MaxValue else Long.MinValue
 
     def bytesOccupied: Int = {
       val firstNonZero = BytesUtil.firstNonZeroByte(bytes)
