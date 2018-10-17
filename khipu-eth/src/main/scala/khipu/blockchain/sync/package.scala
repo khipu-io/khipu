@@ -1,6 +1,7 @@
 package khipu.blockchain
 
 import akka.util.ByteString
+import java.util.Arrays
 import khipu.Command
 import khipu.Hash
 import khipu.crypto
@@ -20,12 +21,13 @@ package object sync {
     val Evmcode = 3.toByte
   }
   sealed trait NodeHash extends Hash.I {
-    def toHash: Hash = Hash(bytes)
     def tpe: Byte
 
-    override def equals(x: Any) = {
+    final def toHash: Hash = Hash(bytes)
+
+    final override def equals(x: Any) = {
       x match {
-        case that: NodeHash => this.tpe == that.tpe && java.util.Arrays.equals(this.bytes, that.bytes)
+        case that: NodeHash => this.tpe == that.tpe && Arrays.equals(this.bytes, that.bytes)
         case _              => false
       }
     }

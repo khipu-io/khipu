@@ -2,6 +2,7 @@ package khipu.ledger
 
 import akka.util.ByteString
 import khipu.domain.TxLogEntry
+import java.util.Arrays
 import khipu.crypto
 import khipu.util.BytesUtil
 
@@ -21,7 +22,7 @@ object BloomFilter {
       val bloomFilterForBytes = bloomFilter(bytes.toArray[Byte])
 
       val andResult = BytesUtil.and(bloomFilterForBytes, bloomFilterBytes.toArray[Byte])
-      andResult sameElements bloomFilterForBytes
+      Arrays.equals(andResult, bloomFilterForBytes)
     }
   }
 

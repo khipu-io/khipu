@@ -49,7 +49,7 @@ object IntIntMap {
    * scramble the key by shuffling its bits -- hash of int
    */
   private val INT_PHI = 0x9E3779B9
-  @inline def phiMix(x: Int): Int = {
+  def phiMix(x: Int): Int = {
     val h = x * INT_PHI
     h ^ (h >> 16)
   }
@@ -337,7 +337,7 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
   /**
    * When length is pow of 2, (i % length) == (i & (length - 1))
    */
-  @inline private def getStartIndex(key: Int): Int = {
+  private def getStartIndex(key: Int): Int = {
     if (isCapacityByPowTwo) {
       (phiMix(key) & m_mask) * (1 + nValues)
     } else {
@@ -345,7 +345,7 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     }
   }
 
-  @inline private def getNextIndex(currentIndex: Int): Int = {
+  private def getNextIndex(currentIndex: Int): Int = {
     if (isCapacityByPowTwo) {
       (currentIndex + 1 + nValues) & m_mask2
     } else {

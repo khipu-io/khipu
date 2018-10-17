@@ -3,6 +3,7 @@ package khipu.store.datasource
 import akka.actor.ActorSystem
 import akka.util.ByteString
 import java.io.File
+import java.util.Arrays
 import java.util.Properties
 import kesque.HashKeyValueTable
 import kesque.HashOffsets
@@ -203,11 +204,11 @@ object KesqueDataSource {
     val table = db.getTable(Array(topic))
     table.iterateOver(0, topic) {
       case (offset, TKeyVal(key, value, timestamp)) =>
-        if (java.util.Arrays.equals(key, lostKey)) {
+        if (Arrays.equals(key, lostKey)) {
           val keyHash = Hash(lostKey).hashCode
           println(s"Found $keyInHex at offset $offset, key hash is $keyHash")
           prevValue map { x =>
-            if (java.util.Arrays.equals(x, value)) {
+            if (Arrays.equals(x, value)) {
               println("Same value as previous")
             } else {
               println("Diff value to previous")

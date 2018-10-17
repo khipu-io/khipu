@@ -27,19 +27,19 @@ object UInt256_biginteger {
 
     // UInt256 value should be put behind MODULUS (will be used in UInt256 constructor) etc
 
-    val Modulus = UInt256.safe(TWO.pow(SIZE_IN_BITS))
+    val Modulus = safe(TWO.pow(SIZE_IN_BITS))
 
-    val Zero: UInt256 = UInt256.safe(ZERO)
-    val One: UInt256 = UInt256.safe(ONE)
-    val Two: UInt256 = UInt256.safe(TWO)
-    val Ten: UInt256 = UInt256.safe(TEN)
-    val MaxInt: UInt256 = UInt256.safe(MAX_INT)
-    val MaxLong: UInt256 = UInt256.safe(MAX_LONG)
-    val ThirtyTwo: UInt256 = UInt256.safe(THIRTY_TWO)
-    val TwoFiveSix = UInt256.safe(TWO_FIVE_SIX)
+    val Zero: UInt256 = safe(ZERO)
+    val One: UInt256 = safe(ONE)
+    val Two: UInt256 = safe(TWO)
+    val Ten: UInt256 = safe(TEN)
+    val MaxInt: UInt256 = safe(MAX_INT)
+    val MaxLong: UInt256 = safe(MAX_LONG)
+    val ThirtyTwo: UInt256 = safe(THIRTY_TWO)
+    val TwoFiveSix = safe(TWO_FIVE_SIX)
 
-    def apply(n: Int): UInt256 = UInt256.safe(n)
-    def apply(n: Long): UInt256 = UInt256.safe(n)
+    def apply(n: Int): UInt256 = safe(n)
+    def apply(n: Long): UInt256 = safe(n)
     def apply(b: Boolean): UInt256 = if (b) One else Zero
     def apply(bytes: ByteString): UInt256 = apply(bytes.toArray)
     def apply(bytes: Hash): UInt256 = apply(bytes.bytes)
@@ -51,14 +51,14 @@ object UInt256_biginteger {
       if (bigEndianBytes.length == 0) {
         UInt256.Zero
       } else {
-        new UInt256(new BigInteger(1, bigEndianBytes))
+        safe(bigEndianBytes)
       }
     }
 
     def safe(n: Int): UInt256 = new UInt256(BigInteger.valueOf(n))
     def safe(n: Long): UInt256 = new UInt256(BigInteger.valueOf(n))
     def safe(n: BigInteger): UInt256 = new UInt256(n)
-    def safe(bigEndianMag: Array[Byte]): UInt256 = safe(new BigInteger(1, bigEndianMag))
+    def safe(bigEndianMag: Array[Byte]): UInt256 = new UInt256(new BigInteger(1, bigEndianMag))
 
     private def boundBigInt(n: BigInteger): BigInteger = {
       if (n.signum > 0) {
@@ -283,12 +283,15 @@ object UInt256_biginteger {
      * otherwise works as #intValue()
      */
     def intValueSafe: Int = {
-      val occupied = bytesOccupied
-      val intVal = intValue
-      if (occupied > 4 || intVal < 0) {
+      if (bytesOccupied > 4) {
         Int.MaxValue
       } else {
-        intVal
+        val intVal = intValue
+        if (intVal < 0) {
+          Int.MaxValue
+        } else {
+          intVal
+        }
       }
     }
 
@@ -315,12 +318,15 @@ object UInt256_biginteger {
      * otherwise works as #longValue()
      */
     def longValueSafe: Long = {
-      val occupied = bytesOccupied
-      val longVal = longValue
-      if (occupied > 8 || longVal < 0) {
+      if (bytesOccupied > 8) {
         Long.MaxValue
       } else {
-        longVal
+        val longVal = longValue
+        if (longVal < 0) {
+          Long.MaxValue
+        } else {
+          longVal
+        }
       }
     }
   }

@@ -1,5 +1,6 @@
 package khipu.validators
 
+import java.util.Arrays
 import khipu.crypto
 import khipu.rlp
 import khipu.rlp.RLPImplicits._
@@ -37,6 +38,6 @@ object MptListValidator {
     }
     val trieRoot = updatedTrie.rootHash
 
-    java.util.Arrays.equals(hash, trieRoot)
+    Arrays.equals(hash, trieRoot)
   }
 }

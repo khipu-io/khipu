@@ -1,5 +1,6 @@
 package kesque
 
+import java.util.Arrays
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 object HashOffsets {
@@ -24,11 +25,11 @@ object HashOffsets {
       i = -max
       while (i <= max) {
         if (i == -i) {
-          if (!java.util.Arrays.equals(map.get(i, n), Array(i))) {
+          if (!Arrays.equals(map.get(i, n), Array(i))) {
             println(s"err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
           }
         } else {
-          if (!java.util.Arrays.equals(map.get(i, n), Array(i, -i))) {
+          if (!Arrays.equals(map.get(i, n), Array(i, -i))) {
             println(s"err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
           }
         }
@@ -51,7 +52,7 @@ object HashOffsets {
             println(s"Remove value -$i from map: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
           }
         } else {
-          if (!java.util.Arrays.equals(map.get(i, n), Array(i))) {
+          if (!Arrays.equals(map.get(i, n), Array(i))) {
             println(s"Remove value -$i from map: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
           }
         }

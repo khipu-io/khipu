@@ -1425,7 +1425,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       mag = reverse(makePositive(bigEndianMag))
       if (mag.length == 0) {
         mag = Array(0)
-        sign = 0
+        sign = 1
       } else {
         sign = -1
       }
@@ -1433,7 +1433,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       mag = reverse(stripLeadingZeroBytes(bigEndianMag))
       if (mag.length == 0) {
         mag = Array(0)
-        sign = 0
+        sign = 1
       } else {
         sign = 1
       }
@@ -1694,14 +1694,14 @@ final class BigInt private () extends Number with Ordered[BigInt] {
       if (this.isZero) {
         0
       } else {
-        if (sign < 0) {
+        if (this.sign < 0) {
           -1
         } else {
           1
         }
       }
     } else {
-      if (sign < 0) {
+      if (this.sign < 0) {
         if (that.sign < 0) {
           -compareAbsTo(that)
         } else {
@@ -4359,7 +4359,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   /**
    * TODO -- currently use BigInteger's algorithm
    */
-  def pow(exponent: Int): BigInt = {
+  def j_pow(exponent: Int): BigInt = {
     val res = toBigInteger.pow(exponent)
     assign(res.toByteArray)
     this
@@ -4368,7 +4368,7 @@ final class BigInt private () extends Number with Ordered[BigInt] {
   /**
    * TODO -- currently use BigInteger's algorithm
    */
-  def modPow(exponent: BigInt, m: BigInt): BigInt = {
+  def j_modPow(exponent: BigInt, m: BigInt): BigInt = {
     val res = toBigInteger.modPow(exponent.toBigInteger, m.toBigInteger)
     val bytes = res.toByteArray
     assign(res.toByteArray)

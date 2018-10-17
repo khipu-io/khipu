@@ -1,6 +1,7 @@
 package khipu.domain
 
 import akka.util.ByteString
+import java.util.Arrays
 import khipu.Hash
 import khipu.UInt256
 import khipu.crypto
@@ -45,7 +46,7 @@ final case class BlockHeader(
   lazy val hash = Hash(crypto.kec256(this.toBytes))
   lazy val hashAsHexString = hash.hexString
 
-  def nonUncles = java.util.Arrays.equals(ommersHash.bytes, BlockHeader.EmptyOmmersHash)
+  def nonUncles = Arrays.equals(ommersHash.bytes, BlockHeader.EmptyOmmersHash)
   def hasUncles = !nonUncles
 
   override def toString: String = {

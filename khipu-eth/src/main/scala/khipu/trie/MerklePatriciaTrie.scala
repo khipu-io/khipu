@@ -1,6 +1,7 @@
 package khipu.trie
 
 import akka.util.ByteString
+import java.util.Arrays
 import khipu.Changed
 import khipu.Deleted
 import khipu.Hash
@@ -60,7 +61,7 @@ object MerklePatriciaTrie {
     new MerklePatriciaTrie[K, V](None, source, Map())(kSerializer, vSerializer)
 
   def apply[K, V](rootHash: Array[Byte], source: NodeKeyValueStorage)(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]): MerklePatriciaTrie[K, V] = {
-    if (java.util.Arrays.equals(EmptyTrieHash, rootHash)) {
+    if (Arrays.equals(EmptyTrieHash, rootHash)) {
       new MerklePatriciaTrie[K, V](None, source, Map())(kSerializer, vSerializer)
     } else {
       new MerklePatriciaTrie[K, V](Some(rootHash), source, Map())(kSerializer, vSerializer)
@@ -96,7 +97,7 @@ final class MerklePatriciaTrie[K, V] private (
   @tailrec
   private def get(node: Node, searchKey: Array[Byte]): Option[Array[Byte]] = node match {
     case LeafNode(key, value) =>
-      if (java.util.Arrays.equals(key, searchKey)) {
+      if (Arrays.equals(key, searchKey)) {
         Some(value)
       } else {
         None
@@ -105,7 +106,7 @@ final class MerklePatriciaTrie[K, V] private (
     case extNode @ ExtensionNode(sharedKey, _) =>
       if (searchKey.length >= sharedKey.length) {
         val (commonKey, remainingKey) = BytesUtil.split(searchKey, sharedKey.length)
-        if (java.util.Arrays.equals(sharedKey, commonKey)) {
+        if (Arrays.equals(sharedKey, commonKey)) {
           val nextNode = getNextNode(extNode)
           get(nextNode, remainingKey)
         } else {
@@ -379,7 +380,7 @@ final class MerklePatriciaTrie[K, V] private (
 
   private def removeFromLeafNode(leafNode: LeafNode, searchKey: Array[Byte]): NodeRemoveResult = {
     val LeafNode(existingKey, _) = leafNode
-    if (existingKey sameElements searchKey) {
+    if (Arrays.equals(existingKey, searchKey)) {
       // We found the node to delete
       NodeRemoveResult(hasChanged = true, newNode = None, changes = Vector(Deleted(leafNode)))
     } else {
@@ -460,7 +461,7 @@ final class MerklePatriciaTrie[K, V] private (
         case Left(nextHash) =>
           // If the node is not in the extension node then it might be a node to be inserted at the end of this remove
           // so we search in this list too
-          notStoredYet.find(n => java.util.Arrays.equals(n.hash, nextHash)).getOrElse(
+          notStoredYet.find(n => Arrays.equals(n.hash, nextHash)).getOrElse(
             getNextNode(extensionNode) // We search for the node in the db
           )
         case Right(nextNodeOnExt) => nextNodeOnExt

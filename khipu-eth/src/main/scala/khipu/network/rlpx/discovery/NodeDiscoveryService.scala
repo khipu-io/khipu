@@ -16,6 +16,7 @@ import akka.io.IO
 import akka.io.Udp
 import akka.util.ByteString
 import java.net.{ InetSocketAddress, URI }
+import java.util.Arrays
 import khipu.NodeStatus
 import khipu.ServerStatus
 import khipu.crypto
@@ -140,7 +141,7 @@ object NodeDiscoveryService {
       } else {
         Try(Packet(input)) match {
           case x @ Success(packet) =>
-            if (java.util.Arrays.equals(packet.mdc.toArray, crypto.kec256(input.drop(32)))) {
+            if (Arrays.equals(packet.mdc.toArray, crypto.kec256(input.drop(32)))) {
               x
             } else {
               Failure(new RuntimeException("MDC check failed"))

@@ -46,7 +46,7 @@ package object rlp {
 
   trait RLPSerializable {
     def toRLPEncodable: RLPEncodeable
-    def toBytes: Array[Byte] = encode(this.toRLPEncodable)
+    final def toBytes: Array[Byte] = encode(this.toRLPEncodable)
   }
 
   // --- utilities for UInt256

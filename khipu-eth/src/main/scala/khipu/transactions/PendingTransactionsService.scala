@@ -70,6 +70,8 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
 
   /**
    * stores all pending transactions
+   *
+   * TODO needs optimize for performance on List (LinkedHashMap ?)
    */
   var pendingTransactions: List[PendingTransaction] = Nil
 

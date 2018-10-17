@@ -2,6 +2,7 @@ package khipu.crypto
 
 import akka.util.ByteString
 import java.math.BigInteger
+import java.util.Arrays
 import khipu.util
 import org.spongycastle.asn1.x9.X9IntegerConverter
 import org.spongycastle.crypto.AsymmetricCipherKeyPair
@@ -297,7 +298,7 @@ object ECDSASignature {
     // byte 0 of encoded ECC point indicates that it is uncompressed point, it is part of spongycastle encoding
     val pubKey = key.getPublic.asInstanceOf[ECPublicKeyParameters].getQ.getEncoded(false).tail
     Seq(PositivePointSign, NegativePointSign).find { i =>
-      recoverPubBytes_etc(r, s, i, messageHash, None).exists(java.util.Arrays.equals(_, pubKey))
+      recoverPubBytes_etc(r, s, i, messageHash, None).exists(Arrays.equals(_, pubKey))
     }
   }
 
@@ -310,7 +311,7 @@ object ECDSASignature {
     var break = false
     while (i < 4 && !break) {
       recoverPubBytesForRecoverId_eth(r, s, i.toByte, messageHash) match {
-        case Some(key) if java.util.Arrays.equals(key, pubKey) =>
+        case Some(key) if Arrays.equals(key, pubKey) =>
           recId = i
           break = true
         case _ =>

@@ -1,6 +1,7 @@
 package khipu.domain
 
 import akka.util.ByteString
+import java.util.Arrays
 import khipu.UInt256
 import khipu.crypto
 import khipu.util.BytesUtil
@@ -43,7 +44,7 @@ final class Address private (val bytes: ByteString) {
   def toUInt256 = if (bytes.length == 0) UInt256.Zero else UInt256(bytes)
 
   override def equals(that: Any): Boolean = that match {
-    case x: Address => java.util.Arrays.equals(x.bytes.toArray, this.bytes.toArray)
+    case x: Address => Arrays.equals(x.bytes.toArray, this.bytes.toArray)
     case other      => false
   }
 

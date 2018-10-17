@@ -1,5 +1,6 @@
 package kesque
 
+import java.util.Arrays
 import org.spongycastle.util.encoders.Hex
 
 object Hash {
@@ -43,7 +44,7 @@ final case class Hash(bytes: Array[Byte]) {
   override def hashCode: Int = intHash
 
   override def equals(any: Any) = any match {
-    case that: Hash => java.util.Arrays.equals(this.bytes, that.bytes)
+    case that: Hash => Arrays.equals(this.bytes, that.bytes)
     case _          => false
   }
 

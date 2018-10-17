@@ -1,6 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
+import java.util.Arrays
 import khipu.UInt256
 
 /**
@@ -73,7 +74,7 @@ final class Memory private () {
 
   override def equals(that: Any): Boolean = {
     that match {
-      case that: Memory => java.util.Arrays.equals(this.underlying, that.underlying)
+      case that: Memory => Arrays.equals(this.underlying, that.underlying)
       case other        => false
     }
   }

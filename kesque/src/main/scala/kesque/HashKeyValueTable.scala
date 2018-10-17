@@ -1,6 +1,7 @@
 package kesque
 
 import java.nio.ByteBuffer
+import java.util.Arrays
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
@@ -165,7 +166,7 @@ final class HashKeyValueTable private[kesque] (
                 val recs = result.info.records.records.iterator
                 while (recs.hasNext) { // NOTE: the records are offset reversed !!
                   val rec = recs.next
-                  if (rec.offset == offset && java.util.Arrays.equals(kesque.getBytes(rec.key), key)) {
+                  if (rec.offset == offset && Arrays.equals(kesque.getBytes(rec.key), key)) {
                     foundOffset = offset
                     foundValue = if (rec.hasValue) Some(TVal(kesque.getBytes(rec.value), rec.timestamp)) else None
                   }
@@ -282,7 +283,7 @@ final class HashKeyValueTable private[kesque] (
     } else if ((v1 eq null) || (v2 eq null)) {
       true
     } else {
-      !java.util.Arrays.equals(v1, v2)
+      !Arrays.equals(v1, v2)
     }
   }
 

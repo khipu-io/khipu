@@ -1,6 +1,7 @@
 package khipu.validators
 
 import akka.util.ByteString
+import java.util.Arrays
 import khipu.crypto
 import khipu.domain.{ Block, BlockHeader, Receipt, SignedTransaction }
 import khipu.ledger.BloomFilter
@@ -102,8 +103,11 @@ object BlockValidator extends BlockValidator {
   private def validateOmmersHash(block: Block): Either[BlockError, Block] = {
     import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
     val encodedOmmers: Array[Byte] = block.body.uncleNodesList.toBytes
-    if (java.util.Arrays.equals(crypto.kec256(encodedOmmers), block.header.ommersHash.bytes)) Right(block)
-    else Left(BlockOmmersHashError)
+    if (Arrays.equals(crypto.kec256(encodedOmmers), block.header.ommersHash.bytes)) {
+      Right(block)
+    } else {
+      Left(BlockOmmersHashError)
+    }
   }
 
   /**

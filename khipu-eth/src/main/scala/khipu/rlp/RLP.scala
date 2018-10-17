@@ -47,7 +47,7 @@ private[rlp] object RLP {
   /**
    * Allow for content up to size of 2&#94;64 bytes *
    */
-  private val MaxItemLength: Double = Math.pow(256, 8)
+  private val MaxItemLength: Double = math.pow(256, 8)
 
   /** RLP encoding rules are defined as follows: */
 
@@ -229,7 +229,7 @@ private[rlp] object RLP {
     if ((singleByte & 0xFF) == 0) {
       Array[Byte]()
     } else {
-      Array[Byte](singleByte)
+      Array(singleByte)
     }
   }
 
@@ -243,7 +243,7 @@ private[rlp] object RLP {
     if ((singleShort & 0xFF) == singleShort) {
       byteToByteArray(singleShort.toByte)
     } else {
-      Array[Byte]((singleShort >> 8 & 0xFF).toByte, (singleShort >> 0 & 0xFF).toByte)
+      Array((singleShort >> 8 & 0xFF).toByte, (singleShort >> 0 & 0xFF).toByte)
     }
   }
 
@@ -259,9 +259,9 @@ private[rlp] object RLP {
     } else if (singleInt == (singleInt & 0xFFFF)) {
       shortToBigEndianMinLength(singleInt.toShort)
     } else if (singleInt == (singleInt & 0xFFFFFF)) {
-      Array[Byte]((singleInt >>> 16).toByte, (singleInt >>> 8).toByte, singleInt.toByte)
+      Array((singleInt >>> 16).toByte, (singleInt >>> 8).toByte, singleInt.toByte)
     } else {
-      Array[Byte]((singleInt >>> 24).toByte, (singleInt >>> 16).toByte, (singleInt >>> 8).toByte, singleInt.toByte)
+      Array((singleInt >>> 24).toByte, (singleInt >>> 16).toByte, (singleInt >>> 8).toByte, singleInt.toByte)
     }
   }
 

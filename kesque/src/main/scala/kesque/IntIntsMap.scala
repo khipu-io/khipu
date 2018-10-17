@@ -1,5 +1,7 @@
 package kesque
 
+import java.util.Arrays
+
 object IntIntsMap {
   type V = Int // unsigned int could be 2^32 = 4,294,967,296
 
@@ -26,12 +28,12 @@ object IntIntsMap {
       i = -max
       while (i <= max) {
         if (i == -i) {
-          if (!java.util.Arrays.equals(map.get(i, n), Array(i))) {
+          if (!Arrays.equals(map.get(i, n), Array(i))) {
             println(s"err at $i - ${map.get(i, n).mkString("[", ",", "]")} should be [$i]")
             System.exit(-1)
           }
         } else {
-          if (!java.util.Arrays.equals(map.get(i, n), Array(i, -i))) {
+          if (!Arrays.equals(map.get(i, n), Array(i, -i))) {
             println(s"err at $i - ${map.get(i, n).mkString("[", ",", "]")} should be [$i, ${-i}]")
             System.exit(-1)
           }
@@ -56,7 +58,7 @@ object IntIntsMap {
             System.exit(-1)
           }
         } else {
-          if (!java.util.Arrays.equals(map.get(i, n), Array(i))) {
+          if (!Arrays.equals(map.get(i, n), Array(i))) {
             println(s"Remove value -$i from map: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
             System.exit(-1)
           }
@@ -457,7 +459,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     }
   }
 
-  @inline private def getStartIndex(key: Int): Int = {
+  private def getStartIndex(key: Int): Int = {
     if (isCapacityByPowTwo) {
       IntIntMap.phiMix(key) & m_mask
     } else {
@@ -465,7 +467,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     }
   }
 
-  @inline private def getNextIndex(currentIndex: Int): Int = {
+  private def getNextIndex(currentIndex: Int): Int = {
     if (isCapacityByPowTwo) {
       (currentIndex + 1) & m_mask
     } else {
