@@ -1,13 +1,42 @@
 package khipu.vm
 
 import khipu.UInt256
-import scala.collection.mutable.ArrayBuffer
 
 object Stack {
+
+  // -- simple test
+  def main(xs: Array[String]) {
+    val s = empty()
+
+    (1 to 11) foreach { n => s.push(UInt256.safe(n)) }
+    println(s)
+
+    (1 to 12) foreach { n =>
+      println(s.pop())
+    }
+    println(s"size after pop() ${s.size}")
+
+    (1 to 11) foreach { n => s.push(UInt256.safe(n)) }
+    (1 to 11) foreach { n =>
+      println(s.pop(2))
+    }
+    println(s"size after pop(2) ${s.size}")
+
+    (1 to 11) foreach { n => s.push(Vector(UInt256.safe(n), UInt256.safe(-n))) }
+    println(s)
+
+    s.swap(10)
+    println(s)
+
+    s.dup(10)
+    println(s)
+  }
+
   /**
    * Stack max size as defined in the YP (9.1)
    */
   val DefaultMaxSize = 1024
+  val ListOfZero = List(UInt256.Zero)
 
   def empty(maxSize: Int = DefaultMaxSize): Stack = new Stack(maxSize)
 }
@@ -19,11 +48,24 @@ object Stack {
  * return the stack unchanged. Pop will always return zeroes in such case.
  */
 final class Stack private (val maxSize: Int) {
-  private val underlying: ArrayBuffer[UInt256] = ArrayBuffer()
+  // store elements in array, the top element is at the tail i.e. (length - 1)
+  private var underlying: Array[UInt256] = Array.ofDim[UInt256](16) // initial size 16
+  private var length = 0
+
+  private def expend(toSize: Int) {
+    val len = (toSize / 16 + 1) * 16
+    val xs = Array.ofDim[UInt256](len)
+    System.arraycopy(underlying, 0, xs, 0, length)
+    underlying = xs
+  }
 
   def push(word: UInt256) {
-    if (underlying.length + 1 <= maxSize) {
-      underlying += word
+    if (length + 1 <= maxSize) {
+      if (underlying.length < length + 1) {
+        expend(length + 1)
+      }
+      underlying(length) = word
+      length += 1
     }
   }
 
@@ -32,15 +74,25 @@ final class Stack private (val maxSize: Int) {
    * in the resulting stack
    */
   def push(words: Vector[UInt256]) {
-    if (underlying.length + words.size <= maxSize) {
-      underlying ++= words
+    val n = words.size
+    if (length + n <= maxSize) {
+      if (underlying.length < length + n) {
+        expend(length + n)
+      }
+      var i = 0
+      val itr = words.iterator
+      while (itr.hasNext) {
+        underlying(length + i) = itr.next
+        i += 1
+      }
+      length += n
     }
   }
 
   def pop(): List[UInt256] = {
-    val len = underlying.length
-    if (len > 0) {
-      List(underlying.remove(len - 1))
+    if (length > 0) {
+      length -= 1
+      List(underlying(length))
     } else {
       List(UInt256.Zero)
     }
@@ -51,15 +103,14 @@ final class Stack private (val maxSize: Int) {
    * in the current stack
    */
   def pop(n: Int): List[UInt256] = {
-    val len = underlying.length
-    if (n > 0 && n <= len) {
+    if (n > 0 && n <= length) {
       var res = List[UInt256]()
       var i = n
       while (i >= 1) {
-        res ::= underlying(len - i)
+        res ::= underlying(length - i)
         i -= 1
       }
-      underlying.remove(len - n, n)
+      length -= n
       res
     } else {
       List.fill(n)(UInt256.Zero)
@@ -70,9 +121,8 @@ final class Stack private (val maxSize: Int) {
    * Duplicate i-th element of the stack, pushing it to the top. i=0 is the top-most element.
    */
   def dup(i: Int) {
-    val len = underlying.length
-    if (i >= 0 && i < len && len < maxSize) {
-      underlying += underlying(len - i - 1)
+    if (i >= 0 && i < length && length < maxSize) {
+      push(underlying(length - i - 1))
     }
   }
 
@@ -80,30 +130,29 @@ final class Stack private (val maxSize: Int) {
    * Swap i-th and the top-most elements of the stack. i=0 is the top-most element (and that would be a no-op)
    */
   def swap(i: Int) {
-    val len = underlying.length
-    if (i > 0 && i < len) {
-      val j = len - i - 1
-      val top = underlying(len - 1)
-      val nth = underlying(j)
-      underlying(len - 1) = nth
-      underlying(j) = top
+    if (i > 0 && i < length) {
+      val k = length - i - 1
+      val top = underlying(length - 1)
+      val nth = underlying(k)
+      underlying(length - 1) = nth
+      underlying(k) = top
     }
   }
 
-  def size: Int = underlying.size
+  def size: Int = length
 
   /**
    * @return the elements of the stack as a sequence, with the top-most element of the stack
    *         as the first element in the sequence
    */
-  def toSeq: Seq[UInt256] = underlying.reverse
+  def toSeq: Seq[UInt256] = underlying.take(length).reverse
 
   override def equals(that: Any): Boolean = that match {
-    case that: Stack => this.underlying sameElements that.underlying
+    case that: Stack => this.underlying.take(length) sameElements that.underlying.take(length)
     case _           => false
   }
 
   override def hashCode(): Int = underlying.hashCode
 
-  override def toString: String = underlying.reverse.mkString("Stack(", ",", ")")
+  override def toString: String = toSeq.mkString("Stack(", ",", ")")
 }
