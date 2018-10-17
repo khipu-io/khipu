@@ -7,6 +7,7 @@ import khipu.rlp.RLPEncodeable
 import khipu.rlp.RLPList
 import khipu.rlp.RLPValue
 import khipu.trie
+import scala.annotation.switch
 
 /**
  * Trie elements
@@ -50,21 +51,29 @@ object Node {
     override def decode(rlp: RLPEncodeable): Node = rlp match {
       case RLPList(xs @ _*) =>
         val items = xs.toArray
-        items.length match {
+        (items.length: @switch) match {
           case ListSize =>
-            val init = Array.ofDim[RLPEncodeable](items.length - 1)
-            System.arraycopy(items, 0, init, 0, init.length)
+            val childrenLength = items.length - 1
+            val parsedChildren = Array.ofDim[Option[Either[Array[Byte], Node]]](childrenLength)
             val last = items(items.length - 1)
-            val parsedChildren = init.map {
-              case list: RLPList     => Some(Right(decode(list)))
-              case RLPValue(Array()) => None
-              case RLPValue(bytes)   => Some(Left(bytes))
+            var i = 0
+            while (i < childrenLength) {
+              val child = items(i) match {
+                case list: RLPList     => Some(Right(decode(list)))
+                case RLPValue(Array()) => None
+                case RLPValue(bytes)   => Some(Left(bytes))
+              }
+              parsedChildren(i) = child
+              i += 1
             }
 
-            BranchNode(parsedChildren, fromEncodeable[Array[Byte]](last) match {
-              case Array()    => None
-              case terminator => Some(terminator)
-            })
+            BranchNode(
+              parsedChildren,
+              fromEncodeable[Array[Byte]](last) match {
+                case Array()    => None
+                case terminator => Some(terminator)
+              }
+            )
 
           case PairSize =>
             HexPrefix.decode(items(0)) match {
@@ -72,10 +81,13 @@ object Node {
                 LeafNode(key, items(1))
 
               case (key, false) =>
-                ExtensionNode(key, items(1) match {
-                  case list: RLPList   => Right(decode(list))
-                  case RLPValue(bytes) => Left(bytes)
-                })
+                ExtensionNode(
+                  key,
+                  items(1) match {
+                    case list: RLPList   => Right(decode(list))
+                    case RLPValue(bytes) => Left(bytes)
+                  }
+                )
             }
 
           case _ => throw new RuntimeException("Invalid Node")
@@ -95,7 +107,7 @@ sealed trait Node {
   lazy val encoded: Array[Byte] = rlp.encode[Node](this)(Node.nodeEnc)
   lazy val hash: Array[Byte] = trie.toHash(encoded)
 
-  def capped: Array[Byte] = if (encoded.length < 32) encoded else hash
+  final def capped: Array[Byte] = if (encoded.length < 32) encoded else hash
 }
 
 final case class LeafNode(key: Array[Byte], value: Array[Byte]) extends Node
