@@ -1,5 +1,7 @@
 package khipu.rlp
 
+import akka.util.ByteString
+import java.nio.ByteBuffer
 import scala.annotation.switch
 import scala.annotation.tailrec
 
@@ -114,29 +116,37 @@ private[rlp] object RLP {
   private[rlp] def encode(input: RLPEncodeable): Array[Byte] = {
     input match {
       case list: RLPList =>
-        val output = list.items.foldLeft(Array.emptyByteArray) { (acc, item) =>
-          val encoded = encode(item)
-          val acc1 = Array.ofDim[Byte](acc.length + encoded.length)
-          System.arraycopy(acc, 0, acc1, 0, acc.length)
-          System.arraycopy(encoded, 0, acc1, acc.length, encoded.length)
-          acc1
+        val items = list.items.toArray
+
+        val encodedItems = Array.ofDim[Array[Byte]](items.length)
+        var length = 0
+        var i = 0
+        while (i < items.length) {
+          val encoded = encode(items(i))
+          encodedItems(i) = encoded
+          length += encoded.length
+          i += 1
         }
-        val binaryLen = encodeLength(output.length, OffsetShortList)
+        val lenInBytes = encodeLength(length, OffsetShortList)
 
-        val payload = Array.ofDim[Byte](binaryLen.length + output.length)
-        System.arraycopy(binaryLen, 0, payload, 0, binaryLen.length)
-        System.arraycopy(output, 0, payload, binaryLen.length, output.length)
-        payload
+        val payload = ByteBuffer.allocate(lenInBytes.length + length)
+        payload.put(lenInBytes)
+        i = 0
+        while (i < encodedItems.length) {
+          payload.put(encodedItems(i))
+          i += 1
+        }
+        payload.array()
 
-      case value: RLPValue =>
-        value.bytes match {
-          case bytes @ Array(b) if (b & 0xff) < 0x80 => bytes
-          case bytes =>
-            val binaryLen = encodeLength(bytes.length, OffsetShortItem)
-            val payload = Array.ofDim[Byte](binaryLen.length + bytes.length)
-            System.arraycopy(binaryLen, 0, payload, 0, binaryLen.length)
-            System.arraycopy(bytes, 0, payload, binaryLen.length, bytes.length)
-            payload
+      case RLPValue(bytes) =>
+        if (bytes.length == 1 && (bytes(0) & 0xFF) < 0x80) {
+          bytes
+        } else {
+          val binaryLen = encodeLength(bytes.length, OffsetShortItem)
+          val payload = Array.ofDim[Byte](binaryLen.length + bytes.length)
+          System.arraycopy(binaryLen, 0, payload, 0, binaryLen.length)
+          System.arraycopy(bytes, 0, payload, binaryLen.length, bytes.length)
+          payload
         }
     }
   }
