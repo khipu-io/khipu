@@ -35,7 +35,7 @@ object BytesUtil {
     require(arrays.map(_.length).distinct.length <= 1, "All the arrays should have the same length")
     require(arrays.nonEmpty, "There should be one or more arrays")
 
-    val zeroes = Array.fill[Byte](arrays.head.length)(0)
+    val zeroes = Array.ofDim[Byte](arrays.head.length) // auto filled with 0
     arrays.foldLeft[Array[Byte]](zeroes) {
       case (acc, array) =>
         var i = 0
@@ -88,7 +88,11 @@ object BytesUtil {
 
   def padLeft(bytes: Array[Byte], length: Int, byte: Byte): Array[Byte] = {
     val len = math.max(0, length - bytes.length)
-    val pads = Array.fill[Byte](len)(byte)
+    val pads = if (byte == 0) {
+      Array.ofDim[Byte](len) // auto filled with 0
+    } else {
+      Array.fill[Byte](len)(byte)
+    }
     concat(pads, bytes)
   }
 

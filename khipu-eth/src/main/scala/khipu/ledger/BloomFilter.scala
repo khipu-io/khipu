@@ -14,7 +14,7 @@ object BloomFilter {
 
   // alyways create new array instead of a val, since we cannot guarantee if it 
   // will be changed outside (it's an array which is mutable)
-  def emptyBloomFilterBytes = Array.fill[Byte](BloomFilterByteSize)(0)
+  def emptyBloomFilterBytes = Array.ofDim[Byte](BloomFilterByteSize) // auto filled with 0
   def emptyBloomFilter = ByteString(emptyBloomFilterBytes)
 
   def containsAnyOf(bloomFilterBytes: ByteString, toCheck: Seq[ByteString]): Boolean = {

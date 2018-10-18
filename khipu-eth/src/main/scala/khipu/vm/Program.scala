@@ -19,7 +19,7 @@ final case class Program(code: Array[Byte]) {
   def getByte(pc: Int): Byte = if (pc >= 0 && pc < length) code(pc) else 0
 
   def getBytes(from: Int, size: Int): ByteString = {
-    val slice = Array.fill[Byte](size)(0)
+    val slice = Array.ofDim[Byte](size) // auto filled with 0
     System.arraycopy(code, from, slice, 0, math.min(size, length - from))
     ByteString(slice)
   }

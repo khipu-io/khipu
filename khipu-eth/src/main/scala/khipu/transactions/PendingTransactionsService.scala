@@ -11,7 +11,6 @@ import akka.cluster.singleton.ClusterSingletonProxySettings
 import akka.pattern.ask
 import akka.util.Timeout
 import khipu.BroadcastTransactions
-import khipu.Hash
 import khipu.ProcessedTransactions
 import khipu.domain.SignedTransaction
 import khipu.network.p2p.messages.CommonMessages.SignedTransactions
@@ -73,7 +72,6 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
    * stores all pending transactions
    */
   private var pendingTransactions: List[PendingTransaction] = Nil
-  private var pendingTxHashs = Set[Hash]()
 
   val mediator = DistributedPubSub(context.system).mediator
 

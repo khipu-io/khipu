@@ -19,7 +19,7 @@ final class FrameCodec(private val secrets: Secrets) {
   val HeaderLength = 32
   val MacSize = 16
 
-  private val allZerosIV = Array.fill[Byte](16)(0)
+  private val allZerosIV = Array.ofDim[Byte](16) // auto filled with 0
 
   private val enc: StreamCipher = {
     val cipher = new SICBlockCipher(new AESEngine)

@@ -341,6 +341,9 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val start = System.currentTimeMillis
     blockchain.storages.accountNodeDataSource.clock.start()
     blockchain.storages.storageNodeDataSource.clock.start()
+    blockchain.storages.evmCodeDataSource.clock.start()
+    blockchain.storages.blockHeaderDataSource.clock.start()
+    blockchain.storages.blockBodyDataSource.clock.start()
 
     val fs = signedTransactions.map(stx => stx -> initialWorldFun.withTx(Some(stx))) map {
       case (stx, initialWorld) =>
@@ -348,9 +351,14 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     }
 
     Future.sequence(fs) map { rs =>
-      val dsGetElapsed1 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped
+      val dsGetElapsed1 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
+        blockchain.storages.evmCodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
+
       blockchain.storages.accountNodeDataSource.clock.start()
       blockchain.storages.storageNodeDataSource.clock.start()
+      blockchain.storages.evmCodeDataSource.clock.start()
+      blockchain.storages.blockHeaderDataSource.clock.start()
+      blockchain.storages.blockBodyDataSource.clock.start()
 
       val (results, elapses) = rs.unzip
       val elapsed = elapses.sum
@@ -419,7 +427,8 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
         //log.debug(s"${blockHeader.number} touched accounts (${r.fold(_.stx, _.stx).hash}):\n ${currWorld.map(_.touchedAccounts.mkString("\n", "\n", "\n")).getOrElse("")}")
       }
 
-      val dsGetElapsed2 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped
+      val dsGetElapsed2 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
+        blockchain.storages.evmCodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
 
       val parallelRate = if (parallelCount > 0) {
         parallelCount * 100.0 / nTx

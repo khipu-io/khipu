@@ -172,7 +172,7 @@ object OpCode {
   def sliceBytes(bytes: ByteString, offset: Int, size: Int): ByteString = sliceBytes(bytes.toArray, offset, size)
   def sliceBytes(bytes: Array[Byte], offset: Int, size: Int): ByteString = {
     if (offset >= 0 && offset <= Int.MaxValue && size > 0) {
-      val slice = Array.fill[Byte](size)(0)
+      val slice = Array.ofDim[Byte](size) // auto filled with 0
       if (offset < bytes.length) {
         System.arraycopy(bytes, offset, slice, 0, math.min(size, bytes.length - offset))
       }
