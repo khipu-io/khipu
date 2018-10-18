@@ -1,10 +1,11 @@
 package khipu
 
 import akka.util.ByteString
-import fr.cryptohash.{ Keccak256, Keccak512 }
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
+import khipu.crypto.hash.Keccak256
+import khipu.crypto.hash.Keccak512
 import org.spongycastle.asn1.sec.SECNamedCurves
 import org.spongycastle.asn1.x9.X9ECParameters
 import org.spongycastle.crypto.AsymmetricCipherKeyPair
@@ -28,7 +29,7 @@ package object crypto {
   }
 
   def kec256(input: Array[Byte]*): Array[Byte] = {
-    val digest: Keccak256 = new Keccak256
+    val digest: Keccak256 = new Keccak256()
     input.foreach(i => digest.update(i))
     digest.digest
   }
