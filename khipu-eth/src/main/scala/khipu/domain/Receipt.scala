@@ -12,7 +12,7 @@ object Receipt {
     override def toBytes(input: Receipt): Array[Byte] = input.toBytes
   }
 
-  val Failure = Hash(Array[Byte]())
+  val Failure = Hash(Array.emptyByteArray)
   val Success = Hash(Array[Byte](1))
 }
 

@@ -7,7 +7,6 @@ import khipu.Hash
 import scala.util.Random
 
 object BytesUtil {
-  val EMPTY_BYTE_ARRAY = Array[Byte]()
   val ZERO_BYTE_ARRAY = Array[Byte](0)
 
   def bigIntegerToBytes(b: BigInteger, numBytes: Int): Array[Byte] = {
@@ -119,7 +118,7 @@ object BytesUtil {
    */
   def parseBytes(input: ByteString, offset: Int, len: Int): Array[Byte] = {
     if (offset >= input.length || len == 0) {
-      EMPTY_BYTE_ARRAY
+      Array.emptyByteArray
     } else {
       val bytes = Array.ofDim[Byte](len)
       System.arraycopy(input.toArray, offset, bytes, 0, math.min(input.length - offset, len))

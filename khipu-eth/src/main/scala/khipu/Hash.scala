@@ -7,7 +7,7 @@ import java.util.Arrays
  * Usually node's hash except in storage's pruneKey. TODO
  */
 object Hash {
-  val empty = Hash(Array[Byte]())
+  val empty = Hash(Array.emptyByteArray)
   def apply(): Hash = empty
 
   def intHash(bytes: Array[Byte]): Int = {

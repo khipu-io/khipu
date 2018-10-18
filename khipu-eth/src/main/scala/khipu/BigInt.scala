@@ -100,7 +100,7 @@ object BigInt {
         assertEquals(s"Should $x == ${x.copy}", x, x.copy)
       }
 
-    val zeroBigInteger = new BigInteger(1, Array[Byte]())
+    val zeroBigInteger = new BigInteger(1, Array.emptyByteArray)
     println(s"zero BigInteger: $zeroBigInteger, bytes: ${zeroBigInteger.toByteArray.mkString(",")}")
     val zeroBigInt = new BigInt(0)
     println(s"zero BigInt: $zeroBigInt, bytes: ${zeroBigInt.toByteArray.mkString(",")}")

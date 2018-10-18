@@ -114,7 +114,7 @@ private[rlp] object RLP {
   private[rlp] def encode(input: RLPEncodeable): Array[Byte] = {
     input match {
       case list: RLPList =>
-        val output = list.items.foldLeft(Array[Byte]()) { (acc, item) =>
+        val output = list.items.foldLeft(Array.emptyByteArray) { (acc, item) =>
           val encoded = encode(item)
           val acc1 = Array.ofDim[Byte](acc.length + encoded.length)
           System.arraycopy(acc, 0, acc1, 0, acc.length)
@@ -203,7 +203,7 @@ private[rlp] object RLP {
     } else {
       getItemBounds(data, pos) match {
         case ItemBounds(start, end, false, isEmpty) =>
-          RLPValue(if (isEmpty) Array[Byte]() else slice(data, start, end + 1)) -> (end + 1)
+          RLPValue(if (isEmpty) Array.emptyByteArray else slice(data, start, end + 1)) -> (end + 1)
         case ItemBounds(start, end, true, _) =>
           RLPList(decodeListRecursive(data, start, end - start + 1, Vector()): _*) -> (end + 1)
       }
@@ -227,7 +227,7 @@ private[rlp] object RLP {
    */
   private[rlp] def byteToByteArray(singleByte: Byte): Array[Byte] = {
     if ((singleByte & 0xFF) == 0) {
-      Array[Byte]()
+      Array.emptyByteArray
     } else {
       Array(singleByte)
     }
@@ -304,7 +304,7 @@ private[rlp] object RLP {
     if (pos == -1) {
       bytes
     } else if (pos == bytes.length - 1) {
-      Array()
+      Array.emptyByteArray
     } else {
       val len = bytes.length - pos
       val res = Array.ofDim[Byte](len)

@@ -11,6 +11,7 @@ import akka.cluster.singleton.ClusterSingletonProxySettings
 import akka.pattern.ask
 import akka.util.Timeout
 import khipu.BroadcastTransactions
+import khipu.Hash
 import khipu.ProcessedTransactions
 import khipu.domain.SignedTransaction
 import khipu.network.p2p.messages.CommonMessages.SignedTransactions
@@ -70,10 +71,9 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
 
   /**
    * stores all pending transactions
-   *
-   * TODO needs optimize for performance on List (LinkedHashMap ?)
    */
-  var pendingTransactions: List[PendingTransaction] = Nil
+  private var pendingTransactions: List[PendingTransaction] = Nil
+  private var pendingTxHashs = Set[Hash]()
 
   val mediator = DistributedPubSub(context.system).mediator
 
@@ -90,7 +90,8 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
       sender() ! PendingTransactionsResponse(pendingTransactions)
 
     case RemoveTransactions(signedTransactions) =>
-      pendingTransactions = pendingTransactions.filterNot(pt => signedTransactions.contains(pt.stx))
+      val stxHashs = signedTransactions.map(_.hash).toSet
+      pendingTransactions = pendingTransactions.filterNot(ptx => stxHashs.contains(ptx.stx.hash))
       mediator ! Publish(khipu.TxTopic, ProcessedTransactions(signedTransactions))
 
     case PeerEntity.MessageFromPeer(peerId, SignedTransactions(signedTransactions)) =>
@@ -98,10 +99,10 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
   }
 
   def addTransactions(signedTransactions: List[SignedTransaction]) {
-    val transactionsToAdd = signedTransactions.filterNot(t => pendingTransactions.map(_.stx).contains(t))
+    val transactionsToAdd = signedTransactions.filterNot(stx => pendingTransactions.contains(stx.hash))
     if (transactionsToAdd.nonEmpty) {
       val timestamp = System.currentTimeMillis
-      pendingTransactions = (transactionsToAdd.map(PendingTransaction(_, timestamp)) ++ pendingTransactions).take(txPoolConfig.txPoolSize)
+      pendingTransactions = (transactionsToAdd.map(PendingTransaction(_, timestamp)) ::: pendingTransactions).take(txPoolConfig.txPoolSize)
 
       broadcastNewTransactions(transactionsToAdd)
     }
@@ -113,14 +114,14 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
     }
 
     val timestamp = System.currentTimeMillis()
-    pendingTransactions = (PendingTransaction(newTx, timestamp) +: txsWithoutObsoletes).take(txPoolConfig.txPoolSize)
+    pendingTransactions = (PendingTransaction(newTx, timestamp) :: txsWithoutObsoletes).take(txPoolConfig.txPoolSize)
 
     broadcastNewTransactions(List(newTx))
   }
 
   def broadcastNewTransactions(signedTransactions: Seq[SignedTransaction]) = {
-    val txsToNotify = signedTransactions.filter(tx => pendingTransactions.exists(_.stx.hash == tx.hash)) // signed transactions that are still pending
-
+    val ptxHashs = pendingTransactions.map(_.stx.hash).toSet
+    val txsToNotify = signedTransactions.filter(tx => ptxHashs.contains(tx.hash)) // signed transactions that are still pending
     if (txsToNotify.nonEmpty) {
       mediator ! Publish(khipu.TxTopic, BroadcastTransactions(txsToNotify))
     }

@@ -40,11 +40,8 @@ package object crypto {
     digest.digest
   }
 
-  def kec256(input: ByteString): Array[Byte] =
-    kec256(input.toArray)
-
-  def kec256(input: Hash): Array[Byte] =
-    kec256(input.bytes)
+  def kec256(input: ByteString): Array[Byte] = kec256(input.toArray)
+  def kec256(input: Hash): Array[Byte] = kec256(input.bytes)
 
   def generateKeyPair(secureRandom: SecureRandom): AsymmetricCipherKeyPair = {
     val generator = new ECKeyPairGenerator

@@ -84,8 +84,8 @@ class GenesisDataLoader(
   private val hashLength = 64
   private val addressLength = 40
 
-  private val emptyTrieRootHash = Hash(crypto.kec256(rlp.encode(Array[Byte]())))
-  private val emptyEvmHash: Hash = Hash(crypto.kec256(Array[Byte]()))
+  private val emptyTrieRootHash = Hash(crypto.kec256(rlp.encode(Array.emptyByteArray)))
+  private val emptyEvmHash: Hash = Hash(crypto.kec256(Array.emptyByteArray))
 
   def loadGenesisData(): Unit = {
     log.debug("Loading genesis data")
@@ -184,7 +184,7 @@ class GenesisDataLoader(
       case None =>
         // using empty namespace because ephemDataSource.storage already has the namespace-prefixed keys
         // TODO deal it with kesque, otherwise the regular sync from scrath won't work because of lack these initial nodes
-        ephemDataSource.toSeq.grouped(dbConfig.batchSize).foreach(toStore => dataSource.update(Array(), Nil, toStore))
+        ephemDataSource.toSeq.grouped(dbConfig.batchSize).foreach(toStore => dataSource.update(Array.emptyByteArray, Nil, toStore))
         blockchain.saveBlock(Block(header, BlockBody(Nil, Nil)))
         blockchain.saveReceipts(header.hash, Nil)
         blockchain.saveTotalDifficulty(header.hash, header.difficulty)

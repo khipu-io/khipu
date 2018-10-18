@@ -74,7 +74,7 @@ object SignedTransaction {
           rlp.toRLPEncodable(tx.nonce),
           rlp.toRLPEncodable(tx.gasPrice),
           tx.gasLimit,
-          tx.receivingAddress.fold(Array[Byte]())(_.toArray),
+          tx.receivingAddress.fold(Array.emptyByteArray)(_.toArray),
           rlp.toRLPEncodable(tx.value),
           tx.payload
         )
@@ -84,7 +84,7 @@ object SignedTransaction {
           rlp.toRLPEncodable(tx.nonce),
           rlp.toRLPEncodable(tx.gasPrice),
           tx.gasLimit,
-          tx.receivingAddress.fold(Array[Byte]())(_.toArray),
+          tx.receivingAddress.fold(Array.emptyByteArray)(_.toArray),
           rlp.toRLPEncodable(tx.value),
           tx.payload,
           chainId.get,
@@ -107,7 +107,7 @@ object SignedTransaction {
           rlp.toRLPEncodable(tx.nonce),
           rlp.toRLPEncodable(tx.gasPrice),
           tx.gasLimit,
-          tx.receivingAddress.fold(Array[Byte]())(_.toArray),
+          tx.receivingAddress.fold(Array.emptyByteArray)(_.toArray),
           rlp.toRLPEncodable(tx.value),
           tx.payload
         )
@@ -117,7 +117,7 @@ object SignedTransaction {
           rlp.toRLPEncodable(tx.nonce),
           rlp.toRLPEncodable(tx.gasPrice),
           tx.gasLimit,
-          tx.receivingAddress.fold(Array[Byte]())(_.toArray),
+          tx.receivingAddress.fold(Array.emptyByteArray)(_.toArray),
           rlp.toRLPEncodable(tx.value),
           tx.payload,
           cid,

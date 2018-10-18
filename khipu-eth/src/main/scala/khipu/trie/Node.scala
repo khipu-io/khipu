@@ -7,7 +7,6 @@ import khipu.rlp.RLPEncodeable
 import khipu.rlp.RLPList
 import khipu.rlp.RLPValue
 import khipu.trie
-import scala.annotation.switch
 
 /**
  * Trie elements
@@ -19,10 +18,7 @@ object Node {
   private[trie] val ListSize: Byte = 17
   private val PairSize: Byte = 2
 
-  val nodeEnc = new NodeEncoder()
-  val nodeDec = new NodeDecoder()
-
-  final class NodeEncoder extends RLPEncoder[Node] {
+  object nodeEnc extends RLPEncoder[Node] {
     override def encode(obj: Node): RLPEncodeable = obj match {
       case LeafNode(key, value) =>
         RLPList(HexPrefix.encode(nibbles = key, isLeaf = true), value)
@@ -37,21 +33,21 @@ object Node {
         val childrenEncoded = children.map {
           case Some(Right(node)) => encode(node)
           case Some(Left(bytes)) => RLPValue(bytes)
-          case None              => RLPValue(Array.ofDim[Byte](0))
+          case None              => RLPValue(Array.emptyByteArray)
         }
         val encoded = Array.ofDim[RLPEncodeable](childrenEncoded.length + 1)
         System.arraycopy(childrenEncoded, 0, encoded, 0, childrenEncoded.length)
-        encoded(encoded.length - 1) = RLPValue(terminator.getOrElse(Array.ofDim[Byte](0)))
+        encoded(encoded.length - 1) = RLPValue(terminator.getOrElse(Array.emptyByteArray))
 
         RLPList(encoded: _*)
     }
   }
 
-  final class NodeDecoder extends RLPDecoder[Node] {
+  object nodeDec extends RLPDecoder[Node] {
     override def decode(rlp: RLPEncodeable): Node = rlp match {
       case RLPList(xs @ _*) =>
         val items = xs.toArray
-        (items.length: @switch) match {
+        items.length match {
           case ListSize =>
             val childrenLength = items.length - 1
             val parsedChildren = Array.ofDim[Option[Either[Array[Byte], Node]]](childrenLength)

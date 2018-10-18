@@ -507,7 +507,7 @@ final class MerklePatriciaTrie[K, V] private (
       case ((toRemove, toUpdate), (hash, Deleted(node))) =>
         val nCapped = node.capped
         if (nCapped.length == 32 || hash == previousRootHash) {
-          (toRemove + (hash -> Deleted(Array())), toUpdate)
+          (toRemove + (hash -> Deleted(Array.emptyByteArray)), toUpdate)
         } else {
           (toRemove, toUpdate)
         }

@@ -4,9 +4,9 @@ import akka.util.ByteString
 
 package object rlp {
 
-  val EmptyRLPData = encode(RLPValue(Array[Byte]()))
+  val EmptyRLPData = encode(RLPValue(Array.emptyByteArray))
   val EmptyRLPList = encode(RLPList())
-  val ZeroByteRLP = RLP.byteToByteArray(0: Byte) // it's Array()
+  val ZeroByteRLP = RLP.byteToByteArray(0: Byte) // return Array()
 
   final case class RLPException(message: String) extends RuntimeException(message)
 

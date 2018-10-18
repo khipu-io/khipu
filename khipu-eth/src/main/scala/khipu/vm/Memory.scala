@@ -16,7 +16,7 @@ object Memory {
   def empty(): Memory = new Memory()
 }
 final class Memory private () {
-  private var underlying: Array[Byte] = Array[Byte]()
+  private var underlying: Array[Byte] = Array.emptyByteArray
 
   def store(offset: Int, b: Byte): Unit = store(offset, Array(b))
   def store(offset: Int, uint: UInt256): Unit = store(offset, uint.bytes)
@@ -49,7 +49,7 @@ final class Memory private () {
       System.arraycopy(underlying, offset, data, 0, size)
       data
     } else {
-      Array()
+      Array.emptyByteArray
     }
   }
 
