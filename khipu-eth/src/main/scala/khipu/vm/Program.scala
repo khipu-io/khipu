@@ -3,7 +3,7 @@ package khipu.vm
 import akka.util.ByteString
 import khipu.Hash
 import khipu.crypto
-import scala.collection.mutable
+import khipu.util.collection.IntSet
 
 /**
  * Holds a program's code and provides utilities for accessing it (defaulting to zeroes when out of scope)
@@ -14,7 +14,7 @@ final case class Program(code: Array[Byte]) {
   val length = code.length
 
   lazy val codeHash = Hash(crypto.kec256(code))
-  private lazy val validJumpDestinations: mutable.Set[Int] = generateValidJumpDestinations()
+  private lazy val validJumpDestinations: IntSet = generateValidJumpDestinations()
 
   def getByte(pc: Int): Byte = if (pc >= 0 && pc < length) code(pc) else 0
   def getBytes(from: Int, size: Int): ByteString = {
@@ -33,7 +33,7 @@ final case class Program(code: Array[Byte]) {
    * @param acc with the previously obtained valid jump destinations.
    */
   private def generateValidJumpDestinations() = {
-    val res = mutable.HashSet[Int]()
+    val res = new IntSet(256)
     var pos = 0
     while (pos < length) {
       val byte = code(pos)
