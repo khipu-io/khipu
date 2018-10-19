@@ -50,8 +50,18 @@ object RLPImplicits {
       if (obj.isZero) byteToByteArray(0) else BigIntUtil.toUnsignedByteArray(obj.toBigInteger)
     )
     override def decode(rlp: RLPEncodeable): BigInt = rlp match {
-      case RLPValue(bytes) => new BigInt(bytes.foldLeft[BigInteger](BigInteger.ZERO) { (rec, byte) => (rec shiftLeft 8) add BigInteger.valueOf(byte & 0xFF) }) // TODO rewrite for BigInt
-      case _               => throw RLPException("src is not an RLPValue")
+      case RLPValue(bytes) =>
+        var res = BigInteger.ZERO
+        var i = 0
+        while (i < bytes.length) {
+          val byte = bytes(i)
+          res = (res shiftLeft 8) add BigInteger.valueOf(byte & 0xFF)
+          i += 1
+        }
+        res
+        new BigInt(res) // TODO rewrite for BigInt?
+      case _ =>
+        throw RLPException("src is not an RLPValue")
     }
   }
 
@@ -61,8 +71,17 @@ object RLPImplicits {
       if (obj.compareTo(BigInteger.ZERO) == 0) byteToByteArray(0) else BigIntUtil.toUnsignedByteArray(obj)
     )
     override def decode(rlp: RLPEncodeable): BigInteger = rlp match {
-      case RLPValue(bytes) => bytes.foldLeft[BigInteger](BigInteger.ZERO) { (rec, byte) => (rec shiftLeft 8) add BigInteger.valueOf(byte & 0xFF) }
-      case _               => throw RLPException("src is not an RLPValue")
+      case RLPValue(bytes) =>
+        var res = BigInteger.ZERO
+        var i = 0
+        while (i < bytes.length) {
+          val byte = bytes(i)
+          res = (res shiftLeft 8) add BigInteger.valueOf(byte & 0xFF)
+          i += 1
+        }
+        res
+      case _ =>
+        throw RLPException("src is not an RLPValue")
     }
   }
 

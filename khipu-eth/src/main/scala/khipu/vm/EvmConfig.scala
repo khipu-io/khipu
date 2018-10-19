@@ -130,7 +130,18 @@ final case class EvmConfig(
 ) {
   import EvmConfig._
 
-  val byteToOpCode: Map[Byte, OpCode[_]] = opCodes.map(op => op.code -> op).toMap
+  private val byteToOpCode = {
+    val ops = Array.ofDim[OpCode[_]](256)
+    opCodes foreach { op =>
+      ops(op.code.toInt & 0xFF) = op
+      op.code.hashCode
+    }
+    ops
+  }
+
+  def getOpCode(code: Byte) = {
+    Option(byteToOpCode(code.toInt & 0xFF))
+  }
 
   /**
    * Calculate gas cost of memory usage. Incur a blocking gas cost if memory usage exceeds reasonable limits.

@@ -34,7 +34,7 @@ object VM {
   @tailrec
   private def run[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]): ProgramState[W, S] = {
     val byte = state.program.getByte(state.pc)
-    state.config.byteToOpCode.get(byte) match {
+    state.config.getOpCode(byte) match {
       case Some(opcode) =>
         if (state.isDebugTraceEnabled) {
           println(s"[trace] $opcode | pc: ${state.pc} | depth: ${state.env.callDepth} | gas: ${state.gas} | ${state.stack} | ${state.memory} | error: ${state.error}")

@@ -767,10 +767,11 @@ case object JUMP extends OpCode[UInt256](0x56, 1, 0) with ConstGas[UInt256] {
     val pos = params
     val dest = pos.toInt // fail with InvalidJump if convertion to Int is lossy
 
-    if (pos == dest && state.program.validJumpDestinations.contains(dest))
+    if (pos == dest && state.program.isValidJumpDestination(dest)) {
       state.goto(dest)
-    else
+    } else {
       state.withError(InvalidJump(pos))
+    }
   }
 }
 
@@ -787,7 +788,7 @@ case object JUMPI extends OpCode[(UInt256, UInt256)](0x57, 2, 0) with ConstGas[(
 
     if (cond.isZero) {
       state.step()
-    } else if (pos == dest && state.program.validJumpDestinations.contains(dest)) {
+    } else if (pos == dest && state.program.isValidJumpDestination(dest)) {
       state.goto(dest)
     } else {
       state.withError(InvalidJump(pos))

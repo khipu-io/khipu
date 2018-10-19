@@ -55,20 +55,28 @@ object Node {
             var i = 0
             while (i < childrenLength) {
               val child = items(i) match {
-                case list: RLPList     => Some(Right(decode(list)))
-                case RLPValue(Array()) => None
-                case RLPValue(bytes)   => Some(Left(bytes))
+                case list: RLPList =>
+                  Some(Right(decode(list)))
+                case RLPValue(bytes) =>
+                  if (bytes.length == 0) {
+                    None
+                  } else {
+                    Some(Left(bytes))
+                  }
               }
               parsedChildren(i) = child
               i += 1
             }
 
+            val teminatorBytes = fromEncodeable[Array[Byte]](last)
+            val terminator = if (teminatorBytes.length == 0) {
+              None
+            } else {
+              Some(teminatorBytes)
+            }
             BranchNode(
               parsedChildren,
-              fromEncodeable[Array[Byte]](last) match {
-                case Array()    => None
-                case terminator => Some(terminator)
-              }
+              terminator
             )
 
           case PairSize =>
