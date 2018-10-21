@@ -42,12 +42,12 @@ object FilterManager {
     fromBlock:       Option[BlockParam],
     toBlock:         Option[BlockParam],
     address:         Option[Address],
-    topics:          Seq[Seq[ByteString]]
+    topics:          List[List[ByteString]]
   ) extends Filter
   final case class BlockFilter(override val id: UInt256) extends Filter
   final case class PendingTransactionFilter(override val id: UInt256) extends Filter
 
-  final case class NewLogFilter(fromBlock: Option[BlockParam], toBlock: Option[BlockParam], address: Option[Address], topics: Seq[Seq[ByteString]])
+  final case class NewLogFilter(fromBlock: Option[BlockParam], toBlock: Option[BlockParam], address: Option[Address], topics: List[List[ByteString]])
   final case class NewBlockFilter()
   final case class NewPendingTransactionFilter()
   final case class NewFilterResponse(id: UInt256)
@@ -58,7 +58,7 @@ object FilterManager {
   final case class GetFilterLogs(id: UInt256)
   final case class GetFilterChanges(id: UInt256)
 
-  final case class GetLogs(fromBlock: Option[BlockParam], toBlock: Option[BlockParam], address: Option[Address], topics: Seq[Seq[ByteString]])
+  final case class GetLogs(fromBlock: Option[BlockParam], toBlock: Option[BlockParam], address: Option[Address], topics: List[List[ByteString]])
 
   final case class TxLog(
     logIndex:         Long,
@@ -173,7 +173,7 @@ class FilterManager(
   }
 
   private def getLogs(filter: LogFilter, startingBlockNumber: Option[Long] = None): Seq[TxLog] = {
-    val bytesToCheckInBloomFilter = filter.address.map(a => Seq(a.bytes)).getOrElse(Nil) ++ filter.topics.flatten
+    val bytesToCheckInBloomFilter = filter.address.map(a => List(a.bytes)).getOrElse(Nil) ::: filter.topics.flatten
 
     @tailrec
     def recur(currentBlockNumber: Long, toBlockNumber: Long, logsSoFar: Seq[TxLog]): Seq[TxLog] = {
@@ -242,7 +242,7 @@ class FilterManager(
   }
 
   private def getLogsFromBlock(filter: LogFilter, block: Block, receipts: Seq[Receipt]): Seq[TxLog] = {
-    val bytesToCheckInBloomFilter = filter.address.map(a => Seq(a.bytes)).getOrElse(Nil) ++ filter.topics.flatten
+    val bytesToCheckInBloomFilter = filter.address.map(a => List(a.bytes)).getOrElse(Nil) ++ filter.topics.flatten
 
     receipts.zipWithIndex.foldLeft(Nil: Seq[TxLog]) {
       case (logsSoFar, (receipt, txIndex)) =>

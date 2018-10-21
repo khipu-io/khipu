@@ -563,7 +563,7 @@ object EthJsonMethodsImplicits extends JsonMethodsImplicits {
   }
 
   private def extractFilter(obj: JObject): Either[JsonRpcError, Filter] = {
-    def allSuccess[T](eithers: Seq[Either[JsonRpcError, T]]): Either[JsonRpcError, Seq[T]] = {
+    def allSuccess[T](eithers: List[Either[JsonRpcError, T]]): Either[JsonRpcError, List[T]] = {
       if (eithers.forall(_.isRight)) Right(eithers.map(_.right.get))
       else Left(InvalidParams(msg = eithers.collect { case Left(err) => err.message }.mkString("\n")))
     }
@@ -572,17 +572,17 @@ object EthJsonMethodsImplicits extends JsonMethodsImplicits {
       extractBytes(jstr).left.map(_ => InvalidParams(msg = s"Unable to parse topics, expected byte data but got ${jstr.values}"))
     }
 
-    def parseNestedTopics(jarr: JArray): Either[JsonRpcError, Seq[ByteString]] = {
+    def parseNestedTopics(jarr: JArray): Either[JsonRpcError, List[ByteString]] = {
       allSuccess(jarr.arr.map {
         case jstr: JString => parseTopic(jstr)
         case other         => Left(InvalidParams(msg = s"Unable to parse topics, expected byte data but got: $other"))
       })
     }
 
-    val topicsEither: Either[JsonRpcError, Seq[Seq[ByteString]]] =
+    val topicsEither: Either[JsonRpcError, List[List[ByteString]]] =
       allSuccess((obj \ "topics").extractOpt[JArray].map(_.arr).getOrElse(Nil).map {
         case JNull         => Right(Nil)
-        case jstr: JString => parseTopic(jstr).map(Seq(_))
+        case jstr: JString => parseTopic(jstr).map(List(_))
         case jarr: JArray  => parseNestedTopics(jarr)
         case other         => Left(InvalidParams(msg = s"Unable to parse topics, expected byte data or array but got: $other"))
       })

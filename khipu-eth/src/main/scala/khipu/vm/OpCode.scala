@@ -907,17 +907,17 @@ case object SWAP14 extends SwapOp(0x9d)
 case object SWAP15 extends SwapOp(0x9e)
 case object SWAP16 extends SwapOp(0x9f)
 
-sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(UInt256, UInt256, Seq[UInt256])](code, i + 2, 0) {
+sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(UInt256, UInt256, List[UInt256])](code, i + 2, 0) {
   def this(code: Int) = this(code, code - 0xa0)
 
   final protected def constGasFn(s: FeeSchedule) = s.G_log
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use save int value
-    val List(offset, size, topics @ _*) = state.stack.pop(delta)
+    val offset :: size :: topics = state.stack.pop(delta)
     (offset, size, topics)
   }
 
-  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, Seq[UInt256])): ProgramState[W, S] = {
+  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, List[UInt256])): ProgramState[W, S] = {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
@@ -928,7 +928,7 @@ sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(UInt
     }
   }
 
-  final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, Seq[UInt256])): Long = {
+  final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, List[UInt256])): Long = {
     val (offset, size, _) = params
     val memCost = state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
     val logCost = state.config.feeSchedule.G_logdata * size.toMaxLong + i * state.config.feeSchedule.G_logtopic

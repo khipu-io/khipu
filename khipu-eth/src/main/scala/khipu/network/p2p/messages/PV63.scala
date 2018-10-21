@@ -255,7 +255,7 @@ object PV63 {
     implicit final class TxLogEntryDec(rlpEncodeable: RLPEncodeable) {
       def toTxLogEntry: TxLogEntry = rlpEncodeable match {
         case RLPList(loggerAddress, logTopics: RLPList, data) =>
-          TxLogEntry(Address(loggerAddress: ByteString), fromRlpList[ByteString](logTopics), data)
+          TxLogEntry(Address(loggerAddress: ByteString), fromRlpList[ByteString](logTopics).toList, data)
 
         case _ => throw new RuntimeException("Cannot decode TransactionLog")
       }

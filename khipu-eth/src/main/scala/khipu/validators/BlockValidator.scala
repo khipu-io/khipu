@@ -142,7 +142,7 @@ object BlockValidator extends BlockValidator {
    */
   private def validateLogBloom(block: Block, receipts: Seq[Receipt]): Either[BlockError, Block] = {
     val logsBloomOr = if (receipts.isEmpty) {
-      BloomFilter.emptyBloomFilter
+      BloomFilter.EmptyBloomFilter
     } else {
       ByteString(BytesUtil.or(receipts.map(_.logsBloomFilter.toArray): _*))
     }

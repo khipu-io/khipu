@@ -155,7 +155,7 @@ object EthService {
     fromBlock: Option[BlockParam],
     toBlock:   Option[BlockParam],
     address:   Option[Address],
-    topics:    Seq[Seq[ByteString]]
+    topics:    List[List[ByteString]]
   )
 
   final case class NewBlockFilterRequest()

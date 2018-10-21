@@ -435,14 +435,14 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       } else {
         0.0
       }
-      val dbTimePercent = 100.0 * (dsGetElapsed1 + dsGetElapsed2) / (elapsed + reExecutedElapsed)
+      val dbTimePerc = 100.0 * (dsGetElapsed1 + dsGetElapsed2) / (elapsed + reExecutedElapsed)
 
       log.debug(s"${blockHeader.number} re-executed in ${reExecutedElapsed}ms, ${100 - parallelRate}% with race conditions, db get ${100.0 * dsGetElapsed2 / reExecutedElapsed}%")
       log.debug(s"${blockHeader.number} touched accounts:\n ${currWorld.map(_.touchedAccounts.mkString("\n", "\n", "\n")).getOrElse("")}")
 
       txError match {
         case Some(error) => Left(error)
-        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePercent)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
+        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePerc)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
       }
     } andThen {
       case Success(_) =>
@@ -509,6 +509,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     evmCfg:       EvmConfig
   )(world: BlockWorldState): Either[BlockExecutionError, TxResult] = {
     try {
+      // TODO put OnAccount(senderAccount) as race condition? It should to be added during executeTransaction  
       val (senderAccount, worldForTx) = world.getAccount(stx.sender) match {
         case Some(account) => (account, world)
         case None =>
