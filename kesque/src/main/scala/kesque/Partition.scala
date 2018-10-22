@@ -642,9 +642,11 @@ class Partition(
     removeMetric("LastStableOffsetLag", tags)
   }
 
-  override def equals(that: Any): Boolean = that match {
-    case other: Partition => partitionId == other.partitionId && topic == other.topic && isOffline == other.isOffline
-    case _                => false
+  override def equals(that: Any): Boolean = {
+    that match {
+      case that: Partition => (this eq that) || partitionId == that.partitionId && topic == that.topic && isOffline == that.isOffline
+      case _               => false
+    }
   }
 
   override def hashCode: Int =

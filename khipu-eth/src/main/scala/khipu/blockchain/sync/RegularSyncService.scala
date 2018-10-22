@@ -47,9 +47,9 @@ trait RegularSyncService { _: SyncService =>
 
   private def tf(n: Int) = "%1$4d".format(n) // tx
   private def xf(n: Double) = "%1$5.1f".format(n) // tps
-  private def pf(n: Double) = "%1$5.2f".format(n) // percent
+  private def pf(n: Double) = "%1$6.2f".format(n) // percent
   private def ef(n: Double) = "%1$6.3f".format(n) // elapse time
-  private def gf(n: Double) = "%1$6.3f".format(n) // gas
+  private def gf(n: Double) = "%1$6.2f".format(n) // gas
   private def lf(n: Int) = "%1$5d".format(n) // payload
 
   // Should keep newer block to be at the front

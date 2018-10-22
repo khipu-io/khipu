@@ -304,11 +304,16 @@ final case class Fp12(a: Fp6, b: Fp6) extends Field[Fp12] {
     this.cyclotomicExp(exp).unitaryInverse()
   }
 
-  override def equals(o: Any): Boolean = {
-    o match {
-      case fp12: Fp12 =>
-        if (if (a != null) !a.equals(fp12.a) else fp12.a != null) return false
-        return !(if (b != null) !b.equals(fp12.b) else fp12.b != null)
+  override def equals(any: Any): Boolean = {
+    any match {
+      case that: Fp12 =>
+        (this eq that) || {
+          if (if (this.a ne null) !this.a.equals(that.a) else that.a ne null) {
+            false
+          } else {
+            !(if (this.b ne null) !this.b.equals(that.b) else that.b ne null)
+          }
+        }
       case _ => false
     }
   }

@@ -102,11 +102,16 @@ final case class Fp2(a: Fp, b: Fp) extends Field[Fp2] {
     a.isValid && b.isValid
   }
 
-  override def equals(o: Any): Boolean = {
-    o match {
-      case fp2: Fp2 =>
-        if (if (a != null) !a.equals(fp2.a) else fp2.a != null) return false
-        return !(if (b != null) !b.equals(fp2.b) else fp2.b != null)
+  override def equals(any: Any): Boolean = {
+    any match {
+      case that: Fp2 =>
+        (this eq that) || {
+          if (if (this.a ne null) !this.a.equals(that.a) else that.a ne null) {
+            false
+          } else {
+            !(if (this.b ne null) !this.b.equals(that.b) else that.b ne null)
+          }
+        }
       case _ => false
     }
   }

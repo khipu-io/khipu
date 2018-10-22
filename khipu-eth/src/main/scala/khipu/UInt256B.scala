@@ -216,13 +216,13 @@ object UInt256_bigint {
 
     override def equals(that: Any): Boolean = {
       that match {
-        case that: UInt256 => this.n == that.n
+        case that: UInt256 => (this eq that) || this.n == that.n
         case that: BigInt  => this.n == that
         case that: Byte    => this.n == that
         case that: Short   => this.n == that
         case that: Int     => this.n == that
         case that: Long    => this.n == that
-        case other         => this.n == other
+        case _             => false
       }
     }
 

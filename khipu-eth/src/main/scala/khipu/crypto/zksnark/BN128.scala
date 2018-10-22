@@ -194,12 +194,18 @@ abstract class BN128[T <: Field[T]] protected (val x: T, val y: T, val z: T) {
     String.format("(%s; %s; %s)", x.toString, y.toString, z.toString)
   }
 
-  override def equals(o: Any): Boolean = {
-    o match {
-      case bn128: BN128[_] =>
-        if (if (x != null) !x.equals(bn128.x) else bn128.x != null) return false
-        if (if (y != null) !y.equals(bn128.y) else bn128.y != null) return false
-        return !(if (z != null) !z.equals(bn128.z) else bn128.z != null)
+  override def equals(any: Any): Boolean = {
+    any match {
+      case that: BN128[_] =>
+        (this eq that) || {
+          if (if (this.x ne null) !this.x.equals(that.x) else that.x ne null) {
+            false
+          } else if (if (this.y ne null) !this.y.equals(that.y) else that.y ne null) {
+            false
+          } else {
+            !(if (this.z ne null) !this.z.equals(that.z) else that.z ne null)
+          }
+        }
       case _ => false
     }
   }

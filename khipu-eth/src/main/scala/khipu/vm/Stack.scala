@@ -147,9 +147,11 @@ final class Stack private (val maxSize: Int) {
    */
   def toSeq: Seq[UInt256] = underlying.take(length).reverse
 
-  override def equals(that: Any): Boolean = that match {
-    case that: Stack => this.underlying.take(length) sameElements that.underlying.take(length)
-    case _           => false
+  override def equals(any: Any): Boolean = {
+    any match {
+      case that: Stack => (this eq that) || (this.underlying.take(length) sameElements that.underlying.take(length))
+      case _           => false
+    }
   }
 
   override def hashCode(): Int = underlying.hashCode

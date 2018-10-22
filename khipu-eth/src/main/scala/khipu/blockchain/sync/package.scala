@@ -25,9 +25,9 @@ package object sync {
 
     final def toHash: Hash = Hash(bytes)
 
-    final override def equals(x: Any) = {
-      x match {
-        case that: NodeHash => this.tpe == that.tpe && Arrays.equals(this.bytes, that.bytes)
+    final override def equals(any: Any) = {
+      any match {
+        case that: NodeHash => (this eq that) || this.tpe == that.tpe && Arrays.equals(this.bytes, that.bytes)
         case _              => false
       }
     }

@@ -58,9 +58,9 @@ object BloomFilter {
 
     // Bloom filter that sets 3 bits out of 2048 based on equations 25-28 from the YP
     private def createBloomFilter(toBloom: Array[Byte]): Bloom = {
-      val mov1 = (((toBloom(0) & 0xFF) & (_3LOW_BITS)) << 8) + ((toBloom(1)) & 0xFF)
-      val mov2 = (((toBloom(2) & 0xFF) & (_3LOW_BITS)) << 8) + ((toBloom(3)) & 0xFF)
-      val mov3 = (((toBloom(4) & 0xFF) & (_3LOW_BITS)) << 8) + ((toBloom(5)) & 0xFF)
+      val mov1 = (((toBloom(0) & 0xFF) & _3LOW_BITS) << 8) + ((toBloom(1)) & 0xFF)
+      val mov2 = (((toBloom(2) & 0xFF) & _3LOW_BITS) << 8) + ((toBloom(3)) & 0xFF)
+      val mov3 = (((toBloom(4) & 0xFF) & _3LOW_BITS) << 8) + ((toBloom(5)) & 0xFF)
 
       val data = Array.ofDim[Byte](256)
       setBit(data, mov1, 1)
@@ -74,7 +74,7 @@ object BloomFilter {
       require((data.length * 8) - 1 >= pos, s"outside byte array limit, pos: $pos")
 
       val posByte = data.length - 1 - (pos / 8)
-      val posBit = (pos) % 8
+      val posBit = pos % 8
       val setter = (1 << (posBit)).toByte
       val toBeSet = data(posByte)
       val res = if (v == 1) {
@@ -114,9 +114,9 @@ object BloomFilter {
 
     override def toString(): String = khipu.toHexString(data)
 
-    override def equals(that: Any): Boolean = {
-      that match {
-        case that: Bloom => (this eq that) || Arrays.equals(data, that.data)
+    override def equals(any: Any): Boolean = {
+      any match {
+        case that: Bloom => (this eq that) || Arrays.equals(this.data, that.data)
         case _           => false
       }
     }

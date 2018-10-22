@@ -72,10 +72,10 @@ final class Memory private () {
 
   def size: Int = underlying.length
 
-  override def equals(that: Any): Boolean = {
-    that match {
-      case that: Memory => Arrays.equals(this.underlying, that.underlying)
-      case other        => false
+  override def equals(any: Any): Boolean = {
+    any match {
+      case that: Memory => (this eq that) || Arrays.equals(this.underlying, that.underlying)
+      case _            => false
     }
   }
 

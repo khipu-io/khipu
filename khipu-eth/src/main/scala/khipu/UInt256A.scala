@@ -210,15 +210,15 @@ object UInt256_biginteger {
 
     def compare(that: UInt256): Int = n.compareTo(that.n)
 
-    override def equals(that: Any): Boolean = {
-      that match {
-        case that: UInt256    => n == that.n
+    override def equals(any: Any): Boolean = {
+      any match {
+        case that: UInt256    => (this eq that) || n == that.n
         case that: BigInteger => n == that
         case that: Byte       => n == BigInteger.valueOf(that)
         case that: Short      => n == BigInteger.valueOf(that)
         case that: Int        => n == BigInteger.valueOf(that)
         case that: Long       => n == BigInteger.valueOf(that)
-        case other            => other == n
+        case _                => false
       }
     }
 

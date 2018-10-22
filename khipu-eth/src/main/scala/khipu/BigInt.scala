@@ -1724,37 +1724,41 @@ final class BigInt private () extends Number with Ordered[BigInt] {
    * @return	true if the two numbers are equal, false otherwise.
    * @complexity	O(n)
    */
-  private def internal_equals(a: BigInt): Boolean = {
-    if (isZero && a.isZero) {
+  private def internal_equals(that: BigInt): Boolean = {
+    if (this eq that) {
       true
-    } else if (len != a.len) {
-      false
-    } else if ((sign ^ a.sign) < 0) {
-      false // in case definition of sign would change...
     } else {
-      var i = 0
-      while (i < len) {
-        if (mag(i) != a.mag(i)) {
-          return false
+      if (isZero && that.isZero) {
+        true
+      } else if (len != that.len) {
+        false
+      } else if ((sign ^ that.sign) < 0) {
+        false // in case definition of sign would change...
+      } else {
+        var i = 0
+        while (i < len) {
+          if (mag(i) != that.mag(i)) {
+            return false
+          }
+          i += 1
         }
-        i += 1
-      }
 
-      true
+        true
+      }
     }
   }
 
   /**
    * {@inheritDoc}
    */
-  override def equals(that: Any): Boolean = {
-    that match {
+  override def equals(any: Any): Boolean = {
+    any match {
       case that: BigInt => this.internal_equals(that)
       case that: Byte   => this.internal_equals(new BigInt(that))
       case that: Short  => this.internal_equals(new BigInt(that))
       case that: Int    => this.internal_equals(new BigInt(that))
       case that: Long   => this.internal_equals(new BigInt(that))
-      case other        => false
+      case _            => false
     }
   }
 

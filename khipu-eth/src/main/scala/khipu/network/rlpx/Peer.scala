@@ -55,9 +55,9 @@ final class OutgoingPeer(val id: String, theUri: URI) extends Peer {
   protected var _uri: Option[URI] = Some(theUri)
   val remoteAddress = new InetSocketAddress(theUri.getHost, theUri.getPort)
 
-  override def equals(x: Any) = {
-    x match {
-      case that: OutgoingPeer => that.id == this.id
+  override def equals(any: Any) = {
+    any match {
+      case that: OutgoingPeer => (this eq that) || this.id == that.id
       case _                  => false
     }
   }
@@ -68,9 +68,9 @@ final class OutgoingPeer(val id: String, theUri: URI) extends Peer {
 final class IncomingPeer(val id: String, val remoteAddress: InetSocketAddress) extends Peer {
   protected var _uri: Option[URI] = None // wil be set later
 
-  override def equals(x: Any) = {
-    x match {
-      case that: IncomingPeer => that.id == this.id
+  override def equals(any: Any) = {
+    any match {
+      case that: IncomingPeer => (this eq that) || this.id == that.id
       case _                  => false
     }
   }

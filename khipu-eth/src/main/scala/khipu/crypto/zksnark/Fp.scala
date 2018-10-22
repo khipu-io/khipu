@@ -49,12 +49,10 @@ class Fp(val v: BigInteger) extends Field[Fp] {
     v.toByteArray()
   }
 
-  override def equals(o: Any): Boolean = {
-    o match {
-      case fp: Fp =>
-        !(if (v != null) v.compareTo(fp.v) != 0 else fp.v != null)
-
-      case _ => false
+  override def equals(any: Any): Boolean = {
+    any match {
+      case that: Fp => (this eq that) || !(if (this.v ne null) this.v.compareTo(that.v) != 0 else that.v ne null)
+      case _        => false
     }
   }
 

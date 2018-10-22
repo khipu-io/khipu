@@ -201,12 +201,16 @@ final case class Fp6(a: Fp2, b: Fp2, c: Fp2) extends Field[Fp6] {
     new Fp6(ra, rb, rc)
   }
 
-  override def equals(o: Any): Boolean = {
-    o match {
-      case fp6: Fp6 =>
-        if (if (a != null) !a.equals(fp6.a) else fp6.a != null) return false
-        if (if (b != null) !b.equals(fp6.b) else fp6.b != null) return false
-        return !(if (c != null) !c.equals(fp6.c) else fp6.c != null)
+  override def equals(any: Any): Boolean = {
+    any match {
+      case that: Fp6 =>
+        if (if (this.a ne null) !this.a.equals(that.a) else that.a ne null) {
+          false
+        } else if (if (this.b ne null) !this.b.equals(that.b) else that.b ne null) {
+          false
+        } else {
+          !(if (this.c ne null) !this.c.equals(that.c) else that.c ne null)
+        }
       case _ => false
     }
   }
