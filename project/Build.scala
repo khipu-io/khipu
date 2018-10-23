@@ -54,7 +54,7 @@ object Build extends sbt.Build {
     fork in run := true,
     fork in Test := true,
     parallelExecution in Test := false,
-    scalaVersion := "2.12.4",
+    scalaVersion := "2.12.7",
     scalacOptions ++= Seq("-unchecked", "-deprecation")
     //javacOptions ++= Seq("-source", "1.8", "-target", "1.8")  // TODO options cause javadoc fail
   ) ++ Environment.settings ++ Formatting.settings
@@ -68,8 +68,8 @@ object Build extends sbt.Build {
 
 object Dependencies {
 
-  private val AKKA_VERSION = "2.5.14"
-  private val AKKA_HTTP_VERSION = "10.1.3"
+  private val AKKA_VERSION = "2.5.17"
+  private val AKKA_HTTP_VERSION = "10.1.5"
   private val SLF4J_VERSION = "1.7.24"
   private val CIRCE_VERSION = "0.7.0"
 
@@ -107,20 +107,16 @@ object Dependencies {
     "org.apache.kafka" %% "kafka" % "2.0.0"
   )
 
-  val spongycastle = Seq("com.madgag.spongycastle" % "core" % "1.56.0.0")
+  val spongycastle = Seq("com.madgag.spongycastle" % "core" % "1.58.0.0")
 
   val snappy = Seq("org.xerial.snappy" % "snappy-java" % "1.1.7")
-
-  val mapdb = Seq("org.mapdb" % "mapdb" % "3.0.7")
 
   val others = Seq(
     "ch.megard" %% "akka-http-cors" % "0.2.1",
     "org.json4s" %% "json4s-native" % "3.5.1",
     "de.heikoseeberger" %% "akka-http-json4s" % "1.11.0",
     "org.consensusresearch" %% "scrypto" % "1.2.0-RC3",
-    "org.scorexfoundation" %% "iodb" % "0.3.0",
     "org.jline" % "jline" % "3.1.2",
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5",
     "commons-io" % "commons-io" % "2.5",
     "com.google.code.findbugs" % "jsr305" % "3.0.2" % Provided,
     "com.github.ben-manes.caffeine" % "caffeine" % "2.6.1"
