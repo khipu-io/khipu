@@ -31,7 +31,7 @@ final class HashKeyValueTable private[kesque] (
   /* time to key table, should be the first topic to initially create it */
   private var timeIndex = Array.ofDim[Array[Byte]](200)
 
-  private val caches = Array.ofDim[CaffeineCache[Hash, (TVal, Int)]](topics.length)
+  private val caches = Array.ofDim[FIFOCache[Hash, (TVal, Int)]](topics.length)
   private val (topicIndex, _) = topics.foldLeft(Map[String, Int](), 0) {
     case ((map, i), topic) => (map + (topic -> i), i + 1)
   }
@@ -56,7 +56,7 @@ final class HashKeyValueTable private[kesque] (
     var n = 0
     while (n < topics.length) {
       val topic = topics(n)
-      caches(n) = new CaffeineCache[Hash, (TVal, Int)](cacheSize, isRecordingStats = true)
+      caches(n) = new FIFOCache[Hash, (TVal, Int)](cacheSize)
 
       tasks = new LoadIndexesTask(n, topic) :: tasks
 

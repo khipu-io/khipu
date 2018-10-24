@@ -48,6 +48,7 @@ trait RegularSyncService { _: SyncService =>
   private def tf(n: Int) = "%1$4d".format(n) // tx
   private def xf(n: Double) = "%1$5.1f".format(n) // tps
   private def pf(n: Double) = "%1$6.2f".format(n) // percent
+  private def pf2(n: Double) = "%1$5.2f".format(n) // percent less than 100%
   private def ef(n: Double) = "%1$6.3f".format(n) // elapse time
   private def gf(n: Double) = "%1$6.2f".format(n) // gas
   private def lf(n: Int) = "%1$6d".format(n) // payload
@@ -426,7 +427,7 @@ trait RegularSyncService { _: SyncService =>
           val elapsed = (System.currentTimeMillis - start) / 1000.0
           val parallel = 100.0 * stats.parallelCount / nTx
           val dbTimePercent = stats.dbReadTimePercent
-          val cacheHitRates = stats.cacheHitRates.map(x => s"${pf(x)}%").mkString(" ")
+          val cacheHitRates = stats.cacheHitRates.map(x => s"${pf2(x)}%").mkString(" ")
           log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${lf(payloadSize)}, parallel ${pf(parallel)}%, db ${pf(dbTimePercent)}%, cache ${cacheHitRates}")
           Right(NewBlock(block, newTd, stats.parallelCount))
 
