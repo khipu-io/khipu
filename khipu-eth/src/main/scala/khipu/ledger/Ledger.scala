@@ -51,7 +51,9 @@ object Ledger {
   type PC = ProgramContext[BlockWorldState, TrieStorage]
   type PR = ProgramResult[BlockWorldState, TrieStorage]
 
-  final case class BlockResult(world: BlockWorldState, gasUsed: Long = 0, receipts: Seq[Receipt] = Nil, parallelCount: Int, dbReadTimePercent: Double)
+  final case class Stats(parallelCount: Int, dbReadTimePercent: Double, cacheHitRates: List[Double])
+
+  final case class BlockResult(world: BlockWorldState, gasUsed: Long = 0, receipts: Seq[Receipt] = Nil, stats: Stats)
   final case class BlockPreparationResult(block: Block, blockResult: BlockResult, stateRootHash: Hash)
   final case class TxResult(stx: SignedTransaction, world: BlockWorldState, gasUsed: Long, txFee: UInt256, logs: Seq[TxLogEntry], touchedAddresses: Set[Address], vmReturnData: ByteString, error: Option[ProgramError], isRevert: Boolean, parallelRaceConditions: Set[ProgramState.ParallelRace])
 
@@ -109,7 +111,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val initialWorld = blockchain.getReadOnlyWorldState(None, blockchainConfig.accountStartNonce, parentStateRoot)
 
     executePreparedTransactions(block.body.transactionList, initialWorld, block.header, validators.signedTransactionValidator) map {
-      case (execResult @ BlockResult(resultingWorldState, _, _, _, _), txExecuted) =>
+      case (execResult @ BlockResult(resultingWorldState, _, _, _), txExecuted) =>
         val worldRewardPaid = payBlockReward(block)(resultingWorldState)
         val worldPersisted = worldRewardPaid.commit().persist()
         BlockPreparationResult(block.copy(body = block.body.copy(transactionList = txExecuted)), execResult, worldPersisted.stateRootHash)
@@ -326,7 +328,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
     txError match {
       case Some(error) => Future.successful(Left(error))
-      case None        => Future.successful(postExecuteTransactions(blockHeader, evmCfg, txResults, 0, 0.0)(currWorld.withTx(None)))
+      case None        => Future.successful(postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(0, 0, Nil))(currWorld.withTx(None)))
     }
   }
 
@@ -353,6 +355,8 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     Future.sequence(fs) map { rs =>
       val dsGetElapsed1 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
         blockchain.storages.evmCodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
+
+      val cacheHitRates = List(blockchain.storages.accountNodeDataSource.cacheHitRate, blockchain.storages.storageNodeDataSource.cacheHitRate).map(_ * 100.0)
 
       blockchain.storages.accountNodeDataSource.clock.start()
       blockchain.storages.storageNodeDataSource.clock.start()
@@ -442,7 +446,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
       txError match {
         case Some(error) => Left(error)
-        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, parallelCount, dbTimePerc)(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
+        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbTimePerc, cacheHitRates))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
       }
     } andThen {
       case Success(_) =>
@@ -451,11 +455,10 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
   }
 
   private def postExecuteTransactions(
-    blockHeader:   BlockHeader,
-    evmCfg:        EvmConfig,
-    txResults:     Vector[TxResult],
-    parallelCount: Int,
-    dbTimePercent: Double
+    blockHeader: BlockHeader,
+    evmCfg:      EvmConfig,
+    txResults:   Vector[TxResult],
+    stats:       Stats
   )(world: BlockWorldState): Either[BlockExecutionError, BlockResult] = {
     try {
       val (accGas, accTxFee, accTouchedAddresses, accReceipts) = txResults.foldLeft(0L, UInt256.Zero, Set[Address](), Vector[Receipt]()) {
@@ -494,7 +497,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       val worldDeletedDeadAccounts = deleteAccounts(deadAccounts)(worldPayMinerForGas)
 
       log.debug(s"$blockHeader, accGas $accGas, receipts = $accReceipts")
-      Right(BlockResult(worldDeletedDeadAccounts, accGas, accReceipts, parallelCount, dbTimePercent))
+      Right(BlockResult(worldDeletedDeadAccounts, accGas, accReceipts, stats))
     } catch {
       case MPTNodeMissingException(_, hash, table) => Left(MissingNodeExecptionError(blockHeader.number, hash, table))
       case e: Throwable                            => throw e

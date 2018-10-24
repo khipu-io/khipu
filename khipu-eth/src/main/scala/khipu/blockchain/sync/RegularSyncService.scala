@@ -50,7 +50,7 @@ trait RegularSyncService { _: SyncService =>
   private def pf(n: Double) = "%1$6.2f".format(n) // percent
   private def ef(n: Double) = "%1$6.3f".format(n) // elapse time
   private def gf(n: Double) = "%1$6.2f".format(n) // gas
-  private def lf(n: Int) = "%1$5d".format(n) // payload
+  private def lf(n: Int) = "%1$6d".format(n) // payload
 
   // Should keep newer block to be at the front
   private var workingHeaders = List[BlockHeader]()
@@ -406,7 +406,7 @@ trait RegularSyncService { _: SyncService =>
     try {
       val start = System.currentTimeMillis
       ledger.executeBlock(block, validators) map {
-        case Right(BlockResult(world, _, receipts, parallelCount, dbTimePercent)) =>
+        case Right(BlockResult(world, _, receipts, stats)) =>
           val newTd = parentTd + block.header.difficulty
 
           val start1 = System.currentTimeMillis
@@ -424,9 +424,11 @@ trait RegularSyncService { _: SyncService =>
           val gasUsed = block.header.gasUsed / 1048576.0
           val payloadSize = block.body.transactionList.map(_.tx.payload.size).foldLeft(0)(_ + _)
           val elapsed = (System.currentTimeMillis - start) / 1000.0
-          val parallel = 100.0 * parallelCount / nTx
-          log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${lf(payloadSize)}, parallel ${pf(parallel)}%, db ${pf(dbTimePercent)}%")
-          Right(NewBlock(block, newTd, parallelCount))
+          val parallel = 100.0 * stats.parallelCount / nTx
+          val dbTimePercent = stats.dbReadTimePercent
+          val cacheHitRates = stats.cacheHitRates.map(x => s"${pf(x)}%").mkString(" ")
+          log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${lf(payloadSize)}, parallel ${pf(parallel)}%, db ${pf(dbTimePercent)}%, cache ${cacheHitRates}")
+          Right(NewBlock(block, newTd, stats.parallelCount))
 
         case Left(err) =>
           log.warning(s"Failed to execute mined block because of $err")

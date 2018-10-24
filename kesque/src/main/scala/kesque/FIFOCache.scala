@@ -30,17 +30,17 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
 
   private val pruneSize = math.max(1, (capacity / threshold - capacity).toInt)
 
-  private val cacheMap = new mutable.LinkedHashMap[K, V]()
+  private val underlying = new mutable.LinkedHashMap[K, V]()
 
   private val cacheLock = new ReentrantReadWriteLock()
   private val readLock = cacheLock.readLock
   private val writeLock = cacheLock.writeLock
 
   private var _hitCount: Int = _
-  def hitCount = _hitCount
+  def hitRate = _hitCount * 1.0 / (_hitCount + _missCount)
 
   private var _missCount: Int = _
-  def missCount = _missCount
+  def missRate = _missCount * 1.0 / (_hitCount + _missCount)
 
   def put(key: K, value: V) {
     try {
@@ -48,7 +48,7 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
       if (isFull) {
         pruneCache()
       }
-      cacheMap.put(key, value)
+      underlying.put(key, value)
     } finally {
       writeLock.unlock()
     }
@@ -58,7 +58,7 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
     try {
       readLock.lock()
 
-      cacheMap.get(key) match {
+      underlying.get(key) match {
         case None =>
           _missCount += 1
           None
@@ -75,13 +75,13 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
     var keys = List[K]()
 
     var count = 0
-    val entries = cacheMap.iterator
+    val entries = underlying.iterator
     while (count < pruneSize && entries.hasNext) {
       keys ::= entries.next()._1
       count += 1
     }
 
-    keys foreach cacheMap.remove
+    keys foreach underlying.remove
     count
   }
 
@@ -94,12 +94,12 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
     }
   }
 
-  private def isFull = cacheMap.size >= capacity
+  private def isFull = underlying.size >= capacity
 
   def remove(keys: Seq[K]) {
     try {
       writeLock.lock()
-      keys foreach cacheMap.remove
+      keys foreach underlying.remove
     } finally {
       writeLock.unlock()
     }
@@ -108,7 +108,7 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
   def remove(key: K) {
     try {
       writeLock.lock()
-      cacheMap.remove(key)
+      underlying.remove(key)
     } finally {
       writeLock.unlock()
     }
@@ -117,15 +117,15 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
   def clear() {
     try {
       writeLock.lock()
-      cacheMap.clear()
+      underlying.clear()
     } finally {
       writeLock.unlock()
     }
   }
 
-  def size = cacheMap.size
+  def size = underlying.size
 
-  def isEmpty = cacheMap.isEmpty
+  def isEmpty = underlying.isEmpty
 
-  override def toString = cacheMap.toString
+  override def toString = underlying.toString
 }

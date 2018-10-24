@@ -247,4 +247,6 @@ final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(im
     table.write(toUpsert.map { case (key, value) => TKeyVal(key.bytes, value.value, _currWritingBlockNumber) }, topic)
     this
   }
+
+  def cacheHitRate = table.cacheHitRate(topic)
 }

@@ -27,7 +27,7 @@ object Build extends sbt.Build {
     .dependsOn(kesque)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.snappy)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.snappy ++ Dependencies.caffeine)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
     .settings(Packaging.settings)
@@ -38,7 +38,7 @@ object Build extends sbt.Build {
   lazy val kesque = Project("kesque", file("kesque"))
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.kafka ++ Dependencies.spongycastle)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.kafka ++ Dependencies.spongycastle ++ Dependencies.caffeine)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
 
@@ -111,6 +111,8 @@ object Dependencies {
 
   val snappy = Seq("org.xerial.snappy" % "snappy-java" % "1.1.7")
 
+  val caffeine = Seq("com.github.ben-manes.caffeine" % "caffeine" % "2.6.2")
+ 
   val others = Seq(
     "ch.megard" %% "akka-http-cors" % "0.2.1",
     "org.json4s" %% "json4s-native" % "3.5.1",
@@ -118,8 +120,7 @@ object Dependencies {
     "org.consensusresearch" %% "scrypto" % "1.2.0-RC3",
     "org.jline" % "jline" % "3.1.2",
     "commons-io" % "commons-io" % "2.5",
-    "com.google.code.findbugs" % "jsr305" % "3.0.2" % Provided,
-    "com.github.ben-manes.caffeine" % "caffeine" % "2.6.1"
+    "com.google.code.findbugs" % "jsr305" % "3.0.2" % Provided 
   )
 
 

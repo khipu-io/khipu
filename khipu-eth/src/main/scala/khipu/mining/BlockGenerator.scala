@@ -54,7 +54,7 @@ final class BlockGenerator(
           val block = Block(header, body)
 
           val prepared = ledger.prepareBlock(block, validators) map {
-            case BlockPreparationResult(prepareBlock, BlockResult(_, gasUsed, receipts, _, _), stateRoot) =>
+            case BlockPreparationResult(prepareBlock, BlockResult(_, gasUsed, receipts, _), stateRoot) =>
               val receiptsLogs = BloomFilter.EmptyBloomFilter.toArray +: receipts.map(_.logsBloomFilter.toArray)
               val bloomFilter = ByteString(BytesUtil.or(receiptsLogs: _*))
 

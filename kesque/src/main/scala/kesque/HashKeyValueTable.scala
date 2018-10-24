@@ -31,7 +31,7 @@ final class HashKeyValueTable private[kesque] (
   /* time to key table, should be the first topic to initially create it */
   private var timeIndex = Array.ofDim[Array[Byte]](200)
 
-  private val caches = Array.ofDim[FIFOCache[Hash, (TVal, Int)]](topics.length)
+  private val caches = Array.ofDim[CaffeineCache[Hash, (TVal, Int)]](topics.length)
   private val (topicIndex, _) = topics.foldLeft(Map[String, Int](), 0) {
     case ((map, i), topic) => (map + (topic -> i), i + 1)
   }
@@ -56,7 +56,7 @@ final class HashKeyValueTable private[kesque] (
     var n = 0
     while (n < topics.length) {
       val topic = topics(n)
-      caches(n) = new FIFOCache[Hash, (TVal, Int)](cacheSize)
+      caches(n) = new CaffeineCache[Hash, (TVal, Int)](cacheSize, isRecordingStats = true)
 
       tasks = new LoadIndexesTask(n, topic) :: tasks
 
@@ -207,7 +207,7 @@ final class HashKeyValueTable private[kesque] (
             records ::= rec
             keyToPrevOffsets += hash -> prevOffset
           } else {
-            debug(s"$topic: value not changed. cache: hit ${caches(topicIdx).hitCount}, miss ${caches(topicIdx).missCount}, size ${caches(topicIdx).size}")
+            debug(s"$topic: value not changed. cache: hit ${caches(topicIdx).hitRate}, miss ${caches(topicIdx).missRate}}")
           }
         case None =>
           val rec = if (timestamp < 0) new SimpleRecord(key, value) else new SimpleRecord(timestamp, key, value)
@@ -360,4 +360,5 @@ final class HashKeyValueTable private[kesque] (
     }
   }
 
+  def cacheHitRate(topic: String) = caches(topicIndex(topic)).hitRate
 }
