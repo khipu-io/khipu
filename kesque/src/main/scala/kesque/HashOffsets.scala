@@ -92,13 +92,13 @@ final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.7
   private val readLock = lock.readLock
   private val writeLock = lock.writeLock
 
-  def get(key: Int, valueIndex: Int): Array[V] = {
+  def get(key: Int, col: Int): Array[V] = {
     try {
       readLock.lock()
 
-      multipleValuesMap.get(key, valueIndex) match {
+      multipleValuesMap.get(key, col) match {
         case IntIntsMap.NO_VALUE =>
-          singleValueMap.get(key, valueIndex) match {
+          singleValueMap.get(key, col) match {
             case IntIntMap.NO_VALUE => IntIntsMap.NO_VALUE
             case value              => Array(value)
           }
@@ -109,62 +109,62 @@ final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.7
     }
   }
 
-  def put(key: Int, value: V, valueIndex: Int): Array[V] = {
+  def put(key: Int, value: V, col: Int): Array[V] = {
     try {
       writeLock.lock()
 
-      multipleValuesMap.get(key, valueIndex) match {
+      multipleValuesMap.get(key, col) match {
         case IntIntsMap.NO_VALUE =>
-          singleValueMap.get(key, valueIndex) match {
-            case IntIntMap.NO_VALUE => Array(singleValueMap.put(key, value, valueIndex))
+          singleValueMap.get(key, col) match {
+            case IntIntMap.NO_VALUE => Array(singleValueMap.put(key, value, col))
             case existed =>
-              singleValueMap.remove(key, valueIndex)
-              multipleValuesMap.put(key, existed, valueIndex)
-              multipleValuesMap.put(key, value, valueIndex)
+              singleValueMap.remove(key, col)
+              multipleValuesMap.put(key, existed, col)
+              multipleValuesMap.put(key, value, col)
           }
         case _ =>
-          multipleValuesMap.put(key, value, valueIndex)
+          multipleValuesMap.put(key, value, col)
       }
     } finally {
       writeLock.unlock()
     }
   }
 
-  def removeValue(key: Int, value: V, valueIndex: Int): Array[V] = {
+  def removeValue(key: Int, value: V, col: Int): Array[V] = {
     try {
       writeLock.lock()
 
-      multipleValuesMap.get(key, valueIndex) match {
+      multipleValuesMap.get(key, col) match {
         case IntIntsMap.NO_VALUE =>
-          singleValueMap.get(key, valueIndex) match {
+          singleValueMap.get(key, col) match {
             case IntIntMap.NO_VALUE => IntIntsMap.NO_VALUE
-            case existedValue       => Array(singleValueMap.remove(key, valueIndex))
+            case existedValue       => Array(singleValueMap.remove(key, col))
           }
-        case _ => multipleValuesMap.removeValue(key, value, valueIndex)
+        case _ => multipleValuesMap.removeValue(key, value, col)
       }
     } finally {
       writeLock.unlock()
     }
   }
 
-  def replace(key: Int, toRemove: V, toPut: V, valueIndex: Int): Array[V] = {
+  def replace(key: Int, toRemove: V, toPut: V, col: Int): Array[V] = {
     try {
       writeLock.lock()
 
       if (toRemove == toPut) {
         Array(toPut)
       } else {
-        multipleValuesMap.get(key, valueIndex) match {
+        multipleValuesMap.get(key, col) match {
           case IntIntsMap.NO_VALUE =>
-            singleValueMap.get(key, valueIndex) match {
-              case IntIntMap.NO_VALUE => Array(singleValueMap.put(key, toPut, valueIndex))
+            singleValueMap.get(key, col) match {
+              case IntIntMap.NO_VALUE => Array(singleValueMap.put(key, toPut, col))
               case existed =>
-                singleValueMap.remove(key, valueIndex)
-                multipleValuesMap.put(key, existed, valueIndex)
-                multipleValuesMap.replace(key, toRemove, toPut, valueIndex)
+                singleValueMap.remove(key, col)
+                multipleValuesMap.put(key, existed, col)
+                multipleValuesMap.replace(key, toRemove, toPut, col)
             }
           case _ =>
-            multipleValuesMap.replace(key, toRemove, toPut, valueIndex)
+            multipleValuesMap.replace(key, toRemove, toPut, col)
         }
       }
     } finally {
@@ -172,17 +172,17 @@ final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.7
     }
   }
 
-  def remove(key: Int, valueIndex: Int): Array[V] = {
+  def remove(key: Int, col: Int): Array[V] = {
     try {
       writeLock.lock()
 
-      multipleValuesMap.remove(key, valueIndex) match {
+      multipleValuesMap.remove(key, col) match {
         case IntIntsMap.NO_VALUE =>
-          singleValueMap.remove(key, valueIndex) match {
+          singleValueMap.remove(key, col) match {
             case IntIntMap.NO_VALUE => IntIntsMap.NO_VALUE
             case existedValue       => Array(existedValue)
           }
-        case _ => multipleValuesMap.remove(key, valueIndex)
+        case _ => multipleValuesMap.remove(key, col)
       }
     } finally {
       writeLock.unlock()

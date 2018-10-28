@@ -46,7 +46,7 @@ trait RegularSyncService { _: SyncService =>
   import util.Config.Sync._
 
   private def tf(n: Int) = "%1$4d".format(n) // tx
-  private def xf(n: Double) = "%1$5.1f".format(n) // tps
+  private def xf(n: Double) = "%1$6.1f".format(n) // tps
   private def pf(n: Double) = "%1$6.2f".format(n) // percent
   private def pf2(n: Double) = "%1$5.2f".format(n) // percent less than 100%
   private def ef(n: Double) = "%1$6.3f".format(n) // elapse time

@@ -87,9 +87,9 @@ object IntIntsMap {
 }
 
 /**
- * It's acutally an Int to Ints map
+ * It's actually an Int to Ints map
  * We introduce one extra pairs of fields - for key=0, which is used as 'used' flag
- * Memoey usage:
+ * Memory usage:
  *   Int -> Int[]
  * Key (Int) in bytes: 4
  * Value (Int[]) in bytes: (16(reference) + 4(length) + 4(align)) + 4 * N = 24 + 4 * N
@@ -130,19 +130,19 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
 
   expendCapacity(isInit = true)
 
-  def get(key: Int, valueIndex: Int): Array[V] = {
+  def get(key: Int, col: Int): Array[V] = {
     if (key == FREE_KEY) {
-      if (m_hasFreeKey(valueIndex)) m_freeValue(valueIndex) else NO_VALUE
+      if (m_hasFreeKey(col)) m_freeValue(col) else NO_VALUE
     } else {
       val idx = getReadIndex(key)
-      if (idx != -1) m_values(valueIndex)(idx) else NO_VALUE
+      if (idx != -1) m_values(col)(idx) else NO_VALUE
     }
   }
 
-  def put(key: Int, value: V, valueIndex: Int): Array[V] = {
-    val oldValues = get(key, valueIndex)
+  def put(key: Int, value: V, col: Int): Array[V] = {
+    val oldValues = get(key, col)
     if (oldValues == NO_VALUE) {
-      put(key, Array(value), valueIndex)
+      put(key, Array(value), col)
     } else {
       val existed = findValue(oldValues, value)
       if (existed != -1) { // already existed do nothing
@@ -151,19 +151,19 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         val newValues = Array.ofDim[V](oldValues.length + 1)
         System.arraycopy(oldValues, 0, newValues, 0, oldValues.length)
         newValues(newValues.length - 1) = value
-        put(key, newValues, valueIndex)
+        put(key, newValues, col)
       }
     }
   }
 
-  private def put(key: Int, value: Array[V], valueIndex: Int): Array[V] = {
+  private def put(key: Int, value: Array[V], col: Int): Array[V] = {
     if (key == FREE_KEY) {
-      val ret = m_freeValue(valueIndex)
-      if (!m_hasFreeKey(valueIndex)) {
+      val ret = m_freeValue(col)
+      if (!m_hasFreeKey(col)) {
         m_size += 1
       }
-      m_hasFreeKey(valueIndex) = true
-      m_freeValue(valueIndex) = value
+      m_hasFreeKey(col) = true
+      m_freeValue(col) = value
       ret
     } else {
       var idx = getPutIndex(key)
@@ -171,37 +171,37 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         rehash()
         idx = getPutIndex(key)
       }
-      val prev = m_values(valueIndex)(idx)
+      val prev = m_values(col)(idx)
       if (m_keys(idx) != key) {
         m_keys(idx) = key
-        m_values(valueIndex)(idx) = value
+        m_values(col)(idx) = value
         m_size += 1
         if (m_size >= m_threshold) {
           rehash()
         }
       } else { // it means used cell with our key
         assert(m_keys(idx) == key)
-        m_values(valueIndex)(idx) = value
+        m_values(col)(idx) = value
       }
       prev
     }
   }
 
-  def removeValue(key: Int, value: V, valueIndex: Int): Array[V] = {
-    val oldValues = get(key, valueIndex)
+  def removeValue(key: Int, value: V, col: Int): Array[V] = {
+    val oldValues = get(key, col)
     if (oldValues == NO_VALUE) {
       NO_VALUE
     } else {
       val existed = findValue(oldValues, value)
       if (existed != -1) { // existed
         if (oldValues.length == 1) { // the existed only one will be removed
-          remove(key, valueIndex)
+          remove(key, col)
         } else {
           val newLen = oldValues.length - 1
           val xs = Array.ofDim[V](newLen)
           System.arraycopy(oldValues, 0, xs, 0, existed)
           System.arraycopy(oldValues, existed + 1, xs, existed, newLen - existed)
-          put(key, xs, valueIndex)
+          put(key, xs, col)
 
           Array(value)
         }
@@ -211,10 +211,10 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     }
   }
 
-  def replace(key: Int, toRemove: V, toPut: V, valueIndex: Int): Array[V] = {
-    val oldValues = get(key, valueIndex)
+  def replace(key: Int, toRemove: V, toPut: V, col: Int): Array[V] = {
+    val oldValues = get(key, col)
     if (oldValues == NO_VALUE) {
-      put(key, Array(toPut), valueIndex)
+      put(key, Array(toPut), col)
     } else {
       val (toRemoveExisted, toPutExisted) = findValues(oldValues, toRemove, toPut)
       if (toRemoveExisted != -1) {
@@ -226,7 +226,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
             val newValues = Array.ofDim[V](newLen)
             System.arraycopy(oldValues, 0, newValues, 0, toRemoveExisted)
             System.arraycopy(oldValues, toRemoveExisted + 1, newValues, toRemoveExisted, newLen - toRemoveExisted)
-            put(key, newValues, valueIndex)
+            put(key, newValues, col)
 
             Array(toPut)
           }
@@ -236,7 +236,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
           System.arraycopy(oldValues, 0, newValues, 0, toRemoveExisted)
           System.arraycopy(oldValues, toRemoveExisted + 1, newValues, toRemoveExisted, newLen - 1 - toRemoveExisted)
           newValues(newLen - 1) = toPut
-          put(key, newValues, valueIndex)
+          put(key, newValues, col)
 
           Array(toPut)
         }
@@ -247,7 +247,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
           val newValues = Array.ofDim[V](oldValues.length + 1)
           System.arraycopy(oldValues, 0, newValues, 0, oldValues.length)
           newValues(newValues.length - 1) = toPut
-          put(key, newValues, valueIndex)
+          put(key, newValues, col)
 
           Array(toPut)
         }
@@ -289,14 +289,14 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     (idx1, idx2)
   }
 
-  def remove(key: Int, valueIndex: Int): Array[V] = {
+  def remove(key: Int, col: Int): Array[V] = {
     if (key == FREE_KEY) {
-      if (!m_hasFreeKey(valueIndex)) {
+      if (!m_hasFreeKey(col)) {
         NO_VALUE
       } else {
-        m_hasFreeKey(valueIndex) = false
-        val ret = m_freeValue(valueIndex)
-        m_freeValue(valueIndex) = NO_VALUE
+        m_hasFreeKey(col) = false
+        val ret = m_freeValue(col)
+        m_freeValue(col) = NO_VALUE
         m_size -= 1
         ret
       }
@@ -305,9 +305,9 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       if (idx == -1) {
         NO_VALUE
       } else {
-        val res = m_values(valueIndex)(idx)
-        m_values(valueIndex)(idx) = NO_VALUE
-        shiftKeys(idx, valueIndex)
+        val res = m_values(col)(idx)
+        m_values(col)(idx) = NO_VALUE
+        shiftKeys(idx, col)
         m_size -= 1
         res
       }
@@ -316,7 +316,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
 
   def size = m_size
 
-  private def shiftKeys(_pos: Int, valueIndex: Int): Int = {
+  private def shiftKeys(_pos: Int, col: Int): Int = {
     var pos = _pos
     // shift entries with the same hash.
     var last = 0
@@ -331,7 +331,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         k = keys(pos)
         if (k == FREE_KEY) {
           keys(last) = FREE_KEY
-          m_values(valueIndex)(last) = NO_VALUE
+          m_values(col)(last) = NO_VALUE
           return last
         }
         slot = getStartIndex(k) // calculate the starting slot for the current key
@@ -342,7 +342,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         }
       }
       keys(last) = k
-      m_values(valueIndex)(last) = m_values(valueIndex)(pos)
+      m_values(col)(last) = m_values(col)(pos)
     }
 
     // should not be here

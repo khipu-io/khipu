@@ -129,11 +129,11 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
 
   expendCapacity(isInit = true)
 
-  def get(key: Int, valueIndex: Int): Int = {
+  def get(key: Int, col: Int): Int = {
     var ptr = getStartIndex(key)
 
     if (key == FREE_KEY) {
-      return if (m_hasFreeKey(valueIndex)) m_freeValue(valueIndex) else NO_VALUE
+      return if (m_hasFreeKey(col)) m_freeValue(col) else NO_VALUE
     }
 
     var k = m_data(ptr)
@@ -141,7 +141,7 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       return NO_VALUE // end of chain already
     }
     if (k == key) { // we check FREE prior to this call
-      return m_data(ptr + 1 + valueIndex)
+      return m_data(ptr + 1 + col)
     }
 
     while (true) {
@@ -151,7 +151,7 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         return NO_VALUE
       }
       if (k == key) {
-        return m_data(ptr + 1 + valueIndex)
+        return m_data(ptr + 1 + col)
       }
     }
 
@@ -159,15 +159,15 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     return NO_VALUE
   }
 
-  def put(key: Int, value: Int, valueIndex: Int): Int = {
+  def put(key: Int, value: Int, col: Int): Int = {
     if (key == FREE_KEY) {
-      val ret = m_freeValue(valueIndex)
-      if (!m_hasFreeKey(valueIndex)) {
+      val ret = m_freeValue(col)
+      if (!m_hasFreeKey(col)) {
         m_size += 1
       }
 
-      m_hasFreeKey(valueIndex) = true
-      m_freeValue(valueIndex) = value
+      m_hasFreeKey(col) = true
+      m_freeValue(col) = value
       return ret
     }
 
@@ -175,15 +175,15 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     var k = m_data(ptr)
     if (k == FREE_KEY) { // end of chain already
       m_data(ptr) = key
-      m_data(ptr + 1 + valueIndex) = value
+      m_data(ptr + 1 + col) = value
       if (m_size >= m_threshold)
         rehash()
       else
         m_size += 1
       return NO_VALUE
     } else if (k == key) { // we check FREE prior to this call
-      val ret = m_data(ptr + 1 + valueIndex)
-      m_data(ptr + 1 + valueIndex) = value
+      val ret = m_data(ptr + 1 + col)
+      m_data(ptr + 1 + col) = value
       return ret
     }
 
@@ -192,15 +192,15 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       k = m_data(ptr)
       if (k == FREE_KEY) {
         m_data(ptr) = key
-        m_data(ptr + 1 + valueIndex) = value
+        m_data(ptr + 1 + col) = value
         if (m_size >= m_threshold)
           rehash()
         else
           m_size += 1
         return NO_VALUE
       } else if (k == key) {
-        val ret = m_data(ptr + 1 + valueIndex)
-        m_data(ptr + 1 + valueIndex) = value
+        val ret = m_data(ptr + 1 + col)
+        m_data(ptr + 1 + col) = value
         return ret
       }
     }
@@ -209,19 +209,19 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     return NO_VALUE
   }
 
-  def remove(key: Int, valueIndex: Int): Int = {
+  def remove(key: Int, col: Int): Int = {
     if (key == FREE_KEY) {
-      if (!m_hasFreeKey(valueIndex))
+      if (!m_hasFreeKey(col))
         return NO_VALUE
-      m_hasFreeKey(valueIndex) = false
+      m_hasFreeKey(col) = false
       m_size -= 1
-      return m_freeValue(valueIndex) // value is not cleaned
+      return m_freeValue(col) // value is not cleaned
     }
 
     var ptr = getStartIndex(key)
     var k = m_data(ptr)
     if (k == key) { // we check FREE prior to this call
-      val res = m_data(ptr + 1 + valueIndex)
+      val res = m_data(ptr + 1 + col)
       shiftKeys(ptr)
       m_size -= 1
       return res
@@ -232,7 +232,7 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       ptr = getNextIndex(ptr)
       k = m_data(ptr)
       if (k == key) {
-        val res = m_data(ptr + 1 + valueIndex)
+        val res = m_data(ptr + 1 + col)
         shiftKeys(ptr)
         m_size -= 1
         return res
