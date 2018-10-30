@@ -162,7 +162,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
   }
 
   override def simulateTransaction(stx: SignedTransaction, blockHeader: BlockHeader)(implicit executor: ExecutionContext): TxResult = {
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
 
     val gasLimit = stx.tx.gasLimit
     val evmCfg = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
@@ -181,12 +181,12 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val gasUsed = stx.tx.gasLimit - totalGasToRefund
     val txFee = UInt256(gasUsed) * stx.tx.gasPrice
 
-    val elapsed = System.currentTimeMillis - start
+    val elapsed = System.nanoTime - start
     TxResult(stx, result.world, gasUsed, txFee, result.txLogs, result.addressesTouched, result.returnData, result.error, result.isRevert, result.parallelRaceConditions)
   }
 
   def validateBlocksBeforeExecution(blocks: Seq[Block], validators: Validators)(implicit executor: ExecutionContext): Future[(Vector[Block], Option[BlockExecutionError])] = {
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
 
     val blocksToValidate = blocks.map(block => block.header.hash -> block).toMap
 
@@ -205,7 +205,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
         }
       }
 
-      log.debug(s"pre-validated ${validBlocks.size} blocks in parallel in ${(System.currentTimeMillis - start)}ms ${errorOpt.fold("")(x => x.toString)}")
+      log.debug(s"pre-validated ${validBlocks.size} blocks in parallel in ${(System.nanoTime - start) / 1000000}ms ${errorOpt.fold("")(x => x.toString)}")
       (validBlocks, errorOpt)
     }
   }
@@ -223,20 +223,20 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
    * Execute and validate on minned block
    */
   override def executeBlock(block: Block, validators: Validators)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
-    val start1 = System.currentTimeMillis
+    val start1 = System.nanoTime
     val parallelResult = executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = true && !blockchainConfig.isDebugTraceEnabled) map {
       case Right(blockResult) =>
-        log.debug(s"${block.header.number} parallel-executed in ${System.currentTimeMillis - start1}ms")
+        log.debug(s"${block.header.number} parallel-executed in ${(System.nanoTime - start1) / 1000000}ms")
 
-        val start2 = System.currentTimeMillis
+        val start2 = System.nanoTime
         val worldRewardPaid = payBlockReward(block)(blockResult.world)
         val worldCommitted = worldRewardPaid.commit() // State root hash needs to be up-to-date for validateBlockAfterExecution
-        log.debug(s"${block.header.number} committed in ${System.currentTimeMillis - start2}ms")
+        log.debug(s"${block.header.number} committed in ${(System.nanoTime - start2) / 1000000}ms")
 
-        val start3 = System.currentTimeMillis
+        val start3 = System.nanoTime
         validateBlockAfterExecution(block, worldCommitted.stateRootHash, blockResult.receipts, blockResult.gasUsed, validators.blockValidator) match {
           case Right(_) =>
-            log.debug(s"${block.header.number} post-validated in ${System.currentTimeMillis - start3}ms")
+            log.debug(s"${block.header.number} post-validated in ${(System.nanoTime - start3) / 1000000}ms")
             Right(blockResult, worldCommitted)
 
           case Left(error) => Left(error)
@@ -251,10 +251,10 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       case left @ Left(error) =>
         log.debug(s"in parallel failed with error $error, try sequential ...")
 
-        val start1 = System.currentTimeMillis
+        val start1 = System.nanoTime
         executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = false) map {
           case Right(blockResult) =>
-            log.debug(s"${block.header.number} sequential-executed in ${System.currentTimeMillis - start1}ms")
+            log.debug(s"${block.header.number} sequential-executed in ${(System.nanoTime - start1) / 1000000}ms")
 
             val worldRewardPaid = payBlockReward(block)(blockResult.world)
             val worldCommitted = worldRewardPaid.commit() // State root hash needs to be up-to-date for validateBlockAfterExecution
@@ -340,7 +340,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
   )(initialWorldFun: => BlockWorldState)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
     val nTx = signedTransactions.size
 
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
     blockchain.storages.accountNodeDataSource.clock.start()
     blockchain.storages.storageNodeDataSource.clock.start()
     blockchain.storages.evmCodeDataSource.clock.start()
@@ -366,7 +366,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
       val (results, elapses) = rs.unzip
       val elapsed = elapses.sum
-      log.debug(s"${blockHeader.number} executed parallel in ${(System.currentTimeMillis - start)}ms, db get ${100.0 * dsGetElapsed1 / elapsed}%")
+      log.debug(s"${blockHeader.number} executed parallel in ${(System.nanoTime - start) / 1000000}ms, db get ${100.0 * dsGetElapsed1 / elapsed}%")
 
       var currWorld: Option[BlockWorldState] = None
       var txError: Option[BlockExecutionError] = None
@@ -376,7 +376,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       // re-execute tx under prevWorld, commit prevWorld to get all nodes exist, see BlockWorldState.getStorage and getStateRoott
       var reExecutedElapsed = 0L
       def reExecute(stx: SignedTransaction, prevWorld: BlockWorldState) = {
-        var start = System.currentTimeMillis
+        var start = System.nanoTime
         log.debug(s"${stx.hash} re-executing")
         // should commit prevWorld's state, since we may need to get newest account/storage/code by new state's hash
         validateAndExecuteTransaction(stx, blockHeader, stxValidator, evmCfg)(prevWorld.commit().withTx(Some(stx))) match {
@@ -385,7 +385,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
             currWorld = Some(newTxResult.world)
             txResults = txResults :+ newTxResult
         }
-        reExecutedElapsed += (System.currentTimeMillis - start)
+        reExecutedElapsed += System.nanoTime - start
       }
 
       val itr = results.iterator
@@ -439,14 +439,14 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       } else {
         0.0
       }
-      val dbTimePerc = 100.0 * (dsGetElapsed1 + dsGetElapsed2) / (elapsed + reExecutedElapsed)
+      val dbReadTimePerc = 100.0 * (dsGetElapsed1 + dsGetElapsed2) / (elapsed + reExecutedElapsed)
 
       log.debug(s"${blockHeader.number} re-executed in ${reExecutedElapsed}ms, ${100 - parallelRate}% with race conditions, db get ${100.0 * dsGetElapsed2 / reExecutedElapsed}%")
       log.debug(s"${blockHeader.number} touched accounts:\n ${currWorld.map(_.touchedAccounts.mkString("\n", "\n", "\n")).getOrElse("")}")
 
       txError match {
         case Some(error) => Left(error)
-        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbTimePerc, cacheHitRates))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
+        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbReadTimePerc, cacheHitRates))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
       }
     } andThen {
       case Success(_) =>
@@ -540,7 +540,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     blockHeader: BlockHeader,
     evmCfg:      EvmConfig
   )(world: BlockWorldState): TxResult = {
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
 
     // TODO catch prepareProgramContext's throwable (MPTException etc from mtp) here
     val (checkpoint, context) = prepareProgramContext(stx, blockHeader, evmCfg)(world)
@@ -572,7 +572,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     //     | - Execution gas paid to miner: $txFee""".stripMargin
     //)
 
-    val elapsed = System.currentTimeMillis - start
+    val elapsed = System.nanoTime - start
     TxResult(stx, worldDeletedAccounts, gasUsed, txFee, result.txLogs, result.addressesTouched, result.returnData, result.error, result.isRevert, result.parallelRaceConditions)
   }
 

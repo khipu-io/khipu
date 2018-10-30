@@ -1,14 +1,14 @@
 package khipu.util
 
 final class Clock {
-  private var _elasped = 0L
+  private var _elasped = 0L // in nano
   def elasped: Long = _elasped
 
   def start() {
     _elasped = 0L
   }
 
-  def elapse(ms: Long) {
-    _elasped += ms
+  def elapse(nano: Long) {
+    _elasped += nano
   }
 }

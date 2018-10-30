@@ -81,7 +81,7 @@ final class HashKeyValueTable private[kesque] (
     val indexTopic = indexTopics(col)
 
     info(s"Loading index of ${topics(col)}")
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
 
     var count = 0
     db.iterateOver(indexTopic, 0, fetchMaxBytesInLoadOffsets) {
@@ -92,14 +92,14 @@ final class HashKeyValueTable private[kesque] (
         }
     }
 
-    info(s"Loaded index of ${topics(col)} in ${System.currentTimeMillis - start} ms, count $count, size ${hashOffsets.size}")
+    info(s"Loaded index of ${topics(col)} in ${(System.nanoTime - start) / 1000000} ms, count $count, size ${hashOffsets.size}")
   }
 
   private def loadTimeIndex() {
     val topic = topics(0)
 
     info(s"Loading time index from $topic")
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
 
     var count = 0
     db.iterateOver(topic, 0, fetchMaxBytesInLoadOffsets) {
@@ -110,7 +110,7 @@ final class HashKeyValueTable private[kesque] (
         }
     }
 
-    info(s"Loaded time index from $topic in ${System.currentTimeMillis - start} ms, count $count")
+    info(s"Loaded time index from $topic in ${(System.nanoTime - start) / 1000000} ms, count $count")
   }
 
   def putTimeToKey(timestamp: Long, key: Array[Byte]) {
@@ -160,13 +160,17 @@ final class HashKeyValueTable private[kesque] (
             case offsets =>
               var foundValue: Option[TVal] = None
               var foundOffset = Int.MinValue
-              var i = offsets.length - 1 // loop backward to find newest one  
+              var i = offsets.length - 1 // loop backward to find the newest one  
               while (i >= 0 && foundValue.isEmpty) {
                 val offset = offsets(i)
                 val (topicPartition, result) = db.read(topic, offset, fetchMaxBytes).head
                 val recs = result.info.records.records.iterator
-                while (recs.hasNext) { // NOTE: the records are offset reversed !!
+                // NOTE: the records usally do not start from the fecth-offset, 
+                // the expected record may be near the tail of recs
+                //debug(s"======== $offset ${result.info.fetchOffsetMetadata} ")
+                while (recs.hasNext) {
                   val rec = recs.next
+                  //debug(s"${rec.offset}")
                   if (rec.offset == offset && Arrays.equals(kesque.getBytes(rec.key), key)) {
                     foundOffset = offset
                     foundValue = if (rec.hasValue) Some(TVal(kesque.getBytes(rec.value), rec.timestamp)) else None

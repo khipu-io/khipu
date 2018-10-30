@@ -125,9 +125,9 @@ final class RLPxStage(
     private def encodeMessages(messageCodec: MessageCodec, messages: Iterable[MessageSerializable], shouldDisconnect: Boolean = false, buffer: ByteStringBuilder = ByteString.createBuilder) = {
       messages.foldLeft(shouldDisconnect, buffer) {
         case ((disconnect, acc), message) =>
-          val start = System.currentTimeMillis
+          val start = System.nanoTime
           val encodedMsg = messageCodec.encodeMessage(message)
-          val duration = System.currentTimeMillis - start
+          val duration = (System.nanoTime - start) / 1000000
           if (messages.nonEmpty && duration > decodeTimeoutInMillis) {
             log.warning(s"[rlpx] Encoded ${message.getClass.getName} in $duration ms, will send to ${peer.id}")
           }
@@ -415,9 +415,9 @@ final class RLPxStage(
 
           case Right(data) =>
             //log.debug(s"got $data")
-            val start = System.currentTimeMillis
+            val start = System.nanoTime
             val (messages, failed) = messageCodec.decodeMessages(data)
-            val duration = System.currentTimeMillis - start
+            val duration = (System.nanoTime - start) / 1000000.0
             if (messages.nonEmpty && duration > decodeTimeoutInMillis) {
               log.warning(s"[rlpx] Decoded ${messages.map(x => x.getClass.getName).mkString("(", ",", ")")} in $duration ms")
             }

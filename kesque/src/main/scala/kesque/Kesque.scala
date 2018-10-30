@@ -35,7 +35,7 @@ object Kesque {
     val props = org.apache.kafka.common.utils.Utils.loadProps(configFile.getAbsolutePath)
     val kesque = new Kesque(props)
     val topic = "kesque-test"
-    val table = kesque.getTable(Array(topic), fetchMaxBytes = 262144, CompressionType.SNAPPY)
+    val table = kesque.getTable(Array(topic), fetchMaxBytes = 4096, CompressionType.SNAPPY)
 
     kesque.deleteTable(topic)
     (1 to 2) foreach { i => testWrite(table, topic, i) }

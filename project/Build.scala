@@ -56,7 +56,7 @@ object Build extends sbt.Build {
     parallelExecution in Test := false,
     scalaVersion := "2.12.7",
     scalacOptions ++= Seq("-unchecked", "-deprecation")
-    //javacOptions ++= Seq("-source", "1.8", "-target", "1.8")  // TODO options cause javadoc fail
+  //javacOptions ++= Seq("-source", "1.8", "-target", "1.8")  // TODO options cause javadoc fail
   ) ++ Environment.settings ++ Formatting.settings
 
   lazy val noPublishing = Seq(
@@ -112,7 +112,7 @@ object Dependencies {
   val snappy = Seq("org.xerial.snappy" % "snappy-java" % "1.1.7")
 
   val caffeine = Seq("com.github.ben-manes.caffeine" % "caffeine" % "2.6.2")
- 
+
   val others = Seq(
     "ch.megard" %% "akka-http-cors" % "0.2.1",
     "org.json4s" %% "json4s-native" % "3.5.1",
@@ -120,9 +120,8 @@ object Dependencies {
     "org.consensusresearch" %% "scrypto" % "1.2.0-RC3",
     "org.jline" % "jline" % "3.1.2",
     "commons-io" % "commons-io" % "2.5",
-    "com.google.code.findbugs" % "jsr305" % "3.0.2" % Provided 
+    "com.google.code.findbugs" % "jsr305" % "3.0.2" % Provided
   )
-
 
   val log = Seq(
     "org.slf4j" % "slf4j-api" % SLF4J_VERSION,

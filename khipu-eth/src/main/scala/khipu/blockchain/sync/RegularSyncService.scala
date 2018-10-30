@@ -50,7 +50,7 @@ trait RegularSyncService { _: SyncService =>
   private def pf(n: Double) = "%1$6.2f".format(n) // percent
   private def pf2(n: Double) = "%1$5.2f".format(n) // percent less than 100%
   private def ef(n: Double) = "%1$6.3f".format(n) // elapse time
-  private def gf(n: Double) = "%1$6.2f".format(n) // gas
+  private def gf(n: Double) = "%1$7.2f".format(n) // gas
   private def lf(n: Int) = "%1$6d".format(n) // payload
 
   // Should keep newer block to be at the front
@@ -278,10 +278,10 @@ trait RegularSyncService { _: SyncService =>
             throw new IllegalStateException(s"No total difficulty for the latest block with number ${blocks.head.header.number - 1} (and hash ${blocks.head.header.parentHash.hexString})")
           }
 
-          val start = System.currentTimeMillis
+          val start = System.nanoTime
           executeAndInsertBlocks(preValidBlocks, parentTd, preValidBlocks.size > 1) andThen {
             case Success((_, newBlocks, errors)) =>
-              val elapsed = (System.currentTimeMillis - start) / 1000.0
+              val elapsed = (System.nanoTime - start) / 1000000000.0
 
               if (newBlocks.nonEmpty) {
                 val (nTx, _gasUsed, nTxInParallel) = newBlocks.foldLeft((0, 0L, 0)) {
@@ -405,18 +405,18 @@ trait RegularSyncService { _: SyncService =>
 
   private def executeAndInsertBlock(block: Block, parentTd: UInt256, isBatch: Boolean): Future[Either[BlockExecutionError, NewBlock]] = {
     try {
-      val start = System.currentTimeMillis
+      val start = System.nanoTime
       ledger.executeBlock(block, validators) map {
         case Right(BlockResult(world, _, receipts, stats)) =>
           val newTd = parentTd + block.header.difficulty
 
-          val start1 = System.currentTimeMillis
+          val start1 = System.nanoTime
           world.persist()
           blockchain.saveBlock(block)
           blockchain.saveReceipts(block.header.hash, receipts)
           blockchain.saveTotalDifficulty(block.header.hash, newTd)
           appStateStorage.putBestBlockNumber(block.header.number)
-          log.debug(s"${block.header.number} persisted in ${System.currentTimeMillis - start1}ms") // usually less than 20ms
+          log.debug(s"${block.header.number} persisted in ${(System.nanoTime - start1) / 1000000}ms") // usually less than 20ms
 
           pendingTransactionsService ! PendingTransactionsService.RemoveTransactions(block.body.transactionList)
           ommersPool ! OmmersPool.RemoveOmmers((block.header +: block.body.uncleNodesList).toList)
@@ -424,7 +424,7 @@ trait RegularSyncService { _: SyncService =>
           val nTx = block.body.transactionList.size
           val gasUsed = block.header.gasUsed / 1048576.0
           val payloadSize = block.body.transactionList.map(_.tx.payload.size).foldLeft(0)(_ + _)
-          val elapsed = (System.currentTimeMillis - start) / 1000.0
+          val elapsed = (System.nanoTime - start) / 1000000000.0
           val parallel = 100.0 * stats.parallelCount / nTx
           val dbTimePercent = stats.dbReadTimePercent
           val cacheHitRates = stats.cacheHitRates.map(x => s"${pf2(x)}%").mkString(" ")

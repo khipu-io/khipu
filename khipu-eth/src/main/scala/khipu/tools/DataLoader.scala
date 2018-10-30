@@ -54,7 +54,7 @@ final class DataLoader(blockchain: Blockchain)(implicit system: ActorSystem) {
 
   private val loadedEvmcodeKeys = mutable.HashSet[Hash]()
 
-  private val start = System.currentTimeMillis
+  private val start = System.nanoTime
   private var nodeCount = 0
   private var accountCount = 0
   private var storageCount = 0
@@ -109,7 +109,7 @@ final class DataLoader(blockchain: Blockchain)(implicit system: ActorSystem) {
               }
 
               nodeCount += 1
-              val elapsed = (System.currentTimeMillis - start) / 1000
+              val elapsed = (System.nanoTime - start) / 1000000000
               val speed = nodeCount / math.max(1, elapsed)
               println(s"${java.time.LocalTime.now} $nodeCount cache ${blockchain.storages.cacheSize} ${speed}/s")
 
@@ -167,7 +167,7 @@ final class NodeDump(blockchain: Blockchain)(implicit system: ActorSystem) {
   }
 
   private def dumpTopic(fromTopic: String, toTopic: String) {
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
 
     val consumer = new KafkaConsumer[Array[Byte], Array[Byte]](kafkaProps)
     val partition = new TopicPartition(fromTopic, 0)
@@ -189,10 +189,10 @@ final class NodeDump(blockchain: Blockchain)(implicit system: ActorSystem) {
       }
 
       count += nPolled
-      println(s"read $fromTopic ${count} in ${(System.currentTimeMillis - start) / 1000.0}s, nPolled $nPolled")
+      println(s"read $fromTopic ${count} in ${(System.nanoTime - start) / 1000000000.0}s, nPolled $nPolled")
     }
 
-    println(s"loaded keys ${loadedKeys.size} in ${(System.currentTimeMillis - start) / 1000.0}s")
+    println(s"loaded keys ${loadedKeys.size} in ${(System.nanoTime - start) / 1000000000.0}s")
 
     benchmarkLoadFromLevelDb()
   }
@@ -242,12 +242,12 @@ final class NodeDump(blockchain: Blockchain)(implicit system: ActorSystem) {
       random.nextInt(hi - lo) + lo
     }
 
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
     var i = 0
     while (i < keys.length) {
       val key = keys(i)
       val node = nodeKeyValueStorage.get(key)
-      val elapsed = (System.currentTimeMillis - start) / 1000
+      val elapsed = (System.nanoTime - start) / 1000000000
       val speed = i / math.max(1, elapsed)
       println(s"${java.time.LocalTime.now} $i ${speed}/s node $node")
       i += 1
@@ -267,7 +267,7 @@ final class DataFinder()(implicit system: ActorSystem) {
   }
 
   private def find(fromTopic: String) {
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
 
     val consumer = new KafkaConsumer[Array[Byte], Array[Byte]](kafkaProps)
     val partition = new TopicPartition(fromTopic, 0)
@@ -289,10 +289,10 @@ final class DataFinder()(implicit system: ActorSystem) {
       }
 
       count += nPolled
-      println(s"read $fromTopic ${count} in ${(System.currentTimeMillis - start) / 1000.0}s, nPolled $nPolled")
+      println(s"read $fromTopic ${count} in ${(System.nanoTime - start) / 1000000000.0}s, nPolled $nPolled")
     }
 
-    println(s"loaded keys $count in ${(System.currentTimeMillis - start) / 1000.0}s")
+    println(s"loaded keys $count in ${(System.nanoTime - start) / 1000000000.0}s")
   }
 
   private def poll(consumer: KafkaConsumer[Array[Byte], Array[Byte]], producer: KafkaProducer[Array[Byte], Array[Byte]], fromTopic: String): Int = {
@@ -336,7 +336,7 @@ final class DataFinder()(implicit system: ActorSystem) {
 //  def dump() {
 //    println("start dump blocks ...")
 //
-//    var start = System.currentTimeMillis
+//    var start = System.nanoTime
 //    val blockTable = db.getTable(Array("header", "body"), 1024000)
 //
 //    //val headerTable = db.getTable("header")
@@ -367,8 +367,8 @@ final class DataFinder()(implicit system: ActorSystem) {
 //      }
 //
 //      if (blockNumber % 1000 == 0) {
-//        println(s"\ndumped up to $blockNumber in ${(System.currentTimeMillis - start) / 1000.0}s")
-//        start = System.currentTimeMillis
+//        println(s"\ndumped up to $blockNumber in ${(System.nanoTime - start) / 1000000000.0}s")
+//        start = System.nanoTime
 //      }
 //
 //      blockNumber += 1

@@ -180,7 +180,7 @@ object KesqueDataSource {
     println("key size: " + records.size)
 
     val reportCount = 1000
-    var start = System.currentTimeMillis
+    var start = System.nanoTime
     var count = 0
     records foreach {
       case (key, value) =>
@@ -188,8 +188,8 @@ object KesqueDataSource {
           case Some(x) =>
             count += 1
             if (count % reportCount == 0) {
-              println(s"rate: ${1000.0 * reportCount / (System.currentTimeMillis - start)}")
-              start = System.currentTimeMillis
+              println(s"rate: ${reportCount / ((System.nanoTime - start) / 1000000000.0)}")
+              start = System.nanoTime
             }
           case None => println(s"not found key ${key}")
         }
@@ -235,9 +235,9 @@ final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(im
   val clock = new Clock()
 
   def get(key: Hash): Option[TVal] = {
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
     val value = table.read(key.bytes, topic)
-    clock.elapse(System.currentTimeMillis - start)
+    clock.elapse(System.nanoTime - start)
     value
   }
 

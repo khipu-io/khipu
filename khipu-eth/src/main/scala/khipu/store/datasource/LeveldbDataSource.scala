@@ -47,9 +47,9 @@ final class LeveldbDataSource(
    */
   override def get(namespace: Namespace, key: Key): Option[Value] = {
     val dbKey = BytesUtil.concat(namespace, key)
-    val start = System.currentTimeMillis
+    val start = System.nanoTime
     val value = db.get(dbKey)
-    clock.elapse(System.currentTimeMillis - start)
+    clock.elapse(System.nanoTime - start)
     Option(value)
   }
 

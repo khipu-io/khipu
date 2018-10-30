@@ -52,9 +52,9 @@ final class TxProcessWorker(ledger: Ledger) extends Actor with ActorLogging {
 
   def receive = {
     case TxProcessor.ExecuteWork(world, stx, blockHeader, stxValidator, evmCfg) =>
-      val start = System.currentTimeMillis
+      val start = System.nanoTime
       val result = ledger.validateAndExecuteTransaction(stx, blockHeader, stxValidator, evmCfg)(world)
-      val elapsed = System.currentTimeMillis - start
+      val elapsed = System.nanoTime - start
       sender() ! (result, elapsed)
 
     case TxProcessor.PreValidateWork(block, validatingBlocks, validators) =>
