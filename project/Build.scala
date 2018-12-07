@@ -54,7 +54,7 @@ object Build extends sbt.Build {
     fork in run := true,
     fork in Test := true,
     parallelExecution in Test := false,
-    scalaVersion := "2.12.7",
+    scalaVersion := "2.12.8",
     scalacOptions ++= Seq("-unchecked", "-deprecation")
   //javacOptions ++= Seq("-source", "1.8", "-target", "1.8")  // TODO options cause javadoc fail
   ) ++ Environment.settings ++ Formatting.settings
@@ -68,7 +68,7 @@ object Build extends sbt.Build {
 
 object Dependencies {
 
-  private val AKKA_VERSION = "2.5.17"
+  private val AKKA_VERSION = "2.5.18"
   private val AKKA_HTTP_VERSION = "10.1.5"
   private val SLF4J_VERSION = "1.7.24"
   private val CIRCE_VERSION = "0.7.0"
