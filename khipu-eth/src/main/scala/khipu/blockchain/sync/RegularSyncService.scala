@@ -427,7 +427,7 @@ trait RegularSyncService { _: SyncService =>
           val elapsed = (System.nanoTime - start) / 1000000000.0
           val parallel = 100.0 * stats.parallelCount / nTx
           val dbTimePercent = stats.dbReadTimePercent
-          val cacheHitRates = stats.cacheHitRates.map(x => s"${pf2(x)}%").mkString(" ")
+          val cacheHitRates = stats.cacheHitRates.map(x => s"${pf(x)}%").mkString(" ")
           log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${lf(payloadSize)}, parallel ${pf(parallel)}%, db ${pf(dbTimePercent)}%, cache ${cacheHitRates}")
           Right(NewBlock(block, newTd, stats.parallelCount))
 

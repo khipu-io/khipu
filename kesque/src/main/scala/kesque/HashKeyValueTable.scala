@@ -368,4 +368,5 @@ final class HashKeyValueTable private[kesque] (
   }
 
   def cacheHitRate(topic: String) = caches(topicToCol(topic)).hitRate
+  def resetCacheHitRate(topic: String) = caches(topicToCol(topic)).resetHitRate()
 }

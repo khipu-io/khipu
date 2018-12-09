@@ -37,10 +37,17 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
   private val writeLock = cacheLock.writeLock
 
   private var _hitCount: Long = _
-  def hitRate = _hitCount * 1.0 / (_hitCount + _missCount)
-
   private var _missCount: Long = _
-  def missRate = _missCount * 1.0 / (_hitCount + _missCount)
+
+  def hitRate = (_hitCount + _missCount) match {
+    case 0 => 0.0
+    case x => _hitCount * 1.0 / x
+  }
+
+  def missRate = (_hitCount + _missCount) match {
+    case 0 => 0.0
+    case x => _missCount * 1.0 / x
+  }
 
   def put(key: K, value: V) {
     try {
@@ -121,6 +128,11 @@ final class FIFOCache[K, V](val capacity: Int, threshold: Float = 0.9f) {
     } finally {
       writeLock.unlock()
     }
+  }
+
+  def resetHitRate() {
+    _hitCount = 0
+    _missCount = 0
   }
 
   def size = underlying.size

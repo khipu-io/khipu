@@ -346,6 +346,8 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     blockchain.storages.evmCodeDataSource.clock.start()
     blockchain.storages.blockHeaderDataSource.clock.start()
     blockchain.storages.blockBodyDataSource.clock.start()
+    blockchain.storages.accountNodeDataSource.resetCacheHitRate()
+    blockchain.storages.storageNodeDataSource.resetCacheHitRate()
 
     val fs = signedTransactions.map(stx => stx -> initialWorldFun.withTx(Some(stx))) map {
       case (stx, initialWorld) =>
@@ -355,8 +357,6 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     Future.sequence(fs) map { rs =>
       val dsGetElapsed1 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
         blockchain.storages.evmCodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
-
-      val cacheHitRates = List(blockchain.storages.accountNodeDataSource.cacheHitRate, blockchain.storages.storageNodeDataSource.cacheHitRate).map(_ * 100.0)
 
       blockchain.storages.accountNodeDataSource.clock.start()
       blockchain.storages.storageNodeDataSource.clock.start()
@@ -440,6 +440,8 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
         0.0
       }
       val dbReadTimePerc = 100.0 * (dsGetElapsed1 + dsGetElapsed2) / (elapsed + reExecutedElapsed)
+
+      val cacheHitRates = List(blockchain.storages.accountNodeDataSource.cacheHitRate, blockchain.storages.storageNodeDataSource.cacheHitRate).map(_ * 100.0)
 
       log.debug(s"${blockHeader.number} re-executed in ${reExecutedElapsed}ms, ${100 - parallelRate}% with race conditions, db get ${100.0 * dsGetElapsed2 / reExecutedElapsed}%")
       log.debug(s"${blockHeader.number} touched accounts:\n ${currWorld.map(_.touchedAccounts.mkString("\n", "\n", "\n")).getOrElse("")}")
