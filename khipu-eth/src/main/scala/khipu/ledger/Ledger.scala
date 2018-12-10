@@ -51,7 +51,7 @@ object Ledger {
   type PC = ProgramContext[BlockWorldState, TrieStorage]
   type PR = ProgramResult[BlockWorldState, TrieStorage]
 
-  final case class Stats(parallelCount: Int, dbReadTimePercent: Double, cacheHitRates: List[Double])
+  final case class Stats(parallelCount: Int, dbReadTimePercent: Double, cacheHitRates: List[Double], cacheReadCount: Long)
 
   final case class BlockResult(world: BlockWorldState, gasUsed: Long = 0, receipts: Seq[Receipt] = Nil, stats: Stats)
   final case class BlockPreparationResult(block: Block, blockResult: BlockResult, stateRootHash: Hash)
@@ -328,7 +328,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
     txError match {
       case Some(error) => Future.successful(Left(error))
-      case None        => Future.successful(postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(0, 0, Nil))(currWorld.withTx(None)))
+      case None        => Future.successful(postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(0, 0, Nil, 0))(currWorld.withTx(None)))
     }
   }
 
@@ -442,13 +442,14 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       val dbReadTimePerc = 100.0 * (dsGetElapsed1 + dsGetElapsed2) / (elapsed + reExecutedElapsed)
 
       val cacheHitRates = List(blockchain.storages.accountNodeDataSource.cacheHitRate, blockchain.storages.storageNodeDataSource.cacheHitRate).map(_ * 100.0)
+      val cacheReadCount = blockchain.storages.accountNodeDataSource.cacheReadCount + blockchain.storages.storageNodeDataSource.cacheReadCount
 
       log.debug(s"${blockHeader.number} re-executed in ${reExecutedElapsed}ms, ${100 - parallelRate}% with race conditions, db get ${100.0 * dsGetElapsed2 / reExecutedElapsed}%")
       log.debug(s"${blockHeader.number} touched accounts:\n ${currWorld.map(_.touchedAccounts.mkString("\n", "\n", "\n")).getOrElse("")}")
 
       txError match {
         case Some(error) => Left(error)
-        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbReadTimePerc, cacheHitRates))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
+        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbReadTimePerc, cacheHitRates, cacheReadCount))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
       }
     } andThen {
       case Success(_) =>

@@ -51,7 +51,8 @@ trait RegularSyncService { _: SyncService =>
   private def pf2(n: Double) = "%1$5.2f".format(n) // percent less than 100%
   private def ef(n: Double) = "%1$6.3f".format(n) // elapse time
   private def gf(n: Double) = "%1$7.2f".format(n) // gas
-  private def lf(n: Int) = "%1$6d".format(n) // payload
+  private def f6(n: Int) = "%1$6d".format(n) // payload
+  private def f4(n: Int) = "%1$4d".format(n) // cache read count 
 
   // Should keep newer block to be at the front
   private var workingHeaders = List[BlockHeader]()
@@ -428,7 +429,8 @@ trait RegularSyncService { _: SyncService =>
           val parallel = 100.0 * stats.parallelCount / nTx
           val dbTimePercent = stats.dbReadTimePercent
           val cacheHitRates = stats.cacheHitRates.map(x => s"${pf(x)}%").mkString(" ")
-          log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${lf(payloadSize)}, parallel ${pf(parallel)}%, db ${pf(dbTimePercent)}%, cache ${cacheHitRates}")
+          val cacheReadCount = stats.cacheReadCount.toInt
+          log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${f6(payloadSize)}, parallel ${pf(parallel)}%, db ${pf(dbTimePercent)}%, cache(${f4(cacheReadCount)}) ${cacheHitRates}")
           Right(NewBlock(block, newTd, stats.parallelCount))
 
         case Left(err) =>
