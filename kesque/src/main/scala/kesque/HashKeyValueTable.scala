@@ -146,7 +146,7 @@ final class HashKeyValueTable private[kesque] (
     }
   }
 
-  def read(key: Array[Byte], topic: String): Option[TVal] = {
+  def read(key: Array[Byte], topic: String, bypassCache: Boolean = false): Option[TVal] = {
     try {
       readLock.lock
 
@@ -179,8 +179,10 @@ final class HashKeyValueTable private[kesque] (
                 i -= 1
               }
 
-              foundValue foreach { tv =>
-                caches(col).put(keyh, (tv, foundOffset))
+              if (!bypassCache) {
+                foundValue foreach { tv =>
+                  caches(col).put(keyh, (tv, foundOffset))
+                }
               }
 
               foundValue

@@ -90,7 +90,7 @@ object KesqueCompactor {
       val encodedOpt = if (key.length < 32) {
         Some(key, blockNumber)
       } else {
-        nodeTable.read(key, topic) match {
+        nodeTable.read(key, topic, bypassCache = true) match {
           case Some(TVal(bytes, blockNumber)) =>
             nodeCount += 1
             if (nodeCount % 1000 == 0) {
@@ -131,7 +131,7 @@ object KesqueCompactor {
     }
   }
 
-  def init() = {
+  private def initTablesBySelf() = {
     val khipuPath = new File(classOf[KesqueDataSource].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
     //val configDir = new File(khipuPath, "../src/universal/conf")
     val configDir = new File(khipuPath, "conf")
@@ -162,9 +162,16 @@ object KesqueCompactor {
     (kesque, accountTable, storageTable, blockHeaderStorage)
   }
 
-  // simple test
+  // --- simple test
   def main(args: Array[String]) {
-    val (kesque, accountTable, storageTable, blockHeaderStorage) = init()
+    //val (kesque, accountTable, storageTable, blockHeaderStorage) = initTableBySelf()
+    val serviceBoard = ServiceBoard(system)
+    val storages = serviceBoard.storages
+    val kesque = storages.kesque
+    val accountTable = storages.accountNodeDataSource.table
+    val storageTable = storages.storageNodeDataSource.table
+    val blockHeaderStorage = storages.blockHeaderStorage
+
     val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 6574258)
     compactor.load()
   }

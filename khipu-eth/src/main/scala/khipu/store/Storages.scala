@@ -1,6 +1,7 @@
 package khipu.store
 
 import akka.actor.ActorSystem
+import kesque.Kesque
 import khipu.store.datasource.DataSources
 import khipu.store.trienode.NodeTableStorage
 import khipu.store.trienode.PruningMode
@@ -9,6 +10,8 @@ object Storages {
 
   trait DefaultStorages extends Storages with DataSources {
     // lazy val -- to wait for other fields (cache pruningMode etc) to be set in last implementation, 
+
+    def kesque: Kesque
 
     lazy val accountNodeStorageFor: (Option[Long]) => NodeTableStorage = bn => new NodeTableStorage(accountNodeDataSource)
     lazy val storageNodeStorageFor: (Option[Long]) => NodeTableStorage = bn => new NodeTableStorage(storageNodeDataSource)
