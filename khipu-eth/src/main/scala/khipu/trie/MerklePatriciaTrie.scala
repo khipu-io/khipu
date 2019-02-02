@@ -553,7 +553,7 @@ final class MerklePatriciaTrie[K, V] private (
       case (k, Deleted(_)) => k -> None
       case (k, Updated(v)) => k -> Some(v)
     }
-    nodeStorage.update(changes)
+    nodeStorage.updatePost(changes)
     this
   }
 

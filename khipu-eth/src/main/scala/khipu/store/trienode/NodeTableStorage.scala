@@ -19,6 +19,13 @@ final class NodeTableStorage(source: KesqueDataSource)(implicit system: ActorSys
     this
   }
 
+  override def updatePost(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): NodeTableStorage = {
+    //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
+    //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
+    source.updatePost(toRemove, toUpsert map { case (key, value) => key -> TVal(value, -1L) })
+    this
+  }
+
   def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingBlockNumber(writingBlockNumber)
 
   override def tableName = source.topic

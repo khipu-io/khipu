@@ -32,8 +32,8 @@ object Build extends sbt.Build {
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
     .settings(Packaging.settings)
     .settings(
-      mainClass in Compile := Some("khipu.store.KesqueCompactor")
-      //mainClass in Compile := Some("khipu.Khipu")
+      //mainClass in Compile := Some("khipu.store.KesqueCompactor")
+      mainClass in Compile := Some("khipu.Khipu")
     )
 
   lazy val kesque = Project("kesque", file("kesque"))
