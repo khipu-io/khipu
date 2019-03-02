@@ -63,37 +63,47 @@ final class HashKeyValueTable private[kesque] (
   }
 
   private def indexTopic(topic: String) = topic + "_idx"
-  private def postTopic(topic: String) = topic + "~"
+  private def shiftTopic(topic: String) = topic + "~"
 
-  private val postTopics = topics map postTopic
   private val indexTopics = topics map indexTopic
-  private val postIndexTopics = postTopics map indexTopic
+  private val shiftTopics = topics map shiftTopic
+  private val shiftIndexTopics = shiftTopics map indexTopic
 
-  private val topicsOfFileno = Array(topics, postTopics)
-  private val indexTopicsOfFileno = Array(indexTopics, postIndexTopics)
+  private var topicsOfFileno = Array(topics, shiftTopics)
+  private var indexTopicsOfFileno = Array(indexTopics, shiftIndexTopics)
 
   private val lock = new ReentrantReadWriteLock()
   private val readLock = lock.readLock
   private val writeLock = lock.writeLock
 
-  private class LoadIndexesTask(col: Int, topic: String) extends Thread {
-    override def run() {
-      loadOffsets(col)
-    }
-  }
-
   loadIndexes()
+
+  def shift() {
+    val x0 = topicsOfFileno(0)
+    val x1 = topicsOfFileno(1)
+    topicsOfFileno = Array(x1, x0)
+
+    val y0 = indexTopicsOfFileno(0)
+    val y1 = indexTopicsOfFileno(1)
+    indexTopicsOfFileno = Array(y1, y0)
+
+    // TODO then delete the old first topic
+  }
 
   private def loadIndexes() {
     var tasks = List[Thread]()
-    var n = 0
-    while (n < topics.length) {
-      val topic = topics(n)
-      caches(n) = new FIFOCache[Hash, (TVal, Int)](cacheSize)
+    var col = 0
+    while (col < topics.length) {
+      val topic = topics(col)
+      caches(col) = new FIFOCache[Hash, (TVal, Int)](cacheSize)
 
-      tasks = new LoadIndexesTask(n, topic) :: tasks
+      tasks = (new Thread() {
+        override def run() {
+          loadOffsetsOf(col)
+        }
+      }) :: tasks
 
-      n += 1
+      col += 1
     }
 
     val timeIndexTask = if (withTimeToKey) {
@@ -110,7 +120,7 @@ final class HashKeyValueTable private[kesque] (
     timeIndexTask ::: tasks foreach { _.join() }
   }
 
-  private def loadOffsets(col: Int) {
+  private def loadOffsetsOf(col: Int) {
     info(s"Loading index of ${topics(col)}")
     val start = System.nanoTime
 
@@ -192,13 +202,13 @@ final class HashKeyValueTable private[kesque] (
           val hash = key.hashCode
           hashOffsets.get(hash, col) match {
             case IntIntsMap.NO_VALUE => None
-            case offsets =>
+            case mixedOffsets =>
               var foundValue: Option[TVal] = None
               var foundOffset = Int.MinValue
-              var i = offsets.length - 1 // loop backward to find the newest one  
+              var i = mixedOffsets.length - 1 // loop backward to find the newest one  
               while (i >= 0 && foundValue.isEmpty) {
-                val fileOffset = offsets(i)
-                val (fileno, offset) = toFileNoAndOffset(fileOffset)
+                val mixedOffset = mixedOffsets(i)
+                val (fileno, offset) = toFileNoAndOffset(mixedOffset)
                 val theTopic = topicsOfFileno(fileno)(col)
                 val (topicPartition, result) = db.read(theTopic, offset, fetchMaxBytes).head
                 val recs = result.info.records.records.iterator
@@ -231,9 +241,12 @@ final class HashKeyValueTable private[kesque] (
     }
   }
 
-  def writePost(kvs: Iterable[TKeyVal], topic: String) = write(kvs, topic, fileno = 1)
-  def writeSnap(kvs: Iterable[TKeyVal], topic: String) = write(kvs, topic, fileno = 0)
+  def writeShift(kvs: Iterable[TKeyVal], topic: String) = {
+    write(kvs, topic, fileno = 1)
+  }
+
   def write(kvs: Iterable[TKeyVal], topic: String): Vector[Iterable[Int]] = write(kvs, topic, fileno = 0)
+
   private def write(kvs: Iterable[TKeyVal], topic: String, fileno: Int): Vector[Iterable[Int]] = {
     val col = topicToCol(topic)
 

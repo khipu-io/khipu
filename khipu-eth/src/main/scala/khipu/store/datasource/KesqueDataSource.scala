@@ -248,13 +248,6 @@ final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(im
     this
   }
 
-  override def updatePost(toRemove: Set[Hash], toUpsert: Map[Hash, TVal]): KesqueDataSource = {
-    // TODO what's the meaning of remove a node? sometimes causes node not found
-    //table.remove(toRemove.map(_.bytes).toList)
-    table.writePost(toUpsert.map { case (key, value) => TKeyVal(key.bytes, value.value, _currWritingBlockNumber) }, topic)
-    this
-  }
-
   def cacheHitRate = table.cacheHitRate(topic)
   def cacheReadCount = table.cacheReadCount(topic)
   def resetCacheHitRate() = table.resetCacheHitRate(topic)

@@ -69,20 +69,6 @@ trait SimpleMap[K, V, T <: SimpleMap[K, V, T]] {
   }
 
   /**
-   * Since the remove may still have to be saved to reposity, we'll let same key
-   * in both toRemove and toUpsert
-   */
-  final def updatePost(changes: Iterable[(K, Option[V])]): T = {
-    val (toRemove, toUpsert) = changes.foldLeft((Set[K](), Map[K, V]())) {
-      case ((toRemove, toUpsert), (k, None))    => (toRemove + k, toUpsert)
-      case ((toRemove, toUpsert), (k, Some(v))) => (toRemove, toUpsert + (k -> v))
-    }
-    updatePost(toRemove, toUpsert)
-  }
-
-  def updatePost(toRemove: Set[K], toUpsert: Map[K, V]): T = update(toRemove, toUpsert)
-
-  /**
    * This function updates the KeyValueStore by deleting, updating and inserting new (key-value) pairs.
    *
    * @param toRemove which includes all the keys to be removed from the KeyValueStore.

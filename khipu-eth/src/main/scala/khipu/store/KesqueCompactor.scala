@@ -200,13 +200,10 @@ final class KesqueCompactor(
   }
 
   private val accountReader = new NodeReader[Account](KesqueDataSource.account, accountTable)(Account.accountSerializer) {
-    override def entityGot(entity: Account, blocknumber: Long) {
-      entity match {
-        // try to extracted storage node hash
-        case Account(_, _, stateRoot, codeHash) =>
-          if (stateRoot != Account.EmptyStorageRootHash) {
-            storageReader.getNode(stateRoot.bytes, blocknumber) map storageReader.processNode
-          }
+    override def entityGot(account: Account, blocknumber: Long) {
+      // try to extracted storage node hash
+      if (account.stateRoot != Account.EmptyStorageRootHash) {
+        storageReader.getNode(account.stateRoot.bytes, blocknumber) map storageReader.processNode
       }
     }
 
