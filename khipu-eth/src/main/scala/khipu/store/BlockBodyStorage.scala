@@ -27,7 +27,7 @@ final class BlockBodyStorage(val source: KesqueDataSource) extends SimpleMap[Has
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockBody]): BlockBodyStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
-    toUpsert foreach { case (key, value) => source.put(key, TVal(value.toBytes, -1L)) }
+    toUpsert foreach { case (key, value) => source.put(key, TVal(value.toBytes, -1, -1L)) }
     toRemove foreach { key => source.remove(key) }
     this
   }

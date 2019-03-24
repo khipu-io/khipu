@@ -57,7 +57,7 @@ final class HashKeyValueTable private[kesque] (
   /* time to key table, should be the first topic to initially create it */
   private var timeIndex = Array.ofDim[Array[Byte]](200)
 
-  private val caches = Array.ofDim[FIFOCache[Hash, (TVal, Int)]](topics.length)
+  private val caches = Array.ofDim[FIFOCache[Hash, TVal]](topics.length)
   private val (topicToCol, _) = topics.foldLeft(Map[String, Int](), 0) {
     case ((map, i), topic) => (map + (topic -> i), i + 1)
   }
@@ -94,24 +94,15 @@ final class HashKeyValueTable private[kesque] (
     var tasks = List[Thread]()
     var col = 0
     while (col < topics.length) {
-      val topic = topics(col)
-      caches(col) = new FIFOCache[Hash, (TVal, Int)](cacheSize)
+      caches(col) = new FIFOCache[Hash, TVal](cacheSize)
 
-      tasks = (new Thread() {
-        override def run() {
-          loadOffsetsOf(col)
-        }
-      }) :: tasks
+      tasks = LoadIndexTask(col) :: tasks
 
       col += 1
     }
 
     val timeIndexTask = if (withTimeToKey) {
-      List(new Thread() {
-        override def run() {
-          loadTimeIndex()
-        }
-      })
+      List(LoadTimeIndexTask)
     } else {
       Nil
     }
@@ -120,6 +111,11 @@ final class HashKeyValueTable private[kesque] (
     timeIndexTask ::: tasks foreach { _.join() }
   }
 
+  final case class LoadIndexTask(col: Int) extends Thread {
+    override def run() {
+      loadOffsetsOf(col)
+    }
+  }
   private def loadOffsetsOf(col: Int) {
     info(s"Loading index of ${topics(col)}")
     val start = System.nanoTime
@@ -128,9 +124,9 @@ final class HashKeyValueTable private[kesque] (
     val (_, counts) = indexTopicsOfFileno.foldLeft(0, initCounts) {
       case ((fileno, counts), idxTps) =>
         db.iterateOver(idxTps(col), 0, fetchMaxBytesInLoadOffsets) {
-          case (offset, TKeyVal(hash, recordOffset, timestamp)) =>
-            if (hash != null && recordOffset != null) {
-              hashOffsets.put(bytesToInt(hash), toMixedOffset(fileno, bytesToInt(recordOffset)), col)
+          case TKeyVal(hash, recordOffsetValue, offset, timestamp) =>
+            if (hash != null && recordOffsetValue != null) {
+              hashOffsets.put(bytesToInt(hash), toMixedOffset(fileno, bytesToInt(recordOffsetValue)), col)
               counts(fileno) += 1
             }
         }
@@ -140,6 +136,11 @@ final class HashKeyValueTable private[kesque] (
     info(s"Loaded index of ${topics(col)} in ${(System.nanoTime - start) / 1000000} ms, count ${counts.mkString("(", ",", ")")}, size ${hashOffsets.size}")
   }
 
+  object LoadTimeIndexTask extends Thread {
+    override def run() {
+      loadTimeIndex()
+    }
+  }
   private def loadTimeIndex() {
     info(s"Loading time index from ${topics(0)}")
     val start = System.nanoTime
@@ -147,7 +148,7 @@ final class HashKeyValueTable private[kesque] (
     var count = 0
     topicsOfFileno foreach { tps =>
       db.iterateOver(tps(0), 0, fetchMaxBytesInLoadOffsets) {
-        case (offset, TKeyVal(key, value, timestamp)) =>
+        case TKeyVal(key, value, offset, timestamp) =>
           if (key != null && value != null) {
             putTimeToKey(timestamp, key)
             count += 1
@@ -191,6 +192,9 @@ final class HashKeyValueTable private[kesque] (
     }
   }
 
+  /**
+   * @return TVal with mixedOffset
+   */
   def read(keyBytes: Array[Byte], topic: String, bypassCache: Boolean = false): Option[TVal] = {
     try {
       readLock.lock
@@ -220,21 +224,19 @@ final class HashKeyValueTable private[kesque] (
                   //debug(s"${rec.offset}")
                   if (rec.offset == offset && Arrays.equals(kesque.getBytes(rec.key), keyBytes)) {
                     foundOffset = offset
-                    foundValue = if (rec.hasValue) Some(TVal(kesque.getBytes(rec.value), rec.timestamp)) else None
+                    foundValue = if (rec.hasValue) Some(TVal(kesque.getBytes(rec.value), mixedOffset, rec.timestamp)) else None
                   }
                 }
                 i -= 1
               }
 
               if (!bypassCache) {
-                foundValue foreach { tv =>
-                  caches(col).put(key, (tv, foundOffset))
-                }
+                foundValue foreach { tv => caches(col).put(key, tv) }
               }
 
               foundValue
           }
-        case Some((value, offset)) => Some(value)
+        case Some(value) => Some(value)
       }
     } finally {
       readLock.unlock()
@@ -257,15 +259,15 @@ final class HashKeyValueTable private[kesque] (
     var keyToPrevOffsets = Map[Hash, Int]()
     val itr = kvs.iterator
     while (itr.hasNext) {
-      val tkv @ TKeyVal(keyBytes, value, timestamp) = itr.next()
+      val tkv @ TKeyVal(keyBytes, value, offset, timestamp) = itr.next()
       val key = Hash(keyBytes)
       caches(col).get(key) match {
-        case Some((TVal(prevValue, _), prevOffset)) =>
+        case Some(TVal(prevValue, prevMixedOffset, _)) =>
           if (isValueChanged(value, prevValue)) {
             val rec = if (timestamp < 0) new SimpleRecord(keyBytes, value) else new SimpleRecord(timestamp, keyBytes, value)
             tkvs ::= tkv
             records ::= rec
-            keyToPrevOffsets += key -> prevOffset
+            keyToPrevOffsets += key -> prevMixedOffset
             // TODO should only happen when value is set to empty, i.e. removed?
             // remove records of prevOffset from memory?
           } else {
@@ -285,10 +287,10 @@ final class HashKeyValueTable private[kesque] (
     debug(s"${recordBatches.map(x => x._1.size).mkString(",")}")
 
     // write to log file
-    recordBatches map { case (tkvs, records, keyToPrevOffsets) => writeRecords(tkvs, records, keyToPrevOffsets, col, fileno) }
+    recordBatches map { case (tkvs, records, keyToPrevMixedOffsets) => writeRecords(tkvs, records, keyToPrevMixedOffsets, col, fileno) }
   }
 
-  private def writeRecords(tkvs: List[TKeyVal], records: List[SimpleRecord], keyToPrevOffsets: Map[Hash, Int], col: Int, fileno: Int): Iterable[Int] = {
+  private def writeRecords(tkvs: List[TKeyVal], records: List[SimpleRecord], keyToPrevMixedOffsets: Map[Hash, Int], col: Int, fileno: Int): Iterable[Int] = {
     try {
       writeLock.lock()
 
@@ -303,19 +305,20 @@ final class HashKeyValueTable private[kesque] (
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
             val (lastOffset, idxRecords) = tkvs.foldLeft(firstOffert, Vector[SimpleRecord]()) {
-              case ((offset, idxRecords), TKeyVal(keyBytes, value, timestamp)) =>
+              case ((_offset, idxRecords), TKeyVal(keyBytes, value, _, timestamp)) =>
+                val offset = _offset.toInt
                 val key = Hash(keyBytes)
                 val hash = key.hashCode
-                val indexRecord = new SimpleRecord(intToBytes(hash), intToBytes(offset.toInt))
+                val indexRecord = new SimpleRecord(intToBytes(hash), intToBytes(offset))
 
-                val mixedOffset = toMixedOffset(fileno, offset.toInt)
-                keyToPrevOffsets.get(key) match {
-                  case Some(prevOffset) => // there is prevOffset, will also remove it (replace it with current one)
-                    hashOffsets.replace(hash, prevOffset, mixedOffset, col)
+                val mixedOffset = toMixedOffset(fileno, offset)
+                keyToPrevMixedOffsets.get(key) match {
+                  case Some(prevMixedOffset) => // there is prevOffset, will also remove it (replace it with current one)
+                    hashOffsets.replace(hash, prevMixedOffset, mixedOffset, col)
                   case None => // there is none prevOffset
                     hashOffsets.put(hash, mixedOffset, col)
                 }
-                caches(col).put(key, (TVal(value, timestamp), mixedOffset))
+                caches(col).put(key, TVal(value, mixedOffset, timestamp))
                 (offset + 1, idxRecords :+ indexRecord)
             }
 
@@ -407,7 +410,7 @@ final class HashKeyValueTable private[kesque] (
     }
   }
 
-  def iterateOver(fetchOffset: Long, topic: String)(op: (Long, TKeyVal) => Unit) = {
+  def iterateOver(fetchOffset: Long, topic: String)(op: TKeyVal => Unit) = {
     try {
       readLock.lock()
 
@@ -417,7 +420,7 @@ final class HashKeyValueTable private[kesque] (
     }
   }
 
-  def readOnce(fetchOffset: Long, topic: String)(op: (Long, TKeyVal) => Unit) = {
+  def readOnce(fetchOffset: Long, topic: String)(op: TKeyVal => Unit) = {
     try {
       readLock.lock()
 

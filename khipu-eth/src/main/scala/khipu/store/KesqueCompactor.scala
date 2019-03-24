@@ -91,7 +91,7 @@ object KesqueCompactor {
         Some(key, blockNumber)
       } else {
         nodeTable.read(key, topic, bypassCache = true) match {
-          case Some(TVal(bytes, blockNumber)) =>
+          case Some(TVal(bytes, offset, blockNumber)) =>
             nodeCount += 1
             if (nodeCount % 1000 == 0) {
               val elapsed = (System.nanoTime - start) / 1000000000
@@ -99,7 +99,7 @@ object KesqueCompactor {
               log.info(s"[comp] $topic $nodeCount nodes $speed/s, at $blockNumber")
             }
 
-            nodeGot(TKeyVal(key, bytes, blockNumber))
+            nodeGot(TKeyVal(key, bytes, offset, blockNumber))
             Some(bytes, blockNumber)
 
           case None =>

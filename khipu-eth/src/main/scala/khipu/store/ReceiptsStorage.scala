@@ -72,7 +72,7 @@ final class ReceiptsStorage(val source: KesqueDataSource) extends SimpleMap[Hash
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Seq[Receipt]]): ReceiptsStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
-    toUpsert foreach { case (key, value) => source.put(key, TVal(toBytes(value), -1L)) }
+    toUpsert foreach { case (key, value) => source.put(key, TVal(toBytes(value), -1, -1L)) }
     toRemove foreach { key => source.remove(key) }
     this
   }

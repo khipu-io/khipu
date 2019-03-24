@@ -25,7 +25,7 @@ final class TotalDifficultyStorage(val source: KesqueDataSource) extends SimpleM
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, UInt256]): TotalDifficultyStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
-    toUpsert foreach { case (key, value) => source.put(key, TVal(value.bigEndianMag, -1L)) }
+    toUpsert foreach { case (key, value) => source.put(key, TVal(value.bigEndianMag, -1, -1L)) }
     toRemove foreach { key => source.remove(key) }
     this
   }

@@ -15,7 +15,7 @@ final class NodeTableStorage(source: KesqueDataSource)(implicit system: ActorSys
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): NodeTableStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
-    source.update(toRemove, toUpsert map { case (key, value) => key -> TVal(value, -1L) })
+    source.update(toRemove, toUpsert map { case (key, value) => key -> TVal(value, -1, -1L) })
     this
   }
 

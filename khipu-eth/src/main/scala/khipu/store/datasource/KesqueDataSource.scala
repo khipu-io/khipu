@@ -133,19 +133,19 @@ object KesqueDataSource {
     var offset = fetchOffset
     var nRead = 0
     do {
-      val records = mutable.ArrayBuffer[(Long, Array[Byte], Array[Byte])]()
+      val records = mutable.ArrayBuffer[(Array[Byte], Array[Byte], Int, Long)]()
       tableSrc.readOnce(offset, src) {
-        case (offset, TKeyVal(k, v, t)) =>
+        case TKeyVal(k, v, offset, t) =>
           val NodeRecord(flag, key, value) = NodeRecord.fromBytes(v)
           val hash = Hash(key)
-          hashOffsets.put(hash.hashCode, offset.toInt, 0) // TODO
+          hashOffsets.put(hash.hashCode, offset, 0) // TODO
 
-          records += ((offset, key, value))
+          records += ((key, value, offset, t))
       } match {
         case (n, o) =>
           println("nRecs read: " + n + ", lastOffset: " + o)
 
-          val sorted = records.sortBy(x => x._1).map(x => TKeyVal(x._2, x._3))
+          val sorted = records.sortBy(x => x._3).map(x => TKeyVal(x._1, x._2, x._3, x._4))
           val writeResults = tableTgt.write(sorted, tgt)
           println(writeResults) // TODO check exceptions
 
@@ -166,7 +166,7 @@ object KesqueDataSource {
 
     val records = new mutable.HashMap[Hash, ByteString]()
     table.iterateOver(0, topic) {
-      case (offset, TKeyVal(key, value, timestamp)) =>
+      case TKeyVal(key, value, offset, timestamp) =>
         //print(s"$offset - ${Hash(key).hexString},")
         val hash = Hash(key)
         if (records.contains(hash)) {
@@ -203,7 +203,7 @@ object KesqueDataSource {
     var prevValue: Option[Array[Byte]] = None
     val table = db.getTable(Array(topic))
     table.iterateOver(0, topic) {
-      case (offset, TKeyVal(key, value, timestamp)) =>
+      case TKeyVal(key, value, offset, timestamp) =>
         if (Arrays.equals(key, lostKey)) {
           val keyHash = Hash(lostKey).hashCode
           println(s"Found $keyInHex at offset $offset, key hash is $keyHash")
@@ -244,7 +244,7 @@ final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(im
   def update(toRemove: Set[Hash], toUpsert: Map[Hash, TVal]): KesqueDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
-    table.write(toUpsert.map { case (key, value) => TKeyVal(key.bytes, value.value, _currWritingBlockNumber) }, topic)
+    table.write(toUpsert.map { case (key, tval) => TKeyVal(key.bytes, tval.value, tval.offset, _currWritingBlockNumber) }, topic)
     this
   }
 

@@ -46,7 +46,7 @@ object Kesque {
 
   private def testWrite(table: HashKeyValueTable, topic: String, seq: Int) = {
     val kvs = 1 to 100000 map { i =>
-      TKeyVal(i.toString.getBytes, (s"value_$i").getBytes)
+      TKeyVal(i.toString.getBytes, (s"value_$i").getBytes, -1, -1)
     }
     table.write(kvs, topic)
   }
@@ -119,7 +119,7 @@ final class Kesque(props: Properties) {
    * @param fetchOffset
    * @param op: action applied on (offset, key, value)
    */
-  private[kesque] def iterateOver(topic: String, fetchOffset: Long = 0L, fetchMaxBytes: Int)(op: (Long, TKeyVal) => Unit) = {
+  private[kesque] def iterateOver(topic: String, fetchOffset: Long = 0L, fetchMaxBytes: Int)(op: TKeyVal => Unit) = {
     var offset = fetchOffset
     var nRead = 0
     do {
@@ -136,7 +136,7 @@ final class Kesque(props: Properties) {
    * @param fetchOffset
    * @param op: action applied on (offset, key, value)
    */
-  private[kesque] def readOnce(topic: String, fetchOffset: Long, fetchMaxBytes: Int)(op: (Long, TKeyVal) => Unit) = {
+  private[kesque] def readOnce(topic: String, fetchOffset: Long, fetchMaxBytes: Int)(op: TKeyVal => Unit) = {
     val (topicPartition, result) = read(topic, fetchOffset, fetchMaxBytes).head
     val recs = result.info.records.records.iterator
     var i = 0
@@ -146,8 +146,8 @@ final class Kesque(props: Properties) {
       val key = if (rec.hasKey) kesque.getBytes(rec.key) else null
       val value = if (rec.hasValue) kesque.getBytes(rec.value) else null
       val timestamp = rec.timestamp
-      val offset = rec.offset
-      op(offset, TKeyVal(key, value, timestamp))
+      val offset = rec.offset.toInt
+      op(TKeyVal(key, value, offset, timestamp))
 
       lastOffset = offset
       i += 1
@@ -161,5 +161,6 @@ final class Kesque(props: Properties) {
   }
 }
 
-final case class TKeyVal(key: Array[Byte], value: Array[Byte], timestamp: Long = -1L)
-final case class TVal(value: Array[Byte], timestamp: Long)
+// -1 value of offset/timestamp means unset
+final case class TKeyVal(key: Array[Byte], value: Array[Byte], offset: Int, timestamp: Long)
+final case class TVal(value: Array[Byte], offset: Int, timestamp: Long)
