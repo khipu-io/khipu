@@ -23,12 +23,12 @@ object HashKeyValueTable {
   // 0x80000000 - 1000 0000 0000 0000 0000 0000 0000 0000
   // 0xC0000000 - 1100 0000 0000 0000 0000 0000 0000 0000
   private val filenoToBitsHeader = Array(0x00000000, 0x80000000)
-  private def toMixedOffset(fileno: Int, offset: Int) = {
+  def toMixedOffset(fileno: Int, offset: Int) = {
     val bitsHeader = filenoToBitsHeader(fileno)
     bitsHeader | offset
   }
 
-  private def toFileNoAndOffset(mixedOffset: Int) = {
+  def toFileNoAndOffset(mixedOffset: Int) = {
     val fileno = mixedOffset >>> 31
     val offset = mixedOffset & 0x7FFFFFFF // 0111 1111 1111 1111 1111 1111 1111 1111
     (fileno, offset)
@@ -37,9 +37,9 @@ object HashKeyValueTable {
 
 /**
  * We use this table to read/write combination of snapshot (in file 0) and post-
- * events. The offsets in caches and hashOffsets(index) are with 1st bit as the
- * fileNo, where, the 0 1st bit indicates that the offset is of file 0, and the
- * 1 1st bit indicates that the offset is of file 1.
+ * events. The offsets in caches and hashOffsets(index) both are with 1st bit as
+ * the fileNo, where, the 0 1st bit indicates that the offset is of file 0, and
+ * the value of 1 of the 1st bit indicates that the offset is of file 1.
  * @see toFileOffset and toOffset
  */
 final class HashKeyValueTable private[kesque] (
@@ -208,7 +208,6 @@ final class HashKeyValueTable private[kesque] (
             case IntIntsMap.NO_VALUE => None
             case mixedOffsets =>
               var foundValue: Option[TVal] = None
-              var foundOffset = Int.MinValue
               var i = mixedOffsets.length - 1 // loop backward to find the newest one  
               while (foundValue.isEmpty && i >= 0) {
                 val mixedOffset = mixedOffsets(i)
@@ -223,7 +222,6 @@ final class HashKeyValueTable private[kesque] (
                   val rec = recs.next
                   //debug(s"${rec.offset}")
                   if (rec.offset == offset && Arrays.equals(kesque.getBytes(rec.key), keyBytes)) {
-                    foundOffset = offset
                     foundValue = if (rec.hasValue) Some(TVal(kesque.getBytes(rec.value), mixedOffset, rec.timestamp)) else None
                   }
                 }
@@ -256,7 +254,7 @@ final class HashKeyValueTable private[kesque] (
     var recordBatches = Vector[(List[TKeyVal], List[SimpleRecord], Map[Hash, Int])]()
     var tkvs = List[TKeyVal]()
     var records = List[SimpleRecord]()
-    var keyToPrevOffsets = Map[Hash, Int]()
+    var keyToPrevMixedOffset = Map[Hash, Int]()
     val itr = kvs.iterator
     while (itr.hasNext) {
       val tkv @ TKeyVal(keyBytes, value, offset, timestamp) = itr.next()
@@ -267,7 +265,7 @@ final class HashKeyValueTable private[kesque] (
             val rec = if (timestamp < 0) new SimpleRecord(keyBytes, value) else new SimpleRecord(timestamp, keyBytes, value)
             tkvs ::= tkv
             records ::= rec
-            keyToPrevOffsets += key -> prevMixedOffset
+            keyToPrevMixedOffset += key -> prevMixedOffset
             // TODO should only happen when value is set to empty, i.e. removed?
             // remove records of prevOffset from memory?
           } else {
@@ -281,16 +279,16 @@ final class HashKeyValueTable private[kesque] (
     }
 
     if (records.nonEmpty) {
-      recordBatches :+= (tkvs, records, keyToPrevOffsets)
+      recordBatches :+= (tkvs, records, keyToPrevMixedOffset)
     }
 
     debug(s"${recordBatches.map(x => x._1.size).mkString(",")}")
 
     // write to log file
-    recordBatches map { case (tkvs, records, keyToPrevMixedOffsets) => writeRecords(tkvs, records, keyToPrevMixedOffsets, col, fileno) }
+    recordBatches map { case (tkvs, records, keyToPrevMixedOffset) => writeRecords(tkvs, records, keyToPrevMixedOffset, col, fileno) }
   }
 
-  private def writeRecords(tkvs: List[TKeyVal], records: List[SimpleRecord], keyToPrevMixedOffsets: Map[Hash, Int], col: Int, fileno: Int): Iterable[Int] = {
+  private def writeRecords(tkvs: List[TKeyVal], records: List[SimpleRecord], keyToPrevMixedOffset: Map[Hash, Int], col: Int, fileno: Int): Iterable[Int] = {
     try {
       writeLock.lock()
 
@@ -312,7 +310,7 @@ final class HashKeyValueTable private[kesque] (
                 val indexRecord = new SimpleRecord(intToBytes(hash), intToBytes(offset))
 
                 val mixedOffset = toMixedOffset(fileno, offset)
-                keyToPrevMixedOffsets.get(key) match {
+                keyToPrevMixedOffset.get(key) match {
                   case Some(prevMixedOffset) => // there is prevOffset, will also remove it (replace it with current one)
                     hashOffsets.replace(hash, prevMixedOffset, mixedOffset, col)
                   case None => // there is none prevOffset
@@ -415,7 +413,7 @@ final class HashKeyValueTable private[kesque] (
     val key = Hash(keyBytes)
     val hash = key.hashCode
     hashOffsets.get(hash, col) match {
-      case IntIntsMap.NO_VALUE => None
+      case IntIntsMap.NO_VALUE =>
       case mixedOffsets =>
         var found = false
         var i = 0

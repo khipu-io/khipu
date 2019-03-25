@@ -18,7 +18,6 @@ import khipu.trie.BranchNode
 import khipu.trie.ByteArraySerializable
 import khipu.trie.ExtensionNode
 import khipu.trie.LeafNode
-import khipu.trie.MerklePatriciaTrie.MPTException
 import khipu.trie.Node
 import khipu.util
 import org.apache.kafka.common.record.CompressionType
@@ -57,7 +56,7 @@ object KesqueCompactor {
     private def processEntity(entity: V, blockNumber: Long) = {
       entityCount += 1
       if (entityCount % 1000 == 0) {
-        log.info(s"[comp] got $topic $entityCount, at $blockNumber")
+        log.info(s"[comp] got $topic entities $entityCount, at #$blockNumber")
       }
 
       entityGot(entity, blockNumber)
@@ -96,14 +95,15 @@ object KesqueCompactor {
             if (nodeCount % 1000 == 0) {
               val elapsed = (System.nanoTime - start) / 1000000000
               val speed = nodeCount / math.max(1, elapsed)
-              log.info(s"[comp] $topic $nodeCount nodes $speed/s, at $blockNumber")
+              log.info(s"[comp] $topic nodes $nodeCount $speed/s, at #$blockNumber")
             }
 
             nodeGot(TKeyVal(key, bytes, mixedOffset, blockNumber))
             Some(bytes, blockNumber)
 
           case None =>
-            throw MPTException(s"$topic Node not found ${khipu.toHexString(key)}, trie is inconsistent")
+            log.warning(s"$topic Node not found ${khipu.toHexString(key)}, trie is inconsistent")
+            None
         }
       }
 
@@ -120,21 +120,35 @@ object KesqueCompactor {
     def write(kv: TKeyVal) {
       buf += kv
       if (buf.size > 100) { // keep the batched size around 4096 (~ 32*100 bytes)
-        nodeTable.writeShift(buf, topic)
+        val kvs = buf map {
+          case TKeyVal(key, value, mixedOffset, timestamp) =>
+            val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
+            TKeyVal(key, value, offset, timestamp)
+        }
+        nodeTable.writeShift(kvs, topic)
+
         buf foreach {
           case TKeyVal(key, _, mixedOffset, _) =>
             nodeTable.removeIndexEntry(key, mixedOffset, topic)
         }
+
         buf.clear()
       }
     }
 
     def flush() {
-      nodeTable.writeShift(buf, topic)
+      val kvs = buf map {
+        case TKeyVal(key, value, mixedOffset, timestamp) =>
+          val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
+          TKeyVal(key, value, offset, timestamp)
+      }
+      nodeTable.writeShift(kvs, topic)
+
       buf foreach {
         case TKeyVal(key, _, mixedOffset, _) =>
           nodeTable.removeIndexEntry(key, mixedOffset, topic)
       }
+
       buf.clear()
     }
   }
@@ -183,7 +197,7 @@ object KesqueCompactor {
     val storageTable = storages.storageNodeDataSource.table
     val blockHeaderStorage = storages.blockHeaderStorage
 
-    val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 7225550)
+    val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 7225555)
     compactor.load()
   }
 }

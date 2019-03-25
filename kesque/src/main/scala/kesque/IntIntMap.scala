@@ -78,16 +78,13 @@ object IntIntMap {
       i = -max
       while (i <= max) {
         map.remove(i, n)
-        i += 1
-      }
-
-      i = -max
-      while (i <= max) {
         if (map.get(i, n) != NO_VALUE) {
           println(s"value index $n err at $i - after remove")
+          System.exit(-1)
         }
         i += 1
       }
+
       n += 1
     }
   }
