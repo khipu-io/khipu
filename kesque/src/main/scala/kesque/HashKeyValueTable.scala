@@ -245,9 +245,7 @@ final class HashKeyValueTable private[kesque] (
     write(kvs, topic, fileno = 1)
   }
 
-  def write(kvs: Iterable[TKeyVal], topic: String): Vector[Iterable[Int]] = write(kvs, topic, fileno = 0)
-
-  private def write(kvs: Iterable[TKeyVal], topic: String, fileno: Int): Vector[Iterable[Int]] = {
+  def write(kvs: Iterable[TKeyVal], topic: String, fileno: Int = 0): Vector[Iterable[Int]] = {
     val col = topicToCol(topic)
 
     // prepare simple records, filter no changed ones

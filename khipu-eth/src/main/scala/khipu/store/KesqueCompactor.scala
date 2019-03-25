@@ -114,7 +114,7 @@ object KesqueCompactor {
 
   }
 
-  final class NodeWriter(topic: String, nodeTable: HashKeyValueTable) {
+  final class NodeWriter(topic: String, nodeTable: HashKeyValueTable, toFileNo: Int) {
     private val buf = new mutable.ArrayBuffer[TKeyVal]()
 
     def write(kv: TKeyVal) {
@@ -125,7 +125,7 @@ object KesqueCompactor {
             val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
             TKeyVal(key, value, offset, timestamp)
         }
-        nodeTable.writeShift(kvs, topic)
+        nodeTable.write(kvs, topic, toFileNo)
 
         buf foreach {
           case TKeyVal(key, _, mixedOffset, _) =>
@@ -142,7 +142,7 @@ object KesqueCompactor {
           val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
           TKeyVal(key, value, offset, timestamp)
       }
-      nodeTable.writeShift(kvs, topic)
+      nodeTable.write(kvs, topic, toFileNo)
 
       buf foreach {
         case TKeyVal(key, _, mixedOffset, _) =>
@@ -197,7 +197,7 @@ object KesqueCompactor {
     val storageTable = storages.storageNodeDataSource.table
     val blockHeaderStorage = storages.blockHeaderStorage
 
-    val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 7225555)
+    val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 7225555, 0, 1)
     compactor.load()
   }
 }
@@ -206,7 +206,9 @@ final class KesqueCompactor(
     accountTable:       HashKeyValueTable,
     storageTable:       HashKeyValueTable,
     blockHeaderStorage: BlockHeaderStorage,
-    blockNumber:        Long
+    blockNumber:        Long,
+    fromFileNo:         Int,
+    toFileNo:           Int
 ) {
   import KesqueCompactor._
 
@@ -215,12 +217,15 @@ final class KesqueCompactor(
   private val targetStorageTable = kesque.getTable(Array(KesqueDataSource.storage), 4096, CompressionType.NONE, 1024)
   private val targetAccountTable = kesque.getTable(Array(KesqueDataSource.account), 4096, CompressionType.NONE, 1024)
 
-  private val storageWriter = new NodeWriter(KesqueDataSource.storage, targetStorageTable)
-  private val accountWriter = new NodeWriter(KesqueDataSource.account, targetAccountTable)
+  private val storageWriter = new NodeWriter(KesqueDataSource.storage, targetStorageTable, toFileNo)
+  private val accountWriter = new NodeWriter(KesqueDataSource.account, targetAccountTable, toFileNo)
 
   private val storageReader = new NodeReader[UInt256](KesqueDataSource.storage, storageTable)(trie.rlpUInt256Serializer) {
     override def nodeGot(kv: TKeyVal) {
-      storageWriter.write(kv)
+      val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset)
+      if (fileno == fromFileNo) {
+        storageWriter.write(kv)
+      }
     }
   }
 
@@ -233,7 +238,10 @@ final class KesqueCompactor(
     }
 
     override def nodeGot(kv: TKeyVal) {
-      accountWriter.write(kv)
+      val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset)
+      if (fileno == fromFileNo) {
+        accountWriter.write(kv)
+      }
     }
   }
 
