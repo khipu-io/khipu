@@ -91,7 +91,7 @@ object KesqueCompactor {
         Some(key, blockNumber)
       } else {
         nodeTable.read(key, topic, bypassCache = true) match {
-          case Some(TVal(bytes, offset, blockNumber)) =>
+          case Some(TVal(bytes, mixedOffset, blockNumber)) =>
             nodeCount += 1
             if (nodeCount % 1000 == 0) {
               val elapsed = (System.nanoTime - start) / 1000000000
@@ -99,7 +99,7 @@ object KesqueCompactor {
               log.info(s"[comp] $topic $nodeCount nodes $speed/s, at $blockNumber")
             }
 
-            nodeGot(TKeyVal(key, bytes, offset, blockNumber))
+            nodeGot(TKeyVal(key, bytes, mixedOffset, blockNumber))
             Some(bytes, blockNumber)
 
           case None =>
@@ -120,17 +120,28 @@ object KesqueCompactor {
     def write(kv: TKeyVal) {
       buf += kv
       if (buf.size > 100) { // keep the batched size around 4096 (~ 32*100 bytes)
-        nodeTable.write(buf, topic)
+        nodeTable.writeShift(buf, topic)
+        buf foreach {
+          case TKeyVal(key, _, mixedOffset, _) =>
+            nodeTable.removeIndexEntry(key, mixedOffset, topic)
+        }
         buf.clear()
       }
     }
 
     def flush() {
-      nodeTable.write(buf, topic)
+      nodeTable.writeShift(buf, topic)
+      buf foreach {
+        case TKeyVal(key, _, mixedOffset, _) =>
+          nodeTable.removeIndexEntry(key, mixedOffset, topic)
+      }
       buf.clear()
     }
   }
 
+  /**
+   * Used for testing only
+   */
   private def initTablesBySelf() = {
     val khipuPath = new File(classOf[KesqueDataSource].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
     //val configDir = new File(khipuPath, "../src/universal/conf")
@@ -172,7 +183,7 @@ object KesqueCompactor {
     val storageTable = storages.storageNodeDataSource.table
     val blockHeaderStorage = storages.blockHeaderStorage
 
-    val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 6574258)
+    val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 7225550)
     compactor.load()
   }
 }
@@ -187,11 +198,11 @@ final class KesqueCompactor(
 
   val log = Logging(system, this)
 
-  private val targetStorageTable = kesque.getTable(Array(KesqueDataSource.storage + "_comp"), 4096, CompressionType.NONE, 1024)
-  private val targetAccountTable = kesque.getTable(Array(KesqueDataSource.account + "_comp"), 4096, CompressionType.NONE, 1024)
+  private val targetStorageTable = kesque.getTable(Array(KesqueDataSource.storage), 4096, CompressionType.NONE, 1024)
+  private val targetAccountTable = kesque.getTable(Array(KesqueDataSource.account), 4096, CompressionType.NONE, 1024)
 
-  private val storageWriter = new NodeWriter(KesqueDataSource.storage + "_comp", targetStorageTable)
-  private val accountWriter = new NodeWriter(KesqueDataSource.account + "_comp", targetAccountTable)
+  private val storageWriter = new NodeWriter(KesqueDataSource.storage, targetStorageTable)
+  private val accountWriter = new NodeWriter(KesqueDataSource.account, targetAccountTable)
 
   private val storageReader = new NodeReader[UInt256](KesqueDataSource.storage, storageTable)(trie.rlpUInt256Serializer) {
     override def nodeGot(kv: TKeyVal) {

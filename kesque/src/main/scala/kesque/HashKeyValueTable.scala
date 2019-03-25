@@ -210,11 +210,11 @@ final class HashKeyValueTable private[kesque] (
               var foundValue: Option[TVal] = None
               var foundOffset = Int.MinValue
               var i = mixedOffsets.length - 1 // loop backward to find the newest one  
-              while (i >= 0 && foundValue.isEmpty) {
+              while (foundValue.isEmpty && i >= 0) {
                 val mixedOffset = mixedOffsets(i)
                 val (fileno, offset) = toFileNoAndOffset(mixedOffset)
-                val theTopic = topicsOfFileno(fileno)(col)
-                val (topicPartition, result) = db.read(theTopic, offset, fetchMaxBytes).head
+                val kafkaTopic = topicsOfFileno(fileno)(col) // kafka topic directory name
+                val (topicPartition, result) = db.read(kafkaTopic, offset, fetchMaxBytes).head
                 val recs = result.info.records.records.iterator
                 // NOTE: the records usally do not start from the fecth-offset, 
                 // the expected record may be near the tail of recs
@@ -294,9 +294,9 @@ final class HashKeyValueTable private[kesque] (
     try {
       writeLock.lock()
 
-      val topic = topicsOfFileno(fileno)(col)
+      val kafkaTopic = topicsOfFileno(fileno)(col)
       // write simple records and create index records
-      val indexRecords = db.write(topic, records, compressionType).foldLeft(Vector[Vector[SimpleRecord]]()) {
+      val indexRecords = db.write(kafkaTopic, records, compressionType).foldLeft(Vector[Vector[SimpleRecord]]()) {
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, Some(ex)))) =>
           error(ex.getMessage, ex) // TODO
           indexRecords
@@ -305,8 +305,8 @@ final class HashKeyValueTable private[kesque] (
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
             val (lastOffset, idxRecords) = tkvs.foldLeft(firstOffert, Vector[SimpleRecord]()) {
-              case ((_offset, idxRecords), TKeyVal(keyBytes, value, _, timestamp)) =>
-                val offset = _offset.toInt
+              case ((longOffset, idxRecords), TKeyVal(keyBytes, value, _, timestamp)) =>
+                val offset = longOffset.toInt
                 val key = Hash(keyBytes)
                 val hash = key.hashCode
                 val indexRecord = new SimpleRecord(intToBytes(hash), intToBytes(offset))
@@ -336,7 +336,7 @@ final class HashKeyValueTable private[kesque] (
         case (topicPartition, LogAppendResult(appendInfo, Some(ex))) =>
           error(ex.getMessage, ex) // TODO
         case (topicPartition, LogAppendResult(appendInfo, None)) =>
-          debug(s"$topic: append index records ${indexRecords.size}")
+          debug(s"$kafkaTopic: append index records ${indexRecords.size}")
       }
 
       indexRecords.map(_.size)
@@ -375,9 +375,9 @@ final class HashKeyValueTable private[kesque] (
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
             val (lastOffset, idxRecords) = records.foldLeft(firstOffert, Vector[SimpleRecord]()) {
-              case ((offset, idxRecords), (key, _)) =>
-                val keyh = Hash(key)
-                val hash = keyh.hashCode
+              case ((offset, idxRecords), (keyBytes, _)) =>
+                val key = Hash(keyBytes)
+                val hash = key.hashCode
                 val indexRecord = new SimpleRecord(intToBytes(hash), intToBytes(offset.toInt))
 
                 // remove action always happens on file 1
@@ -407,6 +407,26 @@ final class HashKeyValueTable private[kesque] (
       indexRecords.map(_.size)
     } finally {
       writeLock.unlock()
+    }
+  }
+
+  def removeIndexEntry(keyBytes: Array[Byte], mixedOffset: Int, topic: String) {
+    val col = topicToCol(topic)
+    val key = Hash(keyBytes)
+    val hash = key.hashCode
+    hashOffsets.get(hash, col) match {
+      case IntIntsMap.NO_VALUE => None
+      case mixedOffsets =>
+        var found = false
+        var i = 0
+        while (!found && i < mixedOffsets.length) {
+          if (mixedOffset == mixedOffsets(i)) {
+            hashOffsets.removeValue(hash, mixedOffset, col)
+            found = true
+          } else {
+            i += 1
+          }
+        }
     }
   }
 
