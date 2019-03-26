@@ -58,34 +58,45 @@ object IntIntMap {
   def main(args: Array[String]) {
     val max = 1000000
     val map = new IntIntMap(200, 3)
-    var n = 0
-    while (n < 3) {
+
+    var col = 0
+    while (col < 3) {
       var i = -max
       while (i <= max) {
-        map.put(i, i + n, n)
+        map.put(i, i + col, col)
         i += 1
       }
 
       i = -max
       while (i <= max) {
-        if (map.get(i, n) != i + n) {
-          println(s"value index $n, err at $i - before remove")
+        if (map.get(i, col) != i + col) {
+          println(s"value index $col, err at $i - before remove")
         }
         i += 1
       }
-      println(map.get(max, n))
+      println(map.get(max, col))
 
+      // iterate
+      var count = 0
+      map.iterateOver(col) {
+        case (k, v) =>
+          //println(s"$k -> $v")
+          count += 1
+      }
+      println(s"count: $count")
+
+      // remove
       i = -max
       while (i <= max) {
-        map.remove(i, n)
-        if (map.get(i, n) != NO_VALUE) {
-          println(s"value index $n err at $i - after remove")
+        map.remove(i, col)
+        if (map.get(i, col) != NO_VALUE) {
+          println(s"value index $col err at $i - after remove")
           System.exit(-1)
         }
         i += 1
       }
 
-      n += 1
+      col += 1
     }
   }
 }
@@ -152,20 +163,20 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       }
     }
 
-    // should not be here
+    // should not arrive here
     return NO_VALUE
   }
 
   def put(key: Int, value: Int, col: Int): Int = {
     if (key == FREE_KEY) {
-      val ret = m_freeValue(col)
+      val v = m_freeValue(col)
       if (!m_hasFreeKey(col)) {
         m_size += 1
       }
 
       m_hasFreeKey(col) = true
       m_freeValue(col) = value
-      return ret
+      return v
     }
 
     var ptr = getStartIndex(key)
@@ -173,15 +184,16 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     if (k == FREE_KEY) { // end of chain already
       m_data(ptr) = key
       m_data(ptr + 1 + col) = value
-      if (m_size >= m_threshold)
+      if (m_size >= m_threshold) {
         rehash()
-      else
+      } else {
         m_size += 1
+      }
       return NO_VALUE
     } else if (k == key) { // we check FREE prior to this call
-      val ret = m_data(ptr + 1 + col)
+      val v = m_data(ptr + 1 + col)
       m_data(ptr + 1 + col) = value
-      return ret
+      return v
     }
 
     while (true) {
@@ -190,26 +202,28 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       if (k == FREE_KEY) {
         m_data(ptr) = key
         m_data(ptr + 1 + col) = value
-        if (m_size >= m_threshold)
+        if (m_size >= m_threshold) {
           rehash()
-        else
+        } else {
           m_size += 1
+        }
         return NO_VALUE
       } else if (k == key) {
-        val ret = m_data(ptr + 1 + col)
+        val v = m_data(ptr + 1 + col)
         m_data(ptr + 1 + col) = value
-        return ret
+        return v
       }
     }
 
-    // should not be here
+    // should not arrive here
     return NO_VALUE
   }
 
   def remove(key: Int, col: Int): Int = {
     if (key == FREE_KEY) {
-      if (!m_hasFreeKey(col))
+      if (!m_hasFreeKey(col)) {
         return NO_VALUE
+      }
       m_hasFreeKey(col) = false
       m_size -= 1
       return m_freeValue(col) // value is not cleaned
@@ -218,63 +232,69 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     var ptr = getStartIndex(key)
     var k = m_data(ptr)
     if (k == key) { // we check FREE prior to this call
-      val res = m_data(ptr + 1 + col)
+      val v = m_data(ptr + 1 + col)
       shiftKeys(ptr)
       m_size -= 1
-      return res
-    } else if (k == FREE_KEY)
+      return v
+    } else if (k == FREE_KEY) {
       return NO_VALUE // end of chain already
+    }
 
     while (true) {
       ptr = getNextIndex(ptr)
       k = m_data(ptr)
       if (k == key) {
-        val res = m_data(ptr + 1 + col)
+        val v = m_data(ptr + 1 + col)
         shiftKeys(ptr)
         m_size -= 1
-        return res
+        return v
       } else if (k == FREE_KEY)
         return NO_VALUE
     }
 
-    // should not be here
+    // should not arrive here
     return NO_VALUE
   }
 
-  private def shiftKeys(_pos: Int): Int = {
+  private def shiftKeys(_ptr: Int): Int = {
     // shift entries with the same hash.
     var last = 0
     var slot = 0
     var k = 0
     val data = this.m_data
-    var pos = _pos
+    var ptr = _ptr
     while (true) {
-      last = pos
-      pos = getNextIndex(last)
+      last = ptr
+      ptr = getNextIndex(last)
 
       var break = false
       while (!break) {
-        k = data(pos)
+        k = data(ptr)
         if (k == FREE_KEY) {
           data(last) = FREE_KEY
           return last
         }
         slot = getStartIndex(k) // calculate the starting slot for the current key
-        if (if (last <= pos) last >= slot || slot > pos else last >= slot && slot > pos) {
-          break = true
+        break = if (last <= ptr) {
+          last >= slot || slot > ptr
         } else {
-          pos = getNextIndex(pos) // go to the next entry
+          last >= slot && slot > ptr
+        }
+        if (!break) {
+          ptr = getNextIndex(ptr) // go to the next entry
         }
       }
+
+      // do key and value shift
       data(last) = k
       var n = 0
       while (n < nValues) {
-        data(last + 1 + n) = data(pos + 1 + n)
+        data(last + 1 + n) = data(ptr + 1 + n)
         n += 1
       }
     }
 
-    // should not be here
+    // should not arrive here
     return last
   }
 
@@ -347,6 +367,26 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       (currentIndex + 1 + nValues) & m_mask2
     } else {
       (currentIndex + 1 + nValues) % m_mask2
+    }
+  }
+
+  def iterateOver(col: Int)(op: (Int, Int) => Unit) {
+    var ptr = 0
+    var freeKeyProcessed = false
+    val len = m_data.length - 1 - col
+    while (ptr <= len) {
+      val k = m_data(ptr)
+      if (!freeKeyProcessed && k == FREE_KEY && m_hasFreeKey(col)) {
+        val v = m_freeValue(col)
+        op(k, v)
+        freeKeyProcessed = true
+      } else {
+        val v = m_data(ptr + 1 + col)
+        if (v != NO_VALUE) {
+          op(k, v)
+        }
+      }
+      ptr += 1 + nValues
     }
   }
 }

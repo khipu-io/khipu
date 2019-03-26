@@ -11,49 +11,49 @@ object HashOffsets {
     val max = 1000000
     val map = new HashOffsets(200, 3)
 
-    var n = 0
-    while (n < 3) {
-      println(s"n is $n")
+    var col = 0
+    while (col < 3) {
+      println(s"n is $col")
       // put i and -i
       var i = -max
       while (i <= max) {
-        map.put(i, i, n)
-        map.put(i, -i, n)
+        map.put(i, i, col)
+        map.put(i, -i, col)
         i += 1
       }
 
       i = -max
       while (i <= max) {
         if (i == -i) {
-          if (!Arrays.equals(map.get(i, n), Array(i))) {
-            println(s"err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
+          if (!Arrays.equals(map.get(i, col), Array(i))) {
+            println(s"err at $i - ${map.get(i, col).mkString("[", ",", "]")}")
           }
         } else {
-          if (!Arrays.equals(map.get(i, n), Array(i, -i))) {
-            println(s"err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
+          if (!Arrays.equals(map.get(i, col), Array(i, -i))) {
+            println(s"err at $i - ${map.get(i, col).mkString("[", ",", "]")}")
           }
         }
         i += 1
       }
-      println(map.get(max, n).mkString(","))
-      println(map.get(1, n).mkString(","))
-      println(map.get(max - 1, n).mkString(","))
+      println(map.get(max, col).mkString(","))
+      println(map.get(1, col).mkString(","))
+      println(map.get(max - 1, col).mkString(","))
 
       // remove value -i from map
       i = -max
       while (i <= max) {
-        map.removeValue(i, -i, n)
+        map.removeValue(i, -i, col)
         i += 1
       }
       i = -max
       while (i <= max) {
         if (i == -i) {
-          if (map.get(i, n) != IntIntsMap.NO_VALUE) {
-            println(s"Remove value -$i from map: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
+          if (map.get(i, col) != IntIntsMap.NO_VALUE) {
+            println(s"Remove value -$i from map: err at $i - ${map.get(i, col).mkString("[", ",", "]")}")
           }
         } else {
-          if (!Arrays.equals(map.get(i, n), Array(i))) {
-            println(s"Remove value -$i from map: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
+          if (!Arrays.equals(map.get(i, col), Array(i))) {
+            println(s"Remove value -$i from map: err at $i - ${map.get(i, col).mkString("[", ",", "]")}")
           }
         }
         i += 1
@@ -62,18 +62,14 @@ object HashOffsets {
       // remove all value
       i = -max
       while (i <= max) {
-        map.remove(i, n)
-        i += 1
-      }
-      i = -max
-      while (i <= max) {
-        if (map.get(i, n) != IntIntsMap.NO_VALUE) {
-          println(s"Remove all value: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
+        map.remove(i, col)
+        if (map.get(i, col) != IntIntsMap.NO_VALUE) {
+          println(s"Remove all value: err at $i - ${map.get(i, col).mkString("[", ",", "]")}")
         }
         i += 1
       }
 
-      n += 1
+      col += 1
     }
   }
 }
@@ -182,7 +178,7 @@ final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.7
             case IntIntMap.NO_VALUE => IntIntsMap.NO_VALUE
             case existedValue       => Array(existedValue)
           }
-        case _ => multipleValuesMap.remove(key, col)
+        case x => x
       }
     } finally {
       writeLock.unlock()

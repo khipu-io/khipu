@@ -13,14 +13,14 @@ object IntIntsMap {
     val max = 1000000
     val map = new IntIntsMap(200, 3)
 
-    var n = 0
-    while (n < 3) {
-      println(s"n is $n")
+    var col = 0
+    while (col < 3) {
+      println(s"col is $col")
       // put i and -i
       var i = -max
       while (i <= max) {
-        map.put(i, i, n)
-        map.put(i, -i, n)
+        map.put(i, i, col)
+        map.put(i, -i, col)
         //println(s"${map.get(i, n).mkString("[", ",", "]")}")
         i += 1
       }
@@ -28,38 +28,38 @@ object IntIntsMap {
       i = -max
       while (i <= max) {
         if (i == -i) {
-          if (!Arrays.equals(map.get(i, n), Array(i))) {
-            println(s"err at $i - ${map.get(i, n).mkString("[", ",", "]")} should be [$i]")
+          if (!Arrays.equals(map.get(i, col), Array(i))) {
+            println(s"err at $i - ${map.get(i, col).mkString("[", ",", "]")} should be [$i]")
             System.exit(-1)
           }
         } else {
-          if (!Arrays.equals(map.get(i, n), Array(i, -i))) {
-            println(s"err at $i - ${map.get(i, n).mkString("[", ",", "]")} should be [$i, ${-i}]")
+          if (!Arrays.equals(map.get(i, col), Array(i, -i))) {
+            println(s"err at $i - ${map.get(i, col).mkString("[", ",", "]")} should be [$i, ${-i}]")
             System.exit(-1)
           }
         }
         i += 1
       }
-      println(map.get(max, n).mkString(","))
-      println(map.get(1, n).mkString(","))
-      println(map.get(max - 1, n).mkString(","))
+      println(map.get(max, col).mkString(","))
+      println(map.get(1, col).mkString(","))
+      println(map.get(max - 1, col).mkString(","))
 
       // remove value -i from map
       i = -max
       while (i <= max) {
-        map.removeValue(i, -i, n)
+        map.removeValue(i, -i, col)
         i += 1
       }
       i = -max
       while (i <= max) {
         if (i == -i) {
-          if (map.get(i, n) != NO_VALUE) {
-            println(s"Remove value -$i from map: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
+          if (map.get(i, col) != NO_VALUE) {
+            println(s"Remove value -$i from map: err at $i - ${map.get(i, col).mkString("[", ",", "]")}")
             System.exit(-1)
           }
         } else {
-          if (!Arrays.equals(map.get(i, n), Array(i))) {
-            println(s"Remove value -$i from map: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
+          if (!Arrays.equals(map.get(i, col), Array(i))) {
+            println(s"Remove value -$i from map: err at $i - ${map.get(i, col).mkString("[", ",", "]")}")
             System.exit(-1)
           }
         }
@@ -69,15 +69,15 @@ object IntIntsMap {
       // remove all value
       i = -max
       while (i <= max) {
-        map.remove(i, n)
-        if (map.get(i, n) != NO_VALUE) {
-          println(s"Remove all value: err at $i - ${map.get(i, n).mkString("[", ",", "]")}")
+        map.remove(i, col)
+        if (map.get(i, col) != NO_VALUE) {
+          println(s"Remove all value: err at $i - ${map.get(i, col).mkString("[", ",", "]")}")
           System.exit(-1)
         }
         i += 1
       }
 
-      n += 1
+      col += 1
     }
   }
 }
@@ -154,13 +154,13 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
 
   private def put(key: Int, value: Array[V], col: Int): Array[V] = {
     if (key == FREE_KEY) {
-      val ret = m_freeValue(col)
+      val v = m_freeValue(col)
       if (!m_hasFreeKey(col)) {
         m_size += 1
       }
       m_hasFreeKey(col) = true
       m_freeValue(col) = value
-      ret
+      v
     } else {
       var idx = getPutIndex(key)
       if (idx < 0) { // no insertion point? Should not happen...
@@ -291,57 +291,62 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         NO_VALUE
       } else {
         m_hasFreeKey(col) = false
-        val ret = m_freeValue(col)
+        val v = m_freeValue(col)
         m_freeValue(col) = NO_VALUE
         m_size -= 1
-        ret
+        v
       }
     } else {
       val idx = getReadIndex(key)
       if (idx == -1) {
         NO_VALUE
       } else {
-        val res = m_values(col)(idx)
+        val v = m_values(col)(idx)
         m_values(col)(idx) = NO_VALUE
         shiftKeys(idx, col)
         m_size -= 1
-        res
+        v
       }
     }
   }
 
   def size = m_size
 
-  private def shiftKeys(_pos: Int, col: Int): Int = {
-    var pos = _pos
+  private def shiftKeys(_ptr: Int, col: Int): Int = {
+    var ptr = _ptr
     // shift entries with the same hash.
     var last = 0
     var slot = 0
     var k = 0
     val keys = this.m_keys
     while (true) {
-      last = pos
-      pos = getNextIndex(pos)
+      last = ptr
+      ptr = getNextIndex(ptr)
       var break = false
       while (!break) {
-        k = keys(pos)
+        k = keys(ptr)
         if (k == FREE_KEY) {
           keys(last) = FREE_KEY
           m_values(col)(last) = NO_VALUE
           return last
         }
         slot = getStartIndex(k) // calculate the starting slot for the current key
-        if (if (last <= pos) last >= slot || slot > pos else last >= slot && slot > pos) {
-          break = true
+        break = if (last <= ptr) {
+          last >= slot || slot > ptr
         } else {
-          pos = getNextIndex(pos)
+          last >= slot && slot > ptr
+        }
+        if (!break) {
+          ptr = getNextIndex(ptr)
         }
       }
+
+      // do key and value shift
       keys(last) = k
-      m_values(col)(last) = m_values(col)(pos)
+      m_values(col)(last) = m_values(col)(ptr)
     }
 
-    // should not be here
+    // should not arrive here
     last
   }
 
