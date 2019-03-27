@@ -111,7 +111,9 @@ final class HashKeyValueTable private[kesque] (
     timeIndexTask ::: tasks foreach { _.join() }
   }
 
-  final case class LoadIndexTask(col: Int) extends Thread {
+  // Add 'final' will cause "The outer reference in this type test cannot be checked at run time." compile warning
+  // This warns about a bug in scalac (scala/bug#4440) that does not exist in Dotty (#2156)
+  case class LoadIndexTask(col: Int) extends Thread {
     override def run() {
       loadOffsetsOf(col)
     }
@@ -407,22 +409,39 @@ final class HashKeyValueTable private[kesque] (
   }
 
   def removeIndexEntry(keyBytes: Array[Byte], mixedOffset: Int, topic: String) {
-    val col = topicToCol(topic)
-    val key = Hash(keyBytes)
-    val hash = key.hashCode
-    hashOffsets.get(hash, col) match {
-      case IntIntsMap.NO_VALUE =>
-      case mixedOffsets =>
-        var found = false
-        var i = 0
-        while (!found && i < mixedOffsets.length) {
-          if (mixedOffset == mixedOffsets(i)) {
-            hashOffsets.removeValue(hash, mixedOffset, col)
-            found = true
-          } else {
-            i += 1
+    try {
+      writeLock.lock()
+
+      val col = topicToCol(topic)
+      val key = Hash(keyBytes)
+      val hash = key.hashCode
+      hashOffsets.get(hash, col) match {
+        case IntIntsMap.NO_VALUE =>
+        case mixedOffsets =>
+          var found = false
+          var i = 0
+          while (!found && i < mixedOffsets.length) {
+            if (mixedOffset == mixedOffsets(i)) {
+              hashOffsets.removeValue(hash, mixedOffset, col)
+              found = true
+            } else {
+              i += 1
+            }
           }
-        }
+      }
+    } finally {
+      writeLock.unlock()
+    }
+  }
+
+  def removeIndexEntries(topic: String)(cond: (Int, Int) => Boolean) {
+    try {
+      writeLock.lock()
+
+      val col = topicToCol(topic)
+      hashOffsets.removeValues(col)(cond)
+    } finally {
+      writeLock.unlock()
     }
   }
 

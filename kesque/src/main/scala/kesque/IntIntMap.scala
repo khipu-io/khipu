@@ -61,6 +61,8 @@ object IntIntMap {
 
     var col = 0
     while (col < 3) {
+      println(s"\n=== col $col ===")
+
       var i = -max
       while (i <= max) {
         map.put(i, i + col, col)
@@ -81,6 +83,24 @@ object IntIntMap {
       map.iterateOver(col) {
         case (k, v) =>
           //println(s"$k -> $v")
+          count += 1
+      }
+      println(s"count: $count")
+
+      // remove values under condition
+      map.removeValues(col) {
+        case (k, v) => v < 0
+      }
+      println(s"remove all < 0")
+
+      // check after remove all
+      count = 0
+      map.iterateOver(col) {
+        case (k, v) =>
+          //println(s"$k -> $v")
+          if (v < 0) {
+            println(s"remove all < 0 err happened")
+          }
           count += 1
       }
       println(s"count: $count")
@@ -376,9 +396,11 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     val len = m_data.length - 1 - col
     while (ptr <= len) {
       val k = m_data(ptr)
-      if (!freeKeyProcessed && k == FREE_KEY && m_hasFreeKey(col)) {
-        val v = m_freeValue(col)
-        op(k, v)
+      if (k == FREE_KEY) {
+        if (!freeKeyProcessed && m_hasFreeKey(col)) {
+          val v = m_freeValue(col)
+          op(k, v)
+        }
         freeKeyProcessed = true
       } else {
         val v = m_data(ptr + 1 + col)
@@ -386,7 +408,39 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
           op(k, v)
         }
       }
+
       ptr += 1 + nValues
+    }
+  }
+
+  def removeValues(col: Int)(cond: (Int, Int) => Boolean) {
+    var ptr = 0
+    var freeKeyProcessed = false
+    val len = m_data.length - 1 - col
+    while (ptr <= len) {
+      val k = m_data(ptr)
+      var keyRemoved = false
+      if (k == FREE_KEY) {
+        if (!freeKeyProcessed && m_hasFreeKey(col)) {
+          val v = m_freeValue(col)
+          if (cond(k, v)) {
+            remove(k, col)
+            keyRemoved = true
+          }
+        }
+        freeKeyProcessed = true
+      } else {
+        val v = m_data(ptr + 1 + col)
+        if (cond(k, v)) {
+          remove(k, col)
+          keyRemoved = true
+        }
+      }
+
+      // if remove happened, the key may be shifted at ptr, we should re-check it
+      if (!keyRemoved) {
+        ptr += 1 + nValues
+      }
     }
   }
 }

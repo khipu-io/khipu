@@ -15,7 +15,8 @@ object IntIntsMap {
 
     var col = 0
     while (col < 3) {
-      println(s"col is $col")
+      println(s"\n=== col $col ===")
+
       // put i and -i
       var i = -max
       while (i <= max) {
@@ -43,6 +44,41 @@ object IntIntsMap {
       println(map.get(max, col).mkString(","))
       println(map.get(1, col).mkString(","))
       println(map.get(max - 1, col).mkString(","))
+
+      // iterate
+      var count = 0
+      map.iterateOver(col) {
+        case (k, v) =>
+          //println(s"$k -> $v")
+          count += 1
+      }
+      println(s"count: $count")
+
+      // remove values under condition
+      map.removeValues(col) {
+        case (k, v) => v < 0
+      }
+      println(s"remove all < 0")
+
+      // check after remove all
+      count = 0
+      map.iterateOver(col) {
+        case (k, v) =>
+          //println(s"$k -> $v")
+          if (v < 0) {
+            println(s"remove all < 0 err happened")
+          }
+          count += 1
+      }
+      println(s"count: $count")
+
+      i = -max
+      while (i <= max) {
+        map.put(i, i, col)
+        map.put(i, -i, col)
+        //println(s"${map.get(i, n).mkString("[", ",", "]")}")
+        i += 1
+      }
 
       // remove value -i from map
       i = -max
@@ -473,6 +509,90 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       (currentIndex + 1) & m_mask
     } else {
       (currentIndex + 1) % m_mask
+    }
+  }
+
+  def iterateOver(col: Int)(op: (Int, V) => Unit) {
+    var ptr = 0
+    var freeKeyProcessed = false
+    val len = m_keys.length - 1
+    while (ptr <= len) {
+      val k = m_keys(ptr)
+      if (k == FREE_KEY) {
+        if (!freeKeyProcessed && m_hasFreeKey(col)) {
+          val v = m_freeValue(col)
+          var i = 0
+          while (i < v.length) {
+            val x = v(i)
+            op(k, x)
+            i += 1
+          }
+        }
+        freeKeyProcessed = true
+      } else {
+        val v = m_values(col)(ptr)
+        if (v != NO_VALUE) {
+          var i = 0
+          while (i < v.length) {
+            val x = v(i)
+            op(k, x)
+            i += 1
+          }
+        }
+      }
+
+      ptr += 1
+    }
+  }
+
+  def removeValues(col: Int)(cond: (Int, Int) => Boolean) {
+    var ptr = 0
+    var freeKeyProcessed = false
+    val len = m_keys.length - 1
+    while (ptr <= len) {
+      val k = m_keys(ptr)
+      var keyRemoved = false
+      if (k == FREE_KEY) {
+        if (!freeKeyProcessed && m_hasFreeKey(col)) {
+          val v = m_freeValue(col)
+          var i = 0
+          var count = 0
+          while (i < v.length) {
+            val x = v(i)
+            if (cond(k, x)) {
+              removeValue(k, x, col)
+              count += 1
+            }
+            i += 1
+          }
+          if (count == v.length) {
+            remove(k, col)
+            keyRemoved = true
+          }
+        }
+        freeKeyProcessed = true
+      } else {
+        val v = m_values(col)(ptr)
+        var count = 0
+        var i = 0
+        while (i < v.length) {
+          val x = v(i)
+          if (cond(k, x)) {
+            removeValue(k, x, col)
+            count += 1
+          }
+          i += 1
+        }
+        if (count == v.length) {
+          remove(k, col)
+          keyRemoved = true
+        }
+      }
+
+      // if remove happened, the key may be shifted at ptr, we should re-check it
+      if (!keyRemoved) {
+        ptr += 1
+      }
     }
   }
 }

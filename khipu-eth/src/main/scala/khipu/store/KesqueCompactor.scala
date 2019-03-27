@@ -117,12 +117,16 @@ object KesqueCompactor {
   final class NodeWriter(topic: String, nodeTable: HashKeyValueTable, toFileNo: Int) {
     private val buf = new mutable.ArrayBuffer[TKeyVal]()
 
+    private var _maxOffset = Int.MinValue
+    def maxOffset = _maxOffset
+
     def write(kv: TKeyVal) {
       buf += kv
       if (buf.size > 100) { // keep the batched size around 4096 (~ 32*100 bytes)
         val kvs = buf map {
           case TKeyVal(key, value, mixedOffset, timestamp) =>
             val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
+            _maxOffset = math.max(_maxOffset, offset)
             TKeyVal(key, value, offset, timestamp)
         }
         nodeTable.write(kvs, topic, toFileNo)
@@ -198,7 +202,7 @@ object KesqueCompactor {
     val blockHeaderStorage = storages.blockHeaderStorage
 
     val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 7225555, 0, 1)
-    compactor.load()
+    compactor.start()
   }
 }
 final class KesqueCompactor(
@@ -245,7 +249,13 @@ final class KesqueCompactor(
     }
   }
 
-  def load() {
+  def start() {
+    load()
+    postAppend()
+    gc()
+  }
+
+  private def load() {
     log.info(s"[comp] loading nodes of #$blockNumber")
     for {
       hash <- blockHeaderStorage.getBlockHash(blockNumber)
@@ -259,4 +269,52 @@ final class KesqueCompactor(
     log.info(s"[comp] all nodes loaded of #$blockNumber")
   }
 
+  /**
+   * should stop world during postAppend()
+   */
+  private def postAppend() {
+    log.info(s"[comp] post append storage from offset ${storageWriter.maxOffset + 1} ...")
+    val storageTask = new Thread {
+      override def run() {
+        storageTable.iterateOver(storageWriter.maxOffset + 1, KesqueDataSource.storage) {
+          kv => storageWriter.write(kv)
+        }
+      }
+    }
+
+    log.info(s"[comp] post append account from offset ${accountWriter.maxOffset + 1} ...")
+    val accountTask = new Thread {
+      override def run() {
+        accountTable.iterateOver(accountWriter.maxOffset + 1, KesqueDataSource.account) {
+          kv => accountWriter.write(kv)
+        }
+      }
+    }
+
+    storageTask.start
+    accountTask.start
+
+    storageTask.join
+    accountTask.join
+    log.info(s"[comp] post append done.")
+  }
+
+  /**
+   * should stop world during gc()
+   */
+  private def gc() {
+    log.info(s"[comp] gc ...")
+    targetStorageTable.removeIndexEntries(KesqueDataSource.storage) {
+      case (k, mixedOffset) =>
+        val (fileNo, _) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
+        fileNo == fromFileNo
+    }
+
+    targetAccountTable.removeIndexEntries(KesqueDataSource.account) {
+      case (k, mixedOffset) =>
+        val (fileNo, _) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
+        fileNo == fromFileNo
+    }
+    log.info(s"[comp] gc done.")
+  }
 }

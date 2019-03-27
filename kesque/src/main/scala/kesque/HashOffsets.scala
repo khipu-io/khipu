@@ -185,5 +185,16 @@ final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.7
     }
   }
 
+  def removeValues(col: Int)(cond: (Int, Int) => Boolean) {
+    try {
+      readLock.lock()
+
+      multipleValuesMap.removeValues(col)(cond)
+      singleValueMap.removeValues(col)(cond)
+    } finally {
+      readLock.unlock()
+    }
+  }
+
   def size = singleValueMap.size + multipleValuesMap.size
 }
