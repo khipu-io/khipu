@@ -6,7 +6,12 @@ object IntIntsMap {
   type V = Int // unsigned int could be 2^32 = 4,294,967,296
 
   private val FREE_KEY = 0
-  val NO_VALUE = Array[V]()
+  /** 
+   * Used for return only. 
+   * Always put null to data[] when removing item instead of NO_VALUE (Array()) 
+   * to release memory.
+   */
+  val NO_VALUE = Array[V]() 
 
   // --- simple test
   def main(args: Array[String]) {
@@ -164,27 +169,38 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
 
   def get(key: Int, col: Int): Array[V] = {
     if (key == FREE_KEY) {
-      if (m_hasFreeKey(col)) m_freeValue(col) else NO_VALUE
+      if (m_hasFreeKey(col)) {
+        m_freeValue(col)
+      } else {
+        NO_VALUE
+      }
     } else {
       val idx = getReadIndex(key)
-      if (idx != -1) m_values(col)(idx) else NO_VALUE
+      if (idx != -1) {
+        m_values(col)(idx) match {
+          case null => NO_VALUE
+          case xs   => xs
+        }
+      } else {
+        NO_VALUE
+      }
     }
   }
 
   def put(key: Int, value: V, col: Int): Array[V] = {
-    val oldValues = get(key, col)
-    if (oldValues == NO_VALUE) {
-      put(key, Array(value), col)
-    } else {
-      val existed = findValue(oldValues, value)
-      if (existed != -1) { // already existed do nothing
-        Array(value)
-      } else {
-        val newValues = Array.ofDim[V](oldValues.length + 1)
-        System.arraycopy(oldValues, 0, newValues, 0, oldValues.length)
-        newValues(newValues.length - 1) = value
-        put(key, newValues, col)
-      }
+    get(key, col) match {
+      case NO_VALUE =>
+        put(key, Array(value), col)
+      case oldValues =>
+        val existed = findValue(oldValues, value)
+        if (existed != -1) { // already existed do nothing
+          Array(value)
+        } else {
+          val newValues = Array.ofDim[V](oldValues.length + 1)
+          System.arraycopy(oldValues, 0, newValues, 0, oldValues.length)
+          newValues(newValues.length - 1) = value
+          put(key, newValues, col)
+        }
     }
   }
 
@@ -215,75 +231,78 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         assert(m_keys(idx) == key)
         m_values(col)(idx) = value
       }
-      prev
+      prev match {
+        case null => NO_VALUE
+        case xs   => xs
+      }
     }
   }
 
   def removeValue(key: Int, value: V, col: Int): Array[V] = {
-    val oldValues = get(key, col)
-    if (oldValues == NO_VALUE) {
-      NO_VALUE
-    } else {
-      val existed = findValue(oldValues, value)
-      if (existed != -1) { // existed
-        if (oldValues.length == 1) { // the existed only one will be removed
-          remove(key, col)
-        } else {
-          val newLen = oldValues.length - 1
-          val xs = Array.ofDim[V](newLen)
-          System.arraycopy(oldValues, 0, xs, 0, existed)
-          System.arraycopy(oldValues, existed + 1, xs, existed, newLen - existed)
-          put(key, xs, col)
-
-          Array(value)
-        }
-      } else {
+    get(key, col) match {
+      case NO_VALUE =>
         NO_VALUE
-      }
+      case oldValues =>
+        val existed = findValue(oldValues, value)
+        if (existed != -1) { // existed
+          if (oldValues.length == 1) { // only one existed, remove it
+            remove(key, col)
+          } else {
+            val newLen = oldValues.length - 1
+            val xs = Array.ofDim[V](newLen)
+            System.arraycopy(oldValues, 0, xs, 0, existed)
+            System.arraycopy(oldValues, existed + 1, xs, existed, newLen - existed)
+            put(key, xs, col)
+
+            Array(value)
+          }
+        } else {
+          NO_VALUE
+        }
     }
   }
 
   def replace(key: Int, toRemove: V, toPut: V, col: Int): Array[V] = {
-    val oldValues = get(key, col)
-    if (oldValues == NO_VALUE) {
-      put(key, Array(toPut), col)
-    } else {
-      val (toRemoveExisted, toPutExisted) = findValues(oldValues, toRemove, toPut)
-      if (toRemoveExisted != -1) {
-        if (toPutExisted != 1) {
-          if (toRemoveExisted == toPutExisted) { // do nothing, do not remove already existed toPut
-            Array(toPut)
-          } else { // remove existed only, toPut already there
-            val newLen = oldValues.length - 1
+    get(key, col) match {
+      case NO_VALUE =>
+        put(key, Array(toPut), col)
+      case oldValues =>
+        val (toRemoveExisted, toPutExisted) = findValues(oldValues, toRemove, toPut)
+        if (toRemoveExisted != -1) {
+          if (toPutExisted != 1) {
+            if (toRemoveExisted == toPutExisted) { // do nothing, do not remove already existed toPut
+              Array(toPut)
+            } else { // remove existed only, toPut already there
+              val newLen = oldValues.length - 1
+              val newValues = Array.ofDim[V](newLen)
+              System.arraycopy(oldValues, 0, newValues, 0, toRemoveExisted)
+              System.arraycopy(oldValues, toRemoveExisted + 1, newValues, toRemoveExisted, newLen - toRemoveExisted)
+              put(key, newValues, col)
+
+              Array(toPut)
+            }
+          } else { // remove existed and put no-existed
+            val newLen = oldValues.length
             val newValues = Array.ofDim[V](newLen)
             System.arraycopy(oldValues, 0, newValues, 0, toRemoveExisted)
-            System.arraycopy(oldValues, toRemoveExisted + 1, newValues, toRemoveExisted, newLen - toRemoveExisted)
+            System.arraycopy(oldValues, toRemoveExisted + 1, newValues, toRemoveExisted, newLen - 1 - toRemoveExisted)
+            newValues(newLen - 1) = toPut
             put(key, newValues, col)
 
             Array(toPut)
           }
-        } else { // remove existed and put no-existed
-          val newLen = oldValues.length
-          val newValues = Array.ofDim[V](newLen)
-          System.arraycopy(oldValues, 0, newValues, 0, toRemoveExisted)
-          System.arraycopy(oldValues, toRemoveExisted + 1, newValues, toRemoveExisted, newLen - 1 - toRemoveExisted)
-          newValues(newLen - 1) = toPut
-          put(key, newValues, col)
+        } else {
+          if (toPutExisted != -1) { // none toRemove and toPut already there, do nothing
+            Array(toPut)
+          } else { // none toRemove and put no-existed
+            val newValues = Array.ofDim[V](oldValues.length + 1)
+            System.arraycopy(oldValues, 0, newValues, 0, oldValues.length)
+            newValues(newValues.length - 1) = toPut
+            put(key, newValues, col)
 
-          Array(toPut)
+            Array(toPut)
+          }
         }
-      } else {
-        if (toPutExisted != -1) { // none toRemove and toPut already there, do nothing
-          Array(toPut)
-        } else { // none toRemove and put no-existed
-          val newValues = Array.ofDim[V](oldValues.length + 1)
-          System.arraycopy(oldValues, 0, newValues, 0, oldValues.length)
-          newValues(newValues.length - 1) = toPut
-          put(key, newValues, col)
-
-          Array(toPut)
-        }
-      }
     }
   }
 
@@ -328,7 +347,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
       } else {
         m_hasFreeKey(col) = false
         val v = m_freeValue(col)
-        m_freeValue(col) = NO_VALUE
+        m_freeValue(col) = null
         m_size -= 1
         v
       }
@@ -338,10 +357,13 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         NO_VALUE
       } else {
         val v = m_values(col)(idx)
-        m_values(col)(idx) = NO_VALUE
+        m_values(col)(idx) = null
         shiftKeys(idx, col)
         m_size -= 1
-        v
+        v match {
+          case null => NO_VALUE
+          case xs   => xs
+        }
       }
     }
   }
@@ -363,7 +385,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         k = keys(ptr)
         if (k == FREE_KEY) {
           keys(last) = FREE_KEY
-          m_values(col)(last) = NO_VALUE
+          m_values(col)(last) = null
           return last
         }
         slot = getStartIndex(k) // calculate the starting slot for the current key
@@ -491,7 +513,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     // filled by key1 may left m_value(1), m_value(2) to be null
     var n = 0
     while (n < nValues) {
-      m_values(n) = Array.fill(m_capacity)(NO_VALUE)
+      m_values(n) = Array.fill(m_capacity)(null)
       n += 1
     }
   }
@@ -531,7 +553,7 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         freeKeyProcessed = true
       } else {
         val v = m_values(col)(ptr)
-        if (v != NO_VALUE) {
+        if (v ne null) {
           var i = 0
           while (i < v.length) {
             val x = v(i)
@@ -573,19 +595,21 @@ final class IntIntsMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
         freeKeyProcessed = true
       } else {
         val v = m_values(col)(ptr)
-        var count = 0
-        var i = 0
-        while (i < v.length) {
-          val x = v(i)
-          if (cond(k, x)) {
-            removeValue(k, x, col)
-            count += 1
+        if (v ne null) {
+          var count = 0
+          var i = 0
+          while (i < v.length) {
+            val x = v(i)
+            if (cond(k, x)) {
+              removeValue(k, x, col)
+              count += 1
+            }
+            i += 1
           }
-          i += 1
-        }
-        if (count == v.length) {
-          remove(k, col)
-          keyRemoved = true
+          if (count == v.length) {
+            remove(k, col)
+            keyRemoved = true
+          }
         }
       }
 
