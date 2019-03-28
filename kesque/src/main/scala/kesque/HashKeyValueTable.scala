@@ -123,7 +123,7 @@ final class HashKeyValueTable private[kesque] (
     val start = System.nanoTime
 
     // TODO shift indexTopics and shiftIndexTopics
-    val indexTopicsOfFileno = Array(indexTopics) 
+    val indexTopicsOfFileno = Array(indexTopics)
     val initCounts = Array.fill[Int](indexTopicsOfFileno.length)(0)
     val (_, counts) = indexTopicsOfFileno.foldLeft(0, initCounts) {
       case ((fileno, counts), idxTps) =>
@@ -432,21 +432,31 @@ final class HashKeyValueTable private[kesque] (
     }
   }
 
-  def iterateOver(fetchOffset: Long, topic: String)(op: TKeyVal => Unit) = {
+  def iterateOver(fromOffset: Long, topic: String)(op: TKeyVal => Unit) = {
     try {
       readLock.lock()
 
-      db.iterateOver(topic, fetchOffset, fetchMaxBytes)(op)
+      db.iterateOver(topic, fromOffset, fetchMaxBytes)(op)
     } finally {
       readLock.unlock()
     }
   }
 
-  def readOnce(fetchOffset: Long, topic: String)(op: TKeyVal => Unit) = {
+  def readOnce(fromOffset: Long, topic: String)(op: TKeyVal => Unit) = {
     try {
       readLock.lock()
 
-      db.readOnce(topic, fetchOffset, fetchMaxBytes)(op)
+      db.readOnce(topic, fromOffset, fetchMaxBytes)(op)
+    } finally {
+      readLock.unlock()
+    }
+  }
+
+  def readBatch(topic: String, fromOffset: Long, fetchMaxBytes: Int): (Long, Array[TKeyVal]) = {
+    try {
+      readLock.lock()
+
+      db.readBatch(topic, fromOffset, fetchMaxBytes)
     } finally {
       readLock.unlock()
     }

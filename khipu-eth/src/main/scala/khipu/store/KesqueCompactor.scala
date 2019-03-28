@@ -132,12 +132,10 @@ object KesqueCompactor {
     }
 
     def flush() {
-      println(s"flush on $topic")
       buf foreach {
         case TKeyVal(key, _, mixedOffset, _) =>
           nodeTable.removeIndexEntry(key, mixedOffset, topic)
       }
-      println(s"flush on $topic, removed index")
 
       val kvs = buf map {
         case TKeyVal(key, value, mixedOffset, timestamp) =>
@@ -145,9 +143,7 @@ object KesqueCompactor {
           _maxOffset = math.max(_maxOffset, offset)
           TKeyVal(key, value, offset, timestamp)
       }
-      println(s"flush on $topic, writing to $toFileNo")
       nodeTable.write(kvs, topic, toFileNo)
-      println(s"flush on $topic, writing done")
 
       buf.clear()
     }
@@ -246,7 +242,7 @@ final class KesqueCompactor(
   }
 
   def start() {
-    loadSnaphot
+    loadSnaphot()
     postAppend()
     gc()
   }
@@ -273,10 +269,15 @@ final class KesqueCompactor(
       override def run() {
         log.info(s"[comp] post append storage from offset ${storageWriter.maxOffset + 1} ...")
         // TODO topic from fromFileNo
-        storageTable.iterateOver(storageWriter.maxOffset + 1, KesqueDataSource.storage) {
-        //storageTable.iterateOver(241714020, KesqueDataSource.storage) {
-          kv => storageWriter.write(kv)
-        }
+        var offset = storageWriter.maxOffset + 1
+        var nRead = 0
+        do {
+          val (lastOffset, recs) = accountTable.readBatch(KesqueDataSource.account, offset, 4096)
+          recs foreach accountWriter.write
+          nRead = recs.length
+          offset = lastOffset + 1
+        } while (nRead > 0)
+
         storageWriter.flush()
         log.info(s"[comp] post append storage done.")
       }
@@ -286,12 +287,15 @@ final class KesqueCompactor(
       override def run() {
         log.info(s"[comp] post append account from offset ${accountWriter.maxOffset + 1} ...")
         // TODO topic from fromFileNo
-        accountTable.iterateOver(accountWriter.maxOffset + 1, KesqueDataSource.account) {
-        //accountTable.iterateOver(109535465, KesqueDataSource.account, true) {
-          kv =>
-            log.info(s"[comp] account iterate on $kv")
-            accountWriter.write(kv)
-        }
+        var offset = accountWriter.maxOffset + 1
+        var nRead = 0
+        do {
+          val (lastOffset, recs) = accountTable.readBatch(KesqueDataSource.account, offset, 4096)
+          recs foreach accountWriter.write
+          nRead = recs.length
+          offset = lastOffset + 1
+        } while (nRead > 0)
+
         accountWriter.flush()
         log.info(s"[comp] post append account done.")
       }

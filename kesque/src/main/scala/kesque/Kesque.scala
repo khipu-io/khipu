@@ -119,8 +119,8 @@ final class Kesque(props: Properties) {
    * @param fetchOffset
    * @param op: action applied on (offset, key, value)
    */
-  private[kesque] def iterateOver(topic: String, fetchOffset: Long = 0L, fetchMaxBytes: Int)(op: TKeyVal => Unit) = {
-    var offset = fetchOffset
+  private[kesque] def iterateOver(topic: String, fromOffset: Long = 0L, fetchMaxBytes: Int)(op: TKeyVal => Unit) = {
+    var offset = fromOffset
     var nRead = 0
     do {
       readOnce(topic, offset, fetchMaxBytes)(op) match {
@@ -134,6 +134,7 @@ final class Kesque(props: Properties) {
   /**
    * @param topic
    * @param from offset
+   * @param fetchMaxBytes
    * @param op: action applied on TKeyVal(key, value, offset, timestamp)
    * @return (number of read, last offset read)
    */
@@ -158,6 +159,34 @@ final class Kesque(props: Properties) {
     }
 
     (count, lastOffset)
+  }
+
+  /**
+   * @param topic
+   * @param from offset
+   * @param fetchMaxBytes
+   * @return (last offset read, records)
+   */
+  private[kesque] def readBatch(topic: String, fromOffset: Long, fetchMaxBytes: Int): (Long, Array[TKeyVal]) = {
+    val batch = mutable.ArrayBuffer[TKeyVal]()
+    val (topicPartition, result) = read(topic, fromOffset, fetchMaxBytes).head
+    val recs = result.info.records.records.iterator
+    var lastOffset = fromOffset
+    while (recs.hasNext) {
+      val rec = recs.next
+      val offset = rec.offset
+      if (offset >= fromOffset) {
+        val key = if (rec.hasKey) kesque.getBytes(rec.key) else null
+        val value = if (rec.hasValue) kesque.getBytes(rec.value) else null
+        val timestamp = rec.timestamp
+
+        batch += TKeyVal(key, value, offset.toInt, timestamp)
+
+        lastOffset = offset
+      }
+    }
+
+    (lastOffset, batch.toArray)
   }
 
   def shutdown() {
