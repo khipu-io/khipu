@@ -6,12 +6,12 @@ object IntIntsMap {
   type V = Int // unsigned int could be 2^32 = 4,294,967,296
 
   private val FREE_KEY = 0
-  /** 
-   * Used for return only. 
-   * Always put null to data[] when removing item instead of NO_VALUE (Array()) 
+  /**
+   * Used for return only.
+   * Always put null to data[] when removing item instead of NO_VALUE (Array())
    * to release memory.
    */
-  val NO_VALUE = Array[V]() 
+  val NO_VALUE = Array[V]()
 
   // --- simple test
   def main(args: Array[String]) {

@@ -13,7 +13,8 @@ object HashOffsets {
 
     var col = 0
     while (col < 3) {
-      println(s"n is $col")
+      println(s"\n=== col $col ===")
+
       // put i and -i
       var i = -max
       while (i <= max) {
@@ -130,13 +131,17 @@ final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.7
     try {
       writeLock.lock()
 
-      multipleValuesMap.get(key, col) match {
-        case IntIntsMap.NO_VALUE =>
-          singleValueMap.get(key, col) match {
-            case IntIntMap.NO_VALUE => IntIntsMap.NO_VALUE
-            case existedValue       => Array(singleValueMap.remove(key, col))
+      multipleValuesMap.removeValue(key, value, col) match {
+        case IntIntsMap.NO_VALUE => Array(singleValueMap.remove(key, col))
+        case removedValue =>
+          if (removedValue.length > 0) {
+            val leftValues = multipleValuesMap.get(key, col)
+            if (leftValues.length == 1) {
+              singleValueMap.put(key, leftValues(0), col)
+              multipleValuesMap.remove(key, col)
+            }
           }
-        case _ => multipleValuesMap.removeValue(key, value, col)
+          removedValue
       }
     } finally {
       writeLock.unlock()
@@ -156,8 +161,7 @@ final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.7
               case IntIntMap.NO_VALUE => Array(singleValueMap.put(key, toPut, col))
               case existed =>
                 singleValueMap.remove(key, col)
-                multipleValuesMap.put(key, existed, col)
-                multipleValuesMap.replace(key, toRemove, toPut, col)
+                Array(singleValueMap.put(key, toPut, col))
             }
           case _ =>
             multipleValuesMap.replace(key, toRemove, toPut, col)
@@ -189,12 +193,13 @@ final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.7
     try {
       readLock.lock()
 
-      multipleValuesMap.removeValues(col)(cond)
+      // TODO should move value to singleValueMap if multipeValuesMap only has one value?
       singleValueMap.removeValues(col)(cond)
+      multipleValuesMap.removeValues(col)(cond)
     } finally {
       readLock.unlock()
     }
   }
 
-  def size = singleValueMap.size + multipleValuesMap.size
+  def size = (singleValueMap.size, multipleValuesMap.size)
 }

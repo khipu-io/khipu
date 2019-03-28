@@ -95,7 +95,8 @@ object KesqueCompactor {
             if (nodeCount % 1000 == 0) {
               val elapsed = (System.nanoTime - start) / 1000000000
               val speed = nodeCount / math.max(1, elapsed)
-              log.info(s"[comp] $topic nodes $nodeCount $speed/s, at #$blockNumber")
+              nodeTable.size
+              log.info(s"[comp] $topic nodes $nodeCount $speed/s, at #$blockNumber, table size ${nodeTable.size}")
             }
 
             nodeGot(TKeyVal(key, bytes, mixedOffset, blockNumber))
@@ -117,41 +118,36 @@ object KesqueCompactor {
   final class NodeWriter(topic: String, nodeTable: HashKeyValueTable, toFileNo: Int) {
     private val buf = new mutable.ArrayBuffer[TKeyVal]()
 
-    private var _maxOffset = Int.MinValue
+    private var _maxOffset = Long.MinValue
     def maxOffset = _maxOffset
 
+    /**
+     * Should flush() after all kv are written.
+     */
     def write(kv: TKeyVal) {
       buf += kv
       if (buf.size > 100) { // keep the batched size around 4096 (~ 32*100 bytes)
-        val kvs = buf map {
-          case TKeyVal(key, value, mixedOffset, timestamp) =>
-            val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
-            _maxOffset = math.max(_maxOffset, offset)
-            TKeyVal(key, value, offset, timestamp)
-        }
-        nodeTable.write(kvs, topic, toFileNo)
-
-        buf foreach {
-          case TKeyVal(key, _, mixedOffset, _) =>
-            nodeTable.removeIndexEntry(key, mixedOffset, topic)
-        }
-
-        buf.clear()
+        flush()
       }
     }
 
     def flush() {
-      val kvs = buf map {
-        case TKeyVal(key, value, mixedOffset, timestamp) =>
-          val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
-          TKeyVal(key, value, offset, timestamp)
-      }
-      nodeTable.write(kvs, topic, toFileNo)
-
+      println(s"flush on $topic")
       buf foreach {
         case TKeyVal(key, _, mixedOffset, _) =>
           nodeTable.removeIndexEntry(key, mixedOffset, topic)
       }
+      println(s"flush on $topic, removed index")
+
+      val kvs = buf map {
+        case TKeyVal(key, value, mixedOffset, timestamp) =>
+          val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
+          _maxOffset = math.max(_maxOffset, offset)
+          TKeyVal(key, value, offset, timestamp)
+      }
+      println(s"flush on $topic, writing to $toFileNo")
+      nodeTable.write(kvs, topic, toFileNo)
+      println(s"flush on $topic, writing done")
 
       buf.clear()
     }
@@ -250,12 +246,12 @@ final class KesqueCompactor(
   }
 
   def start() {
-    load()
+    loadSnaphot
     postAppend()
     gc()
   }
 
-  private def load() {
+  private def loadSnaphot() {
     log.info(s"[comp] loading nodes of #$blockNumber")
     for {
       hash <- blockHeaderStorage.getBlockHash(blockNumber)
@@ -273,21 +269,31 @@ final class KesqueCompactor(
    * should stop world during postAppend()
    */
   private def postAppend() {
-    log.info(s"[comp] post append storage from offset ${storageWriter.maxOffset + 1} ...")
     val storageTask = new Thread {
       override def run() {
+        log.info(s"[comp] post append storage from offset ${storageWriter.maxOffset + 1} ...")
+        // TODO topic from fromFileNo
         storageTable.iterateOver(storageWriter.maxOffset + 1, KesqueDataSource.storage) {
+        //storageTable.iterateOver(241714020, KesqueDataSource.storage) {
           kv => storageWriter.write(kv)
         }
+        storageWriter.flush()
+        log.info(s"[comp] post append storage done.")
       }
     }
 
-    log.info(s"[comp] post append account from offset ${accountWriter.maxOffset + 1} ...")
     val accountTask = new Thread {
       override def run() {
+        log.info(s"[comp] post append account from offset ${accountWriter.maxOffset + 1} ...")
+        // TODO topic from fromFileNo
         accountTable.iterateOver(accountWriter.maxOffset + 1, KesqueDataSource.account) {
-          kv => accountWriter.write(kv)
+        //accountTable.iterateOver(109535465, KesqueDataSource.account, true) {
+          kv =>
+            log.info(s"[comp] account iterate on $kv")
+            accountWriter.write(kv)
         }
+        accountWriter.flush()
+        log.info(s"[comp] post append account done.")
       }
     }
 

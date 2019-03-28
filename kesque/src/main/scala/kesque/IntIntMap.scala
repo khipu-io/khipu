@@ -161,7 +161,11 @@ final class IntIntMap(initSize: Int, nValues: Int, fillFactor: Float = 0.75f) {
     var ptr = getStartIndex(key)
 
     if (key == FREE_KEY) {
-      return if (m_hasFreeKey(col)) m_freeValue(col) else NO_VALUE
+      return if (m_hasFreeKey(col)) {
+        m_freeValue(col)
+      } else {
+        NO_VALUE
+      }
     }
 
     var k = m_data(ptr)

@@ -124,36 +124,40 @@ final class Kesque(props: Properties) {
     var nRead = 0
     do {
       readOnce(topic, offset, fetchMaxBytes)(op) match {
-        case (n, o) =>
-          nRead = n
-          offset = o + 1
+        case (count, lastOffset) =>
+          nRead = count
+          offset = lastOffset + 1
       }
     } while (nRead > 0)
   }
 
   /**
    * @param topic
-   * @param fetchOffset
-   * @param op: action applied on (offset, key, value)
+   * @param from offset
+   * @param op: action applied on TKeyVal(key, value, offset, timestamp)
+   * @return (number of read, last offset read)
    */
-  private[kesque] def readOnce(topic: String, fetchOffset: Long, fetchMaxBytes: Int)(op: TKeyVal => Unit) = {
-    val (topicPartition, result) = read(topic, fetchOffset, fetchMaxBytes).head
+  private[kesque] def readOnce(topic: String, fromOffset: Long, fetchMaxBytes: Int)(op: TKeyVal => Unit) = {
+    val (topicPartition, result) = read(topic, fromOffset, fetchMaxBytes).head
     val recs = result.info.records.records.iterator
-    var i = 0
-    var lastOffset = fetchOffset
+    var count = 0
+    var lastOffset = fromOffset
     while (recs.hasNext) {
       val rec = recs.next
-      val key = if (rec.hasKey) kesque.getBytes(rec.key) else null
-      val value = if (rec.hasValue) kesque.getBytes(rec.value) else null
-      val timestamp = rec.timestamp
-      val offset = rec.offset.toInt
-      op(TKeyVal(key, value, offset, timestamp))
+      val offset = rec.offset
+      if (offset >= fromOffset) {
+        val key = if (rec.hasKey) kesque.getBytes(rec.key) else null
+        val value = if (rec.hasValue) kesque.getBytes(rec.value) else null
+        val timestamp = rec.timestamp
 
-      lastOffset = offset
-      i += 1
+        op(TKeyVal(key, value, offset.toInt, timestamp))
+
+        lastOffset = offset
+        count += 1
+      }
     }
 
-    (i, lastOffset)
+    (count, lastOffset)
   }
 
   def shutdown() {

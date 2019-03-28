@@ -122,6 +122,8 @@ final class HashKeyValueTable private[kesque] (
     info(s"Loading index of ${topics(col)}")
     val start = System.nanoTime
 
+    // TODO shift indexTopics and shiftIndexTopics
+    val indexTopicsOfFileno = Array(indexTopics) 
     val initCounts = Array.fill[Int](indexTopicsOfFileno.length)(0)
     val (_, counts) = indexTopicsOfFileno.foldLeft(0, initCounts) {
       case ((fileno, counts), idxTps) =>
@@ -217,7 +219,7 @@ final class HashKeyValueTable private[kesque] (
                 val kafkaTopic = topicsOfFileno(fileno)(col) // kafka topic directory name
                 val (topicPartition, result) = db.read(kafkaTopic, offset, fetchMaxBytes).head
                 val recs = result.info.records.records.iterator
-                // NOTE: the records usally do not start from the fecth-offset, 
+                // NOTE: the records usually do not start from the fecth-offset, 
                 // the expected record may be near the tail of recs
                 //debug(s"======== $offset ${result.info.fetchOffsetMetadata} ")
                 while (recs.hasNext) {
@@ -413,22 +415,7 @@ final class HashKeyValueTable private[kesque] (
       writeLock.lock()
 
       val col = topicToCol(topic)
-      val key = Hash(keyBytes)
-      val hash = key.hashCode
-      hashOffsets.get(hash, col) match {
-        case IntIntsMap.NO_VALUE =>
-        case mixedOffsets =>
-          var found = false
-          var i = 0
-          while (!found && i < mixedOffsets.length) {
-            if (mixedOffset == mixedOffsets(i)) {
-              hashOffsets.removeValue(hash, mixedOffset, col)
-              found = true
-            } else {
-              i += 1
-            }
-          }
-      }
+      hashOffsets.removeValue(Hash(keyBytes).hashCode, mixedOffset, col)
     } finally {
       writeLock.unlock()
     }
@@ -464,6 +451,8 @@ final class HashKeyValueTable private[kesque] (
       readLock.unlock()
     }
   }
+
+  def size = hashOffsets.size
 
   def cacheHitRate(topic: String) = caches(topicToCol(topic)).hitRate
   def cacheReadCount(topic: String) = caches(topicToCol(topic)).readCount
