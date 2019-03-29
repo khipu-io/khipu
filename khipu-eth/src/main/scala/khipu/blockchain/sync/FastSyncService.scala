@@ -24,6 +24,7 @@ import khipu.network.rlpx.Peer
 import khipu.network.rlpx.RLPxStage
 import khipu.store.AppStateStorage
 import khipu.store.FastSyncStateStorage
+import khipu.store.trienode.NodeKeyValueStorage
 import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -790,6 +791,9 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
   private val accountNodeStorage = blockchainStorages.accountNodeStorageFor(None)
   private val storageNodeStorage = blockchainStorages.storageNodeStorageFor(None)
 
+  val accountNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()
+  val storageNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()
+
   override def preStart() {
     super.preStart()
     log.info("PersistenceService started")
@@ -824,19 +828,38 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
 
     case SaveAccountNodes(kvs) =>
       val start = System.nanoTime
-      kvs map { case (k, v) => }
-      accountNodeStorage.update(Set(), kvs)
+      saveNodes(accountNodeStorage, kvs, accountNodeBuf)
       log.debug(s"SaveAccountNodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
 
     case SaveStorageNodes(kvs) =>
       val start = System.nanoTime
-      storageNodeStorage.update(Set(), kvs)
+      saveNodes(storageNodeStorage, kvs, storageNodeBuf)
       log.debug(s"SaveStorageNodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
 
     case SaveEvmcodes(kvs) =>
       val start = System.nanoTime
       kvs foreach { case (k, v) => blockchain.saveEvmcode(k, v) }
       log.debug(s"SaveEvmcodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
+  }
+
+  private def saveNodes(storage: NodeKeyValueStorage, kvs: Map[Hash, Array[Byte]], buf: mutable.HashMap[Hash, Array[Byte]]) {
+    var size = 0
+    kvs foreach {
+      case (k, v) =>
+        buf += ((k, v))
+        size += 1
+        if (size > 100) { // save per 100 to keep the batched size around 4096 (~ 32*100 bytes)
+          flush(storage, buf)
+          buf.clear()
+          size = 0
+        }
+    }
+    flush(storage, buf)
+    buf.clear()
+  }
+
+  private def flush(storage: NodeKeyValueStorage, buf: mutable.HashMap[Hash, Array[Byte]]) {
+    storage.update(Set(), buf.toMap)
   }
 
   private def updateBestBlockIfNeeded(receivedBlockHashes: Seq[Hash]): Option[Long] = {
