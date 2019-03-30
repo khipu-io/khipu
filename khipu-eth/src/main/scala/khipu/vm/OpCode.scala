@@ -166,6 +166,11 @@ object OpCodes {
     RETURNDATACOPY,
     STATICCALL
   )
+  val ConstantinopleCodes: List[OpCode[_]] = ByzantiumOpCodes ++ List(
+    SHL,
+    SHR,
+    SAR
+  )
 }
 
 object OpCode {
@@ -337,6 +342,18 @@ case object BYTE extends BinaryOp(0x1a) with ConstGas[(UInt256, UInt256)] {
 
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def f(x: UInt256, y: UInt256) = y getByte x
+}
+case object SHL extends BinaryOp(0x1b) with ConstGas[(UInt256, UInt256)] {
+  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def f(x: UInt256, y: UInt256) = y shiftLeft x
+}
+case object SHR extends BinaryOp(0x1c) with ConstGas[(UInt256, UInt256)] {
+  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def f(x: UInt256, y: UInt256) = y shiftRight x
+}
+case object SAR extends BinaryOp(0x1d) with ConstGas[(UInt256, UInt256)] {
+  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def f(x: UInt256, y: UInt256) = y shiftRightSigned x
 }
 
 sealed abstract class UnaryOp(code: Int) extends OpCode[UInt256](code, 1, 1) with ConstGas[UInt256] {

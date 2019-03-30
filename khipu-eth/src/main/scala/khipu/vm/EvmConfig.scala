@@ -47,7 +47,8 @@ object EvmConfig {
     eip213 = false,
     eip212 = false,
     eip198 = false,
-    eip658 = false
+    eip658 = false,
+    eip145 = false
   )
 
   val HomesteadConfig = EvmConfig(
@@ -63,7 +64,8 @@ object EvmConfig {
     eip213 = false,
     eip212 = false,
     eip198 = false,
-    eip658 = false
+    eip658 = false,
+    eip145 = false
   )
 
   val PostEIP150Config = HomesteadConfig.copy(
@@ -111,6 +113,11 @@ object EvmConfig {
     eip198 = true,
     eip658 = true
   )
+
+  val ConstantinopleConfig = ByzantiumConfig.copy(
+    opCodes = OpCodes.ConstantinopleCodes,
+    eip145 = true
+  )
 }
 
 final case class EvmConfig(
@@ -126,7 +133,8 @@ final case class EvmConfig(
     eip213:                          Boolean, // replaced eip196
     eip212:                          Boolean, // replaced eip197
     eip198:                          Boolean,
-    eip658:                          Boolean
+    eip658:                          Boolean,
+    eip145:                          Boolean
 ) {
   import EvmConfig._
 

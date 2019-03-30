@@ -19,6 +19,7 @@ object UInt256_biginteger {
     private val THIRTY_ONE = BigInteger.valueOf(31)
     private val THIRTY_TWO = BigInteger.valueOf(32)
     private val TWO_FIVE_SIX = BigInteger.valueOf(256)
+    private val MAX_POW = TWO_FIVE_SIX
 
     // --- Beware mutable MODULUS/MAX_VALUE/MAX_SIGNED_VALUE, use them with copy
     private val MODULUS = TWO.pow(SIZE_IN_BITS)
@@ -84,6 +85,80 @@ object UInt256_biginteger {
      * We assume n is not neseccary to exceed Long.MaxValue, and use Long here
      */
     def wordsForBytes(n: Long): Long = if (n == 0) 0 else (n - 1) / SIZE + 1
+
+  }
+
+  // --- simple test
+  def main(args: Array[String]) {
+    var a1 = UInt256(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    var a2 = UInt256(hexDecode("01"))
+    var r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0xc000000000000000000000000000000000000000000000000000000000000000
+
+    a1 = UInt256(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = UInt256(hexDecode("ff"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+    a1 = UInt256(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = UInt256(hexDecode("0100"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+    a1 = UInt256(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = UInt256(hexDecode("0101"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+    a1 = UInt256(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = UInt256(hexDecode("00"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+    a1 = UInt256(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = UInt256(hexDecode("01"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+    a1 = UInt256(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = UInt256(hexDecode("ff"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+    a1 = UInt256(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = UInt256(hexDecode("0100"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+    a1 = UInt256(hexDecode("0000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = UInt256(hexDecode("01"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
+
+    a1 = UInt256(hexDecode("4000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = UInt256(hexDecode("fe"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000001
+
+    a1 = UInt256(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = UInt256(hexDecode("f8"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0x000000000000000000000000000000000000000000000000000000000000007f
+
+    a1 = UInt256(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = UInt256(hexDecode("fe"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000001
+
+    a1 = UInt256(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = UInt256(hexDecode("ff"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
+
+    a1 = UInt256(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = UInt256(hexDecode("0100"))
+    r = a1.shiftRightSigned(a2)
+    println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
   }
 
   /**
@@ -206,6 +281,58 @@ object UInt256_biginteger {
         }
         UInt256.safe(newN)
       }
+    }
+
+    /**
+     * Shift left, both this and input arg are treated as unsigned
+     * @param arg
+     * @return this << arg
+     */
+    def shiftLeft(arg: UInt256): UInt256 = {
+      if (arg.n.compareTo(MAX_POW) >= 0) {
+        Zero
+      } else {
+        UInt256(n.shiftLeft(arg.intValueSafe))
+      }
+    }
+
+    /**
+     * Shift right, both this and input arg are treated as unsigned
+     * @param arg
+     * @return this >> arg
+     */
+    def shiftRight(arg: UInt256): UInt256 = {
+      if (arg.n.compareTo(MAX_POW) >= 0) {
+        Zero
+      } else {
+        UInt256(n.shiftRight(arg.intValueSafe))
+      }
+    }
+
+    /**
+     * Shift right, this is signed, while input arg is treated as unsigned
+     * @param arg
+     * @return this >> arg
+     */
+    def shiftRightSigned(arg: UInt256): UInt256 = {
+      if (arg.n.compareTo(MAX_POW) >= 0) {
+        if (isNegative) {
+          UInt256(BigInteger.ONE.negate)
+        } else {
+          Zero
+        }
+      } else {
+
+        UInt256(signed.shiftRight(arg.intValueSafe))
+      }
+    }
+
+    /**
+     * only in case of signed operation when the number is explicit defined
+     * as negative
+     */
+    private def isNegative = {
+      signed.signum < 0
     }
 
     def compare(that: UInt256): Int = n.compareTo(that.n)
