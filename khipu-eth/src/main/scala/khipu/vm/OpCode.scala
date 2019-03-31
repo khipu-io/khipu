@@ -771,7 +771,40 @@ case object SSTORE extends OpCode[(UInt256, UInt256)](0x55, 2, 0) {
     } else {
       val (key, value) = params
       val oldValue = state.storage.load(key)
-      val refund = if (value.isZero && oldValue.nonZero) state.config.feeSchedule.R_sclear else 0
+      var refund = 0L
+      if (state.config.eip1283) {
+        val origValue = state.storage.getOriginalValue(key).getOrElse(UInt256.Zero)
+        if (oldValue == origValue) {
+          if (origValue.isZero) {
+            // no refund 
+          } else {
+            if (value.isZero) {
+              refund += state.config.feeSchedule.R_sclear
+            }
+          }
+        } else { // oldValue != origValue
+          if (origValue.nonZero) {
+            if (value.isZero) {
+              refund -= state.config.feeSchedule.R_sclear
+            } else {
+              refund += state.config.feeSchedule.R_sclear
+            }
+          }
+
+          if (origValue == value) {
+            if (origValue.isZero) {
+              refund += (state.config.feeSchedule.G_sset - state.config.feeSchedule.R_sclear)
+            } else {
+              refund += (state.config.feeSchedule.G_sreset - state.config.feeSchedule.R_sclear)
+            }
+          }
+        }
+      } else {
+        if (oldValue.nonZero && value.isZero) {
+          refund += state.config.feeSchedule.R_sclear
+        }
+      }
+
       val updatedStorage = state.storage.store(key, value)
       val world = state.world.saveStorage(state.ownAddress, updatedStorage)
 
@@ -783,9 +816,30 @@ case object SSTORE extends OpCode[(UInt256, UInt256)](0x55, 2, 0) {
   }
 
   protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
-    val (offset, value) = params
-    val oldValue = state.storage.load(offset)
-    if (oldValue.isZero && !value.isZero) state.config.feeSchedule.G_sset else state.config.feeSchedule.G_sreset
+    val (key, value) = params
+    val oldValue = state.storage.load(key)
+    if (state.config.eip1283) {
+      if (value == oldValue) {
+        state.config.feeSchedule.G_sreuse
+      } else {
+        val origValue = state.storage.getOriginalValue(key).getOrElse(UInt256.Zero)
+        if (oldValue == origValue) {
+          if (origValue.isZero) {
+            state.config.feeSchedule.G_sset
+          } else {
+            state.config.feeSchedule.G_sreset
+          }
+        } else {
+          state.config.feeSchedule.G_sreuse
+        }
+      }
+    } else {
+      if (oldValue.isZero && value.nonZero) {
+        state.config.feeSchedule.G_sset
+      } else {
+        state.config.feeSchedule.G_sreset
+      }
+    }
   }
 }
 

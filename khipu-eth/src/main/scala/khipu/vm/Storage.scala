@@ -8,4 +8,5 @@ import khipu.UInt256
 trait Storage[S <: Storage[S]] {
   def store(offset: UInt256, value: UInt256): S
   def load(offset: UInt256): UInt256
+  def getOriginalValue(address: UInt256): Option[UInt256]
 }

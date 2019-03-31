@@ -49,7 +49,8 @@ object EvmConfig {
     eip198 = false,
     eip658 = false,
     eip145 = false,
-    eip1052 = false
+    eip1052 = false,
+    eip1283 = false
   )
 
   val HomesteadConfig = EvmConfig(
@@ -67,7 +68,8 @@ object EvmConfig {
     eip198 = false,
     eip658 = false,
     eip145 = false,
-    eip1052 = false
+    eip1052 = false,
+    eip1283 = false
   )
 
   val PostEIP150Config = HomesteadConfig.copy(
@@ -138,7 +140,8 @@ final case class EvmConfig(
     eip198:                          Boolean,
     eip658:                          Boolean,
     eip145:                          Boolean,
-    eip1052:                         Boolean
+    eip1052:                         Boolean,
+    eip1283:                         Boolean
 ) {
   import EvmConfig._
 
@@ -240,6 +243,7 @@ object FeeSchedule {
     override val G_jumpdest = 1
     override val G_sset = 20000
     override val G_sreset = 5000
+    override val G_sreuse = 200
     override val R_sclear = 15000
     override val R_selfdestruct = 24000
     override val G_selfdestruct = 0
@@ -300,6 +304,7 @@ trait FeeSchedule {
   def G_jumpdest: Long
   def G_sset: Long
   def G_sreset: Long
+  def G_sreuse: Long
   def R_sclear: Long
   def R_selfdestruct: Long
   def G_selfdestruct: Long

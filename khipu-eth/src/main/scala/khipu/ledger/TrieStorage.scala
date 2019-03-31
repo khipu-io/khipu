@@ -25,11 +25,19 @@ final class TrieStorage private (
 
   def underlying = underlyingTrie
 
+  private var originalValues = Map[UInt256, UInt256]()
+
+  def getOriginalValue(address: UInt256): Option[UInt256] =
+    originalValues.get(address) orElse underlyingTrie.get(address)
+
   def load(address: UInt256): UInt256 = {
     logs.get(address) match {
       case None =>
         underlyingTrie.get(address) match {
           case Some(value) =>
+            if (!originalValues.contains(address)) {
+              originalValues += (address -> value)
+            }
             logs += (address -> Original(value))
             value
           case None => UInt256.Zero
