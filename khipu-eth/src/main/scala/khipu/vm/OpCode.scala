@@ -170,6 +170,7 @@ object OpCodes {
     SHL,
     SHR,
     SAR,
+    CREATE2,
     EXTCODEHASH
   )
 }
@@ -1028,31 +1029,21 @@ case object LOG2 extends LogOp(0xa2)
 case object LOG3 extends LogOp(0xa3)
 case object LOG4 extends LogOp(0xa4)
 
-case object CREATE extends OpCode[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
-  protected def constGasFn(s: FeeSchedule) = s.G_create
-  protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
-    val List(endowment, inOffset, inSize) = state.stack.pop(3)
-    if (inOffset.compareTo(UInt256.MaxInt) > 0 || inSize.compareTo(UInt256.MaxInt) > 0) {
-      state.withError(ArithmeticException)
-    }
-    (endowment, inOffset, inSize)
-  }
+sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCode[P](code.toByte, delta, alpha) {
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  final protected def doExec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], endowment: UInt256, inOffset: UInt256, inSize: UInt256, salt: UInt256, params: P): ProgramState[W, S] = {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
-      val (endowment, inOffset, inSize) = params
-
       state.resetReturnDataBuffer() // reset before call
 
       val isValidCall = state.env.callDepth < EvmConfig.MaxCallDepth && endowment <= state.ownBalance
 
       if (isValidCall) {
 
-        val initCode = state.memory.load(inOffset.intValueSafe, inSize.intValueSafe)
+        val initCode = state.memory.load(inOffset.intValueSafe, inSize.intValueSafe).toArray
         // if creation fails at this point we still leave the creators nonce incremented
-        val (newAddress, checkpoint, worldAtCheckpoint) = state.world.createAddressByOpCode(state.env.ownerAddr) match {
+        val (newAddress, checkpoint, worldAtCheckpoint) = createContactAddress[W, S](state, initCode, salt.bytes) match {
           case (address, world) => (address, world.copy, world)
         }
         //println(s"newAddress: $newAddress via ${state.env.ownerAddr} in CREATE")
@@ -1156,9 +1147,64 @@ case object CREATE extends OpCode[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
     }
   }
 
+  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): (Address, W)
+}
+case object CREATE extends CreatOp[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
+  protected def constGasFn(s: FeeSchedule) = s.G_create
+  protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
+    val List(endowment, inOffset, inSize) = state.stack.pop(3)
+    if (inOffset.compareTo(UInt256.MaxInt) > 0 || inSize.compareTo(UInt256.MaxInt) > 0) {
+      state.withError(ArithmeticException)
+    }
+    (endowment, inOffset, inSize)
+  }
+
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+    val (endowment, inOffset, inSize) = params
+    doExec(state, endowment, inOffset, inSize, null, params)
+  }
+
+  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): (Address, W) = {
+    state.world.createAddressByOpCode(state.env.ownerAddr)
+  }
+
   protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): Long = {
     val (_, inOffset, inSize) = params
-    state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
+    val memCost = state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
+    memCost
+  }
+}
+
+/**
+ * CREATE2 is identical to CREATE, except the following line:
+ *   val (newAddress, checkpoint, worldAtCheckpoint) = state.world.createAddressBySalt(state.env.ownerAddr, initCode, salt.bytes) match {
+ *
+ * TODO reduce redundancy code of CREATE and CREATE2
+ */
+case object CREATE2 extends CreatOp[(UInt256, UInt256, UInt256, UInt256)](0xf5, 4, 1) {
+  protected def constGasFn(s: FeeSchedule) = s.G_create
+  protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
+    val List(endowment, inOffset, inSize, salt) = state.stack.pop(4)
+    if (inOffset.compareTo(UInt256.MaxInt) > 0 || inSize.compareTo(UInt256.MaxInt) > 0) {
+      state.withError(ArithmeticException)
+    }
+    (endowment, inOffset, inSize, salt)
+  }
+
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+    val (endowment, inOffset, inSize, salt) = params
+    doExec(state, endowment, inOffset, inSize, salt, params)
+  }
+
+  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): (Address, W) = {
+    state.world.createAddressBySalt(state.env.ownerAddr, initCode, salt)
+  }
+
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): Long = {
+    val (_, inOffset, inSize, _) = params
+    val memCost = state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
+    val shaCost = state.config.feeSchedule.G_sha3word * UInt256.wordsForBytes(inSize.longValueSafe)
+    memCost + shaCost
   }
 }
 

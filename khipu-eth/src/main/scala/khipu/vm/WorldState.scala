@@ -91,8 +91,8 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
    */
   def createAddress(creatorAddr: Address): Address = {
     val creatorAccount = getGuaranteedAccount(creatorAddr)
-    val hash = crypto.kec256(rlp.encode(RLPList(creatorAddr.bytes, rlp.toRLPEncodable(creatorAccount.nonce - UInt256.One))))
-    Address(hash)
+    val addr = crypto.kec256(rlp.encode(RLPList(creatorAddr.bytes, rlp.toRLPEncodable(creatorAccount.nonce - UInt256.One))))
+    Address(addr)
   }
 
   /**
@@ -105,6 +105,35 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
     val creatorAccount = getGuaranteedAccount(creatorAddr)
     val world1 = saveAccount(creatorAddr, creatorAccount.increaseNonce())
     (world1.createAddress(creatorAddr), world1)
+  }
+
+  def createAddressBySalt(creatorAddr: Address, initCode: Array[Byte], salt: Array[Byte]): (Address, W) = {
+    val creatorAccount = getGuaranteedAccount(creatorAddr)
+    val world1 = saveAccount(creatorAddr, creatorAccount.increaseNonce())
+    (world1.createSaltAddrress(creatorAddr.toArray, initCode, salt), world1)
+  }
+
+  /**
+   * sha3(0xff ++ msg.sender ++ salt ++ sha3(init_code)))[12:]
+   *
+   * @param creatorAddr - creating address
+   * @param initCode - contract init code
+   * @param salt - salt to make different result addresses, 32 bytes stack item
+   * @return new address
+   */
+  private def createSaltAddrress(creatorAddr: Array[Byte], initCode: Array[Byte], salt: Array[Byte]): Address = {
+    val data = Array.ofDim[Byte](1 + creatorAddr.length + salt.length + 32)
+    data(0) = 0xff.toByte
+    var offset = 1
+    System.arraycopy(creatorAddr, 0, data, offset, creatorAddr.length)
+    offset += creatorAddr.length
+    System.arraycopy(salt, 0, data, offset, salt.length)
+    offset += salt.length
+    val sha3InitCode = crypto.kec256(initCode)
+    System.arraycopy(sha3InitCode, 0, data, offset, sha3InitCode.length)
+
+    val addr = crypto.kec256(data)
+    Address(addr)
   }
 
   def mergeRaceConditions(that: W): W

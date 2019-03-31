@@ -49,6 +49,7 @@ object EvmConfig {
     eip198 = false,
     eip658 = false,
     eip145 = false,
+    eip1014 = false,
     eip1052 = false,
     eip1283 = false
   )
@@ -68,6 +69,7 @@ object EvmConfig {
     eip198 = false,
     eip658 = false,
     eip145 = false,
+    eip1014 = false,
     eip1052 = false,
     eip1283 = false
   )
@@ -121,6 +123,7 @@ object EvmConfig {
   val ConstantinopleConfig = ByzantiumConfig.copy(
     opCodes = OpCodes.ConstantinopleCodes,
     eip145 = true,
+    eip1014 = true,
     eip1052 = true
   )
 }
@@ -140,6 +143,7 @@ final case class EvmConfig(
     eip198:                          Boolean,
     eip658:                          Boolean,
     eip145:                          Boolean,
+    eip1014:                         Boolean,
     eip1052:                         Boolean,
     eip1283:                         Boolean
 ) {
