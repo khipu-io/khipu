@@ -48,7 +48,8 @@ object EvmConfig {
     eip212 = false,
     eip198 = false,
     eip658 = false,
-    eip145 = false
+    eip145 = false,
+    eip1052 = false
   )
 
   val HomesteadConfig = EvmConfig(
@@ -65,7 +66,8 @@ object EvmConfig {
     eip212 = false,
     eip198 = false,
     eip658 = false,
-    eip145 = false
+    eip145 = false,
+    eip1052 = false
   )
 
   val PostEIP150Config = HomesteadConfig.copy(
@@ -116,7 +118,8 @@ object EvmConfig {
 
   val ConstantinopleConfig = ByzantiumConfig.copy(
     opCodes = OpCodes.ConstantinopleCodes,
-    eip145 = true
+    eip145 = true,
+    eip1052 = true
   )
 }
 
@@ -134,7 +137,8 @@ final case class EvmConfig(
     eip212:                          Boolean, // replaced eip197
     eip198:                          Boolean,
     eip658:                          Boolean,
-    eip145:                          Boolean
+    eip145:                          Boolean,
+    eip1052:                         Boolean
 ) {
   import EvmConfig._
 
@@ -259,7 +263,9 @@ object FeeSchedule {
     override val G_sha3word = 6
     override val G_copy = 3
     override val G_blockhash = 20
-    override val G_extcode = 20
+    override val G_extcodesize = 20
+    override val G_extcodecopy = 20
+    override val G_extcodehash = 400
   }
 
   object HomesteadFeeSchedule extends HomesteadFeeSchedule
@@ -273,7 +279,8 @@ object FeeSchedule {
     override val G_call = 700
     override val G_balance = 400
     override val G_selfdestruct = 5000
-    override val G_extcode = 700
+    override val G_extcodesize = 700
+    override val G_extcodecopy = 700
   }
 
   object PostEIP160FeeSchedule extends PostEIP160FeeSchedule
@@ -316,5 +323,7 @@ trait FeeSchedule {
   def G_sha3word: Long
   def G_copy: Long
   def G_blockhash: Long
-  def G_extcode: Long
+  def G_extcodesize: Long
+  def G_extcodecopy: Long
+  def G_extcodehash: Long
 }

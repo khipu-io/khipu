@@ -169,7 +169,8 @@ object OpCodes {
   val ConstantinopleCodes: List[OpCode[_]] = ByzantiumOpCodes ++ List(
     SHL,
     SHR,
-    SAR
+    SAR,
+    EXTCODEHASH
   )
 }
 
@@ -564,7 +565,7 @@ case object CODECOPY extends OpCode[(UInt256, UInt256, UInt256)](0x39, 3, 0) {
 }
 
 case object EXTCODESIZE extends OpCode[UInt256](0x3b, 1, 1) with ConstGas[UInt256] {
-  protected def constGasFn(s: FeeSchedule) = s.G_extcode
+  protected def constGasFn(s: FeeSchedule) = s.G_extcodesize
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(addr) = state.stack.pop()
     addr
@@ -579,7 +580,7 @@ case object EXTCODESIZE extends OpCode[UInt256](0x3b, 1, 1) with ConstGas[UInt25
 }
 
 case object EXTCODECOPY extends OpCode[(UInt256, UInt256, UInt256, UInt256)](0x3c, 4, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_extcode
+  protected def constGasFn(s: FeeSchedule) = s.G_extcodecopy
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
     val List(address, memOffset, codeOffset, size) = state.stack.pop(4)
@@ -598,6 +599,21 @@ case object EXTCODECOPY extends OpCode[(UInt256, UInt256, UInt256, UInt256)](0x3
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
     val copyCost = state.config.feeSchedule.G_copy * UInt256.wordsForBytes(size.longValueSafe)
     memCost + copyCost
+  }
+}
+
+case object EXTCODEHASH extends OpCode[UInt256](0x3f, 1, 1) with ConstGas[UInt256] {
+  protected def constGasFn(s: FeeSchedule) = s.G_extcodehash
+  protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
+    val List(addr) = state.stack.pop()
+    addr
+  }
+
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+    val addr = params
+    val codeHash = state.world.getCodeHash(Address(addr)).getOrElse(UInt256.Zero)
+    state.stack.push(codeHash)
+    state.step()
   }
 }
 

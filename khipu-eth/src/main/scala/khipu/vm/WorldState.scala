@@ -41,6 +41,7 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
   def getCode(address: Address): ByteString
   def getStorage(address: Address): S
   def getBlockHash(number: Long): Option[UInt256]
+  def getCodeHash(address: Address): Option[UInt256]
 
   def saveCode(address: Address, code: ByteString): W
   def saveStorage(address: Address, storage: S): W

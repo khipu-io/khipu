@@ -273,6 +273,10 @@ final class BlockWorldState private (
     this
   }
 
+  def getCodeHash(address: Address): Option[UInt256] = {
+    getAccount(address).map(_.codeHash).map(UInt256(_))
+  }
+
   private def addRaceCondition(modified: RaceCondition, address: Address) {
     raceConditions += (modified -> (raceConditions.getOrElse(modified, Set()) + address))
   }
