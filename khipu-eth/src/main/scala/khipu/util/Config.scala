@@ -217,6 +217,7 @@ object BlockchainConfig {
       val eip100BlockNumber = blockchainConfig.getLong("eip100-block-number")
       val eip649BlockNumber = blockchainConfig.getLong("eip649-block-number")
       val byzantiumBlockNumber = blockchainConfig.getLong("byzantium-block-number")
+      val constantinopleBlockNumber = blockchainConfig.getLong("constantinople-block-number")
 
       val difficultyBombPauseBlockNumber = blockchainConfig.getLong("difficulty-bomb-pause-block-number")
       val difficultyBombContinueBlockNumber = blockchainConfig.getLong("difficulty-bomb-continue-block-number")
@@ -256,6 +257,7 @@ trait BlockchainConfig {
   def eip100BlockNumber: Long
   def eip649BlockNumber: Long
   def byzantiumBlockNumber: Long
+  def constantinopleBlockNumber: Long
 
   def difficultyBombPauseBlockNumber: Long
   def difficultyBombContinueBlockNumber: Long
@@ -279,15 +281,17 @@ object MonetaryPolicyConfig {
       mpConfig.getLong("era-duration"),
       mpConfig.getDouble("reward-reduction-rate"),
       UInt256(new BigInteger(mpConfig.getString("first-era-block-reward"))),
-      UInt256(new BigInteger(mpConfig.getString("byzantium-block-reward")))
+      UInt256(new BigInteger(mpConfig.getString("byzantium-block-reward"))),
+      UInt256(new BigInteger(mpConfig.getString("constantinople-block-reward")))
     )
   }
 }
 final case class MonetaryPolicyConfig(
-    eraDuration:          Long,
-    rewardRedutionRate:   Double,
-    firstEraBlockReward:  UInt256,
-    byzantiumBlockReward: UInt256
+    eraDuration:               Long,
+    rewardRedutionRate:        Double,
+    firstEraBlockReward:       UInt256,
+    byzantiumBlockReward:      UInt256,
+    constantinopleBlockReward: UInt256
 ) {
   require(
     rewardRedutionRate >= 0.0 && rewardRedutionRate <= 1.0,

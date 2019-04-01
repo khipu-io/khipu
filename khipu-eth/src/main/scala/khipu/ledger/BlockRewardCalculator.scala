@@ -46,10 +46,14 @@ final class BlockRewardCalculator(blockchainConfig: BlockchainConfig) {
   val firstEraOmmerMiningRewardDenom = UInt256.safe(8)
 
   /** Base block reward in the first era */
-  def blockRewardOf(blockNumber: Long): UInt256 = if (blockNumber < blockchainConfig.byzantiumBlockNumber) {
-    config.firstEraBlockReward
-  } else {
-    config.byzantiumBlockReward
+  def blockRewardOf(blockNumber: Long): UInt256 = {
+    if (blockNumber < blockchainConfig.byzantiumBlockNumber) {
+      config.firstEraBlockReward
+    } else if (blockNumber < blockchainConfig.constantinopleBlockNumber) {
+      config.byzantiumBlockReward
+    } else {
+      config.constantinopleBlockReward
+    }
   }
 
   def calcBlockMinerReward(blockNumber: Long, ommersCount: Int): UInt256 = {

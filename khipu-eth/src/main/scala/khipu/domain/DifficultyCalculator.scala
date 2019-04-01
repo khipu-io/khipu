@@ -69,8 +69,10 @@ final class DifficultyCalculator(blockchainConfig: BlockchainConfig) {
   private def getBombExponent_eth(blockNumber: Long): Long = {
     if (blockNumber < blockchainConfig.byzantiumBlockNumber) {
       blockNumber / ExpDifficultyPeriod - 2
-    } else { // eip649
+    } else if (blockNumber < blockchainConfig.constantinopleBlockNumber) { // eip649
       math.max(blockNumber - 3000000, 0) / ExpDifficultyPeriod - 2
+    } else { // eip1234
+      math.max(blockNumber - 5000000, 0) / ExpDifficultyPeriod - 2
     }
   }
 }
