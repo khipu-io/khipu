@@ -24,7 +24,8 @@ object EvmConfig {
       blockchainConfig.eip170BlockNumber -> PostEIP170Config,
       blockchainConfig.eip161PatchBlockNumber -> EIP161PatchConfig,
       blockchainConfig.eip161PatchBlockNumber + 1 -> PostEIP161PatchConfig,
-      blockchainConfig.byzantiumBlockNumber -> ByzantiumConfig
+      blockchainConfig.byzantiumBlockNumber -> ByzantiumConfig,
+      blockchainConfig.constantinopleBlockNumber -> ConstantinopleConfig
     )
 
     // highest transition block that is less/equal to `blockNumber`
