@@ -1031,7 +1031,7 @@ case object LOG4 extends LogOp(0xa4)
 
 sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCode[P](code.toByte, delta, alpha) {
 
-  final protected def doExec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], endowment: UInt256, inOffset: UInt256, inSize: UInt256, salt: UInt256, params: P): ProgramState[W, S] = {
+  final protected def doExec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], endowment: UInt256, inOffset: UInt256, inSize: UInt256, salt: Array[Byte], params: P): ProgramState[W, S] = {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
@@ -1043,7 +1043,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
 
         val initCode = state.memory.load(inOffset.intValueSafe, inSize.intValueSafe).toArray
         // if creation fails at this point we still leave the creators nonce incremented
-        val (newAddress, checkpoint, worldAtCheckpoint) = createContactAddress[W, S](state, initCode, salt.bytes) match {
+        val (newAddress, checkpoint, worldAtCheckpoint) = createContactAddress[W, S](state, initCode, salt) match {
           case (address, world) => (address, world.copy, world)
         }
         //println(s"newAddress: $newAddress via ${state.env.ownerAddr} in CREATE")
@@ -1060,7 +1060,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
           callerAddr = state.env.ownerAddr,
           ownerAddr = newAddress,
           value = endowment,
-          program = Program(initCode.toArray),
+          program = Program(initCode),
           callDepth = state.env.callDepth + 1
         )
 
@@ -1193,7 +1193,7 @@ case object CREATE2 extends CreatOp[(UInt256, UInt256, UInt256, UInt256)](0xf5, 
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): ProgramState[W, S] = {
     val (endowment, inOffset, inSize, salt) = params
-    doExec(state, endowment, inOffset, inSize, salt, params)
+    doExec(state, endowment, inOffset, inSize, salt.bytes, params)
   }
 
   protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): (Address, W) = {
