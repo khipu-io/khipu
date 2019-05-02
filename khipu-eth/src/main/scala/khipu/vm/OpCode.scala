@@ -1319,13 +1319,18 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
 
         state.withReturnDataBuffer(result.returnData)
 
-        if (result.error.isEmpty && !result.isRevert) { // everything ok
-          state.stack.push(UInt256.One)
+        // NOTE even if result.isRevert, we'll still put returnData to memory, 
+        // which could be reason message etc that could be used by caller.
+        if (result.error.isEmpty) {
           val sizeCap = math.min(outSize.intValueSafe, result.returnData.size)
           if (sizeCap >= 0) {
             val output = result.returnData.take(sizeCap)
             state.memory.store(outOffset.intValueSafe, output)
           }
+        }
+
+        if (result.error.isEmpty && !result.isRevert) { // everything ok
+          state.stack.push(UInt256.One)
 
           state
             .spendGas(-result.gasRemaining)

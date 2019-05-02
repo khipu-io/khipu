@@ -483,6 +483,10 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
             logs = logs
           )
 
+          if (blockchainConfig.isDebugTraceEnabled) {
+            println(s"\nTx ${stx.hash} ${receipt}")
+          }
+
           (accGas + gasUsed, accTxFee + txFee, accTouchedAddresses ++ touchedAddresses, accReceipts :+ receipt)
       }
 

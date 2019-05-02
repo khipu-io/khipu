@@ -9,10 +9,10 @@ object Receipt {
     import khipu.network.p2p.messages.PV63.ReceiptImplicits._
 
     override def fromBytes(bytes: Array[Byte]): Receipt = bytes.toReceipt
-    override def toBytes(input: Receipt): Array[Byte] = input.toBytes
+    override def toBytes(receipt: Receipt): Array[Byte] = receipt.toBytes
   }
 
-  val Failure = Hash(Array.emptyByteArray)
+  val Failure = Hash(Array[Byte]())
   val Success = Hash(Array[Byte](1))
 }
 
@@ -26,15 +26,11 @@ final case class Receipt(
     logs:              Seq[TxLogEntry]
 ) {
 
-  def hasTxStatus = {
-    postTxState.length <= 1
-  }
+  def hasTxStatus = postTxState.length <= 1
 
-  def isTxStatusOK = {
-    postTxState == Receipt.Success
-  }
+  def isTxStatusOK = postTxState == Receipt.Success
 
-  private def stateHashOrStatus = {
+  private def printStateHashOrStatus = {
     if (hasTxStatus) {
       if (isTxStatusOK) "OK" else "Failed"
     } else {
@@ -45,7 +41,7 @@ final case class Receipt(
   override def toString: String = {
     s"""
        |Receipt{
-       | ${stateHashOrStatus}
+       | ${printStateHashOrStatus}
        | cumulativeGasUsed: $cumulativeGasUsed
        | logsBloomFilter: ${khipu.toHexString(logsBloomFilter)}
        | logs: $logs
