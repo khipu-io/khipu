@@ -597,7 +597,7 @@ trait FastSyncService { _: SyncService =>
           }
 
         case Success(None) =>
-          self ! BlacklistPeer(peer.id, s"Got block bodies empty response for known hashes ${peer.id}")
+          self ! BlacklistPeer(peer.id, s"Got block bodies empty response for known hashes from ${peer.id}: $requestingHashes")
           self ! EnqueueBlockBodies(requestingHashes)
           self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, None))
 
@@ -628,7 +628,7 @@ trait FastSyncService { _: SyncService =>
 
         case Success(None) =>
           self ! EnqueueReceipts(requestingHashes)
-          self ! BlacklistPeer(peer.id, s"Got receipts empty for known hashes ${peer.id}")
+          self ! BlacklistPeer(peer.id, s"Got receipts empty for known hashes from ${peer.id}: $requestingHashes")
           self ! PeerWorkDone(peer, ReceiptsWork(requestingHashes))
 
         case Failure(e: AskTimeoutException) =>
@@ -685,7 +685,13 @@ trait FastSyncService { _: SyncService =>
 
       headerToBody.collectFirst {
         case (None, _) => DbError
-        case (Some(header), body) if validators.blockValidator.validateHeaderAndBody(header, body).isLeft => Invalid
+        case (Some(header), body) =>
+          validators.blockValidator.validateHeaderAndBody(header, body) match {
+            case Right(_) => Valid
+            case Left(error) =>
+              log.debug(s"[fast] invalid block body $error \nheader: $header \n$body")
+              Invalid
+          }
       } getOrElse (Valid)
     }
 
