@@ -545,7 +545,7 @@ case object CALLDATACOPY extends OpCode[(UInt256, UInt256, UInt256)](0x37, 3, 0)
 case object CODECOPY extends OpCode[(UInt256, UInt256, UInt256)](0x39, 3, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
-    // do not need to check params bound, just use save int value
+    // do not need to check params bound, just use safe int value
     val List(memOffset, codeOffset, size) = state.stack.pop(3)
     (memOffset, codeOffset, size)
   }
@@ -1093,12 +1093,13 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
         val totalGasRequired = gasUsedInCreating + codeDepositGas
         val isEnoughGasForDeposit = totalGasRequired <= startGas
 
-        val creationFailed = result.error.isDefined || (!isEnoughGasForDeposit && state.config.exceptionalFailedCodeDeposit)
+        val isCreationFailed = result.error.isDefined || (!isEnoughGasForDeposit && state.config.exceptionalFailedCodeDeposit)
 
-        if (creationFailed || result.isRevert) {
+        if (isCreationFailed || result.isRevert) {
           state.stack.push(UInt256.Zero)
 
-          if (result.isRevert) {
+          
+          if (result.isRevert && !isCreationFailed) {
             state.spendGas(gasUsedInCreating)
           } else {
             state.spendGas(startGas)
@@ -1177,9 +1178,9 @@ case object CREATE extends CreatOp[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
 
 /**
  * CREATE2 is identical to CREATE, except the following line:
- *   val (newAddress, checkpoint, worldAtCheckpoint) = state.world.createAddressBySalt(state.env.ownerAddr, initCode, salt.bytes) match {
- *
- * TODO reduce redundancy code of CREATE and CREATE2
+ *   val List(endowment, inOffset, inSize, salt) = state.stack.pop(4)
+ *   state.world.createAddressBySalt(state.env.ownerAddr, initCode, salt)
+ *   val shaCost = state.config.feeSchedule.G_sha3word * UInt256.wordsForBytes(inSize.longValueSafe)
  */
 case object CREATE2 extends CreatOp[(UInt256, UInt256, UInt256, UInt256)](0xf5, 4, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_create
