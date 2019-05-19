@@ -210,13 +210,13 @@ sealed abstract class OpCode[P](val code: Byte, val delta: Int, val alpha: Int) 
       val params = getParams(state)
       if (state.error.isEmpty) { // error is checked during getParams
         val constGas = constGasFn(state.config.feeSchedule)
-        val theGas = varGas(state, params)
-        val spendingGas = constGas + theGas
+        val moreGas = varGas(state, params)
+        val spendingGas = constGas + moreGas
         //println(s"spendingGas: $spendingGas, state.gas ${state.gas}, OOG? ${spendingGas > state.gas}")
         // TODO since we use Long (signed number type) to calculate gas, how to 
         // make sure the value is always > 0 and < Long.MaxValue to avoid it becoming 
         // negative value
-        if (theGas < 0 || spendingGas < 0 || spendingGas > state.gas) {
+        if (moreGas < 0 || spendingGas < 0 || spendingGas > state.gas) {
           state.withGas(0).withError(OutOfGas)
         } else {
           exec(state, params).spendGas(spendingGas)
@@ -1087,19 +1087,19 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
           state.withReturnDataBuffer(result.returnData)
         }
 
-        val code = result.returnData
         val gasUsedInCreating = startGas - result.gasRemaining
+        
+        val code = result.returnData
         val codeDepositGas = state.config.calcCodeDepositCost(code)
-        val totalGasRequired = gasUsedInCreating + codeDepositGas
-        val isEnoughGasForDeposit = totalGasRequired <= startGas
+        val isRequestGasForCodeDeposit = state.config.exceptionalFailedCodeDeposit && !result.isRevert
+        val notEnoughGasForCodeDeposit = gasUsedInCreating + codeDepositGas > startGas
 
-        val isCreationFailed = result.error.isDefined || (!isEnoughGasForDeposit && state.config.exceptionalFailedCodeDeposit)
+        val isCreationFailed = result.error.isDefined || (isRequestGasForCodeDeposit && notEnoughGasForCodeDeposit)
 
         if (isCreationFailed || result.isRevert) {
           state.stack.push(UInt256.Zero)
-
           
-          if (result.isRevert && !isCreationFailed) {
+          if (result.error.isEmpty && result.isRevert) {
             state.spendGas(gasUsedInCreating)
           } else {
             state.spendGas(startGas)
@@ -1116,7 +1116,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
 
           state.spendGas(gasUsedInCreating)
 
-          if (!isEnoughGasForDeposit) {
+          if (notEnoughGasForCodeDeposit) {
             state.withWorld(result.world)
           } else {
             if (code.length > state.config.maxContractSize) {
@@ -1176,12 +1176,6 @@ case object CREATE extends CreatOp[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
   }
 }
 
-/**
- * CREATE2 is identical to CREATE, except the following line:
- *   val List(endowment, inOffset, inSize, salt) = state.stack.pop(4)
- *   state.world.createAddressBySalt(state.env.ownerAddr, initCode, salt)
- *   val shaCost = state.config.feeSchedule.G_sha3word * UInt256.wordsForBytes(inSize.longValueSafe)
- */
 case object CREATE2 extends CreatOp[(UInt256, UInt256, UInt256, UInt256)](0xf5, 4, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_create
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
