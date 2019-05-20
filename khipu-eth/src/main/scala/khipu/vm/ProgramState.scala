@@ -39,6 +39,7 @@ final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: Pr
   private var _halted: Boolean = false
   var error: Option[ProgramError] = None
   private var _isRevert: Boolean = false
+  var info: Option[String] = None
 
   var returnDataBuffer: ByteString = ByteString()
 
@@ -89,6 +90,16 @@ final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: Pr
   def withError(error: ProgramError): ProgramState[W, S] = {
     this.error = Some(error)
     this._halted = true
+    this
+  }
+
+  def withInfo(info: String): ProgramState[W, S] = {
+    this.info = Some(info)
+    this
+  }
+
+  def resetInfo(): ProgramState[W, S] = {
+    this.info = None
     this
   }
 

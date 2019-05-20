@@ -17,6 +17,7 @@ import khipu.rlp.RLPList
  */
 object WorldState {
   final case class StateException(message: String) extends RuntimeException(message)
+  final case class AddressCollisions(address: Address)
 }
 trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
   import WorldState._
@@ -54,6 +55,9 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
 
   def isAccountDead(address: Address): Boolean =
     getAccount(address).map(_.isEmpty).getOrElse(true)
+
+  def isAccountNonEmptyNonceOrCode(account: Account) =
+    account.nonce.nonZero || account.codeHash != Account.EmptyCodeHash
 
   def getBalance(address: Address): UInt256 =
     getAccount(address).map(a => a.balance).getOrElse(UInt256.Zero)
@@ -101,16 +105,40 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
    * @param creatorAddr, the address of the creator of the new address
    * @return the new address and the state world after the creator's nonce was increased
    */
-  def createAddressByOpCode(creatorAddr: Address): (Address, W) = {
+  def createContractAddress(creatorAddr: Address): Either[AddressCollisions, (Address, W)] = {
     val creatorAccount = getGuaranteedAccount(creatorAddr)
     val world1 = saveAccount(creatorAddr, creatorAccount.increaseNonce())
-    (world1.createAddress(creatorAddr), world1)
+
+    val addressToCreate = createAddress(creatorAddr)
+    if (isAddressCollisions(addressToCreate)) {
+      Left(AddressCollisions(addressToCreate))
+    } else {
+      Right(addressToCreate, world1)
+    }
   }
 
-  def createAddressBySalt(creatorAddr: Address, initCode: Array[Byte], salt: Array[Byte]): (Address, W) = {
+  def createContractAddress(creatorAddr: Address, initCode: Array[Byte], salt: Array[Byte]): Either[AddressCollisions, (Address, W)] = {
     val creatorAccount = getGuaranteedAccount(creatorAddr)
     val world1 = saveAccount(creatorAddr, creatorAccount.increaseNonce())
-    (world1.createSaltAddrress(creatorAddr.toArray, initCode, salt), world1)
+
+    val addressToCreate = createSaltAddress(creatorAddr.toArray, initCode, salt)
+    if (isAddressCollisions(addressToCreate)) {
+      Left(AddressCollisions(addressToCreate))
+    } else {
+      Right(addressToCreate, world1)
+    }
+  }
+
+  /**
+   * Should prevent address collisions:
+   *   https://github.com/ethereum/EIPs/issues/684
+   *   http://eips.ethereum.org/EIPS/eip-1014
+   */
+  private def isAddressCollisions(addressToCreate: Address) = {
+    getAccount(addressToCreate) match {
+      case Some(existed) => isAccountNonEmptyNonceOrCode(existed)
+      case None          => false
+    }
   }
 
   /**
@@ -121,7 +149,7 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
    * @param salt - salt to make different result addresses, 32 bytes stack item
    * @return new address
    */
-  private def createSaltAddrress(creatorAddr: Array[Byte], initCode: Array[Byte], salt: Array[Byte]): Address = {
+  private def createSaltAddress(creatorAddr: Array[Byte], initCode: Array[Byte], salt: Array[Byte]): Address = {
     val data = Array.ofDim[Byte](1 + creatorAddr.length + salt.length + 32)
     data(0) = 0xff.toByte
     var offset = 1

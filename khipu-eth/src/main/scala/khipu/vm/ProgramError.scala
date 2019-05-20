@@ -1,6 +1,7 @@
 package khipu.vm
 
 import khipu.UInt256
+import khipu.domain.Address
 
 /**
  * Marker trait for errors that may occur during program execution
@@ -8,6 +9,7 @@ import khipu.UInt256
 sealed trait ProgramError
 case object OutOfGas extends ProgramError
 case object PrecompiledContractFailed extends ProgramError
+final case class AddressCollisions(address: Address) extends ProgramError
 final case class InvalidOpCode(code: Byte) extends ProgramError {
   override def toString: String =
     f"InvalidOpCode(0x${code.toInt & 0xff}%02x)"

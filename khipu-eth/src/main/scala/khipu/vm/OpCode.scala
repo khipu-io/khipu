@@ -1041,104 +1041,118 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
 
       if (isValidCall) {
 
-        val initCode = state.memory.load(inOffset.intValueSafe, inSize.intValueSafe).toArray
-        // if creation fails at this point we still leave the creators nonce incremented
-        val (newAddress, checkpoint, worldAtCheckpoint) = createContactAddress[W, S](state, initCode, salt) match {
-          case (address, world) => (address, world.copy, world)
-        }
-        //println(s"newAddress: $newAddress via ${state.env.ownerAddr} in CREATE")
-        val worldBeforeTransfer = if (state.config.eip161) {
-          worldAtCheckpoint.increaseNonce(newAddress)
-        } else {
-          worldAtCheckpoint
-        }
-
-        val worldAfterTransfer = worldBeforeTransfer.transfer(state.env.ownerAddr, newAddress, endowment)
-
-        val env = state.env.copy(
-          inputData = ByteString(),
-          callerAddr = state.env.ownerAddr,
-          ownerAddr = newAddress,
-          value = endowment,
-          program = Program(initCode),
-          callDepth = state.env.callDepth + 1
-        )
-
         //FIXME: to avoid calculating this twice, we could adjust state.gas prior to execution in OpCode#execute
         //not sure how this would affect other opcodes [EC-243]
         val availableGas = state.gas - (constGasFn(state.config.feeSchedule) + varGas(state, params))
         val startGas = state.config.gasCap(availableGas)
 
-        val context = ProgramContext[W, S](
-          env,
-          newAddress,
-          startGas,
-          worldAfterTransfer,
-          state.config,
-          state.addressesToDelete,
-          state.addressesTouched + newAddress,
-          state.context.isStaticCall
-        )
-
-        val result = VM.run(context, state.isDebugTraceEnabled)
-        state.mergeParallelRaceConditions(result.parallelRaceConditions)
-
-        if (result.isRevert) {
-          state.withReturnDataBuffer(result.returnData)
-        }
-
-        val gasUsedInCreating = startGas - result.gasRemaining
-        
-        val code = result.returnData
-        val codeDepositGas = state.config.calcCodeDepositCost(code)
-        val isRequestGasForCodeDeposit = state.config.exceptionalFailedCodeDeposit && !result.isRevert
-        val notEnoughGasForCodeDeposit = gasUsedInCreating + codeDepositGas > startGas
-
-        val isCreationFailed = result.error.isDefined || (isRequestGasForCodeDeposit && notEnoughGasForCodeDeposit)
-
-        if (isCreationFailed || result.isRevert) {
-          state.stack.push(UInt256.Zero)
-          
-          if (result.error.isEmpty && result.isRevert) {
-            state.spendGas(gasUsedInCreating)
-          } else {
-            state.spendGas(startGas)
-          }
-
-          // the error result may be caused by parallel race condition, so merge all possible modifies
-          state
-            .withParallelRaceCondition(ProgramState.OnError)
-            .withWorld(checkpoint.mergeRaceConditions(result.world))
-            .step()
-
-        } else {
-          state.stack.push(newAddress.toUInt256)
-
-          state.spendGas(gasUsedInCreating)
-
-          if (notEnoughGasForCodeDeposit) {
-            state.withWorld(result.world)
-          } else {
-            if (code.length > state.config.maxContractSize) {
-              //println(s"Contract size too large: ${code.length}")
-              state.withWorld(result.world).withError(OutOfGas)
+        val initCode = state.memory.load(inOffset.intValueSafe, inSize.intValueSafe).toArray
+        // if creation fails at this point we still leave the creators nonce incremented
+        createContactAddress[W, S](state, initCode, salt) match {
+          case Right((address, world)) =>
+            val (newAddress, checkpoint, worldAtCheckpoint) = (address, world.copy, world)
+            //println(s"newAddress: $newAddress via ${state.env.ownerAddr} in CREATE")
+            val worldBeforeTransfer = if (state.config.eip161) {
+              worldAtCheckpoint.increaseNonce(newAddress)
             } else {
-              if (!result.isRevert) {
-                val world3 = result.world.saveCode(newAddress, code)
-                state.withWorld(world3).spendGas(codeDepositGas)
-              }
+              worldAtCheckpoint
             }
-          }
 
-          state
-            .refundGas(result.gasRefund)
-            .withAddAddressesToDelete(result.addressesToDelete)
-            .withAddAddressesTouched(result.addressesTouched)
-            .withTxLogs(result.txLogs)
-            .step()
+            val worldAfterTransfer = worldBeforeTransfer.transfer(state.env.ownerAddr, newAddress, endowment)
+
+            val env = state.env.copy(
+              inputData = ByteString(),
+              callerAddr = state.env.ownerAddr,
+              ownerAddr = newAddress,
+              value = endowment,
+              program = Program(initCode),
+              callDepth = state.env.callDepth + 1
+            )
+
+            val context = ProgramContext[W, S](
+              env,
+              newAddress,
+              startGas,
+              worldAfterTransfer,
+              state.config,
+              state.addressesToDelete,
+              state.addressesTouched + newAddress,
+              state.context.isStaticCall
+            )
+
+            val result = VM.run(context, state.isDebugTraceEnabled)
+            state.mergeParallelRaceConditions(result.parallelRaceConditions)
+
+            if (result.isRevert) {
+              state.withReturnDataBuffer(result.returnData)
+            }
+
+            val gasUsedInCreating = startGas - result.gasRemaining
+
+            val code = result.returnData
+            val codeDepositGas = state.config.calcCodeDepositCost(code)
+            val isRequestGasForCodeDeposit = state.config.exceptionalFailedCodeDeposit && !result.isRevert
+            val notEnoughGasForCodeDeposit = gasUsedInCreating + codeDepositGas > startGas
+
+            val isCreationFailed = result.error.isDefined || (isRequestGasForCodeDeposit && notEnoughGasForCodeDeposit)
+
+            if (isCreationFailed || result.isRevert) {
+              state.stack.push(UInt256.Zero)
+
+              if (result.error.isEmpty && result.isRevert) {
+                state.spendGas(gasUsedInCreating)
+              } else {
+                state.spendGas(startGas)
+              }
+
+              // the error result may be caused by parallel race condition, so merge all possible modifies
+              state
+                .withParallelRaceCondition(ProgramState.OnError)
+                .withWorld(checkpoint.mergeRaceConditions(result.world))
+                .step()
+
+            } else {
+              state.stack.push(newAddress.toUInt256)
+
+              state.spendGas(gasUsedInCreating)
+
+              if (notEnoughGasForCodeDeposit) {
+                state.withWorld(result.world)
+              } else {
+                if (code.length > state.config.maxContractSize) {
+                  //println(s"Contract size too large: ${code.length}")
+                  state.withWorld(result.world).withError(OutOfGas)
+                } else {
+                  if (!result.isRevert) {
+                    val world3 = result.world.saveCode(newAddress, code)
+                    state.withWorld(world3).spendGas(codeDepositGas)
+                  }
+                }
+              }
+
+              state
+                .refundGas(result.gasRefund)
+                .withAddAddressesToDelete(result.addressesToDelete)
+                .withAddAddressesTouched(result.addressesTouched)
+                .withTxLogs(result.txLogs)
+                .step()
+            }
+
+          case Left(WorldState.AddressCollisions(account)) =>
+            // throws immediately, with exactly the same behavior as would arise 
+            // if the first byte in the init code were an invalid opcode.
+            // TODO added trace info? Don't use state.withError(...) which will halt parent call
+            state.stack.push(UInt256.Zero)
+
+            state
+              .spendGas(startGas)
+              .withInfo(s"$AddressCollisions(account)")
+              .withParallelRaceCondition(ProgramState.OnAccount)
+              .step()
         }
       } else { // invalid call
         state.stack.push(UInt256.Zero)
+
         if (endowment <= state.ownBalance) {
           state.withParallelRaceCondition(ProgramState.OnAccount)
         }
@@ -1148,7 +1162,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
     }
   }
 
-  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): (Address, W)
+  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): Either[WorldState.AddressCollisions, (Address, W)]
 }
 case object CREATE extends CreatOp[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_create
@@ -1165,8 +1179,8 @@ case object CREATE extends CreatOp[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
     doExec(state, endowment, inOffset, inSize, null, params)
   }
 
-  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): (Address, W) = {
-    state.world.createAddressByOpCode(state.env.ownerAddr)
+  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): Either[WorldState.AddressCollisions, (Address, W)] = {
+    state.world.createContractAddress(state.env.ownerAddr)
   }
 
   protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): Long = {
@@ -1191,8 +1205,8 @@ case object CREATE2 extends CreatOp[(UInt256, UInt256, UInt256, UInt256)](0xf5, 
     doExec(state, endowment, inOffset, inSize, salt.bytes, params)
   }
 
-  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): (Address, W) = {
-    state.world.createAddressBySalt(state.env.ownerAddr, initCode, salt)
+  protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): Either[WorldState.AddressCollisions, (Address, W)] = {
+    state.world.createContractAddress(state.env.ownerAddr, initCode, salt)
   }
 
   protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): Long = {
@@ -1368,6 +1382,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
 
       } else { // invalid call
         state.stack.push(UInt256.Zero)
+
         if (endowment <= state.ownBalance) {
           state.withParallelRaceCondition(ProgramState.OnAccount)
         }
