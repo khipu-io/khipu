@@ -1091,10 +1091,10 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
 
             val code = result.returnData
             val codeDepositGas = state.config.calcCodeDepositCost(code)
-            val isRequestGasForCodeDeposit = state.config.exceptionalFailedCodeDeposit && !result.isRevert
+            val isRequireGasForCodeDeposit = state.config.exceptionalFailedCodeDeposit && !result.isRevert
             val notEnoughGasForCodeDeposit = gasUsedInCreating + codeDepositGas > startGas
 
-            val isCreationFailed = result.error.isDefined || (isRequestGasForCodeDeposit && notEnoughGasForCodeDeposit)
+            val isCreationFailed = result.error.isDefined || (isRequireGasForCodeDeposit && notEnoughGasForCodeDeposit)
 
             if (isCreationFailed || result.isRevert) {
               state.stack.push(UInt256.Zero)
@@ -1138,15 +1138,14 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
                 .step()
             }
 
-          case Left(WorldState.AddressCollisions(account)) =>
+          case Left(WorldState.AddressCollisions(address)) =>
             // throws immediately, with exactly the same behavior as would arise 
             // if the first byte in the init code were an invalid opcode.
-            // TODO added trace info? Don't use state.withError(...) which will halt parent call
             state.stack.push(UInt256.Zero)
 
             state
               .spendGas(startGas)
-              .withInfo(s"$AddressCollisions(account)")
+              .withInfo(s"Address collision at $address")
               .withParallelRaceCondition(ProgramState.OnAccount)
               .step()
         }
