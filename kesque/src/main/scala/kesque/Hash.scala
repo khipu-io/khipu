@@ -6,10 +6,8 @@ import org.spongycastle.util.encoders.Hex
 object Hash {
   val empty = Hash(Array[Byte]())
   def apply(): Hash = empty
-}
-final case class Hash(bytes: Array[Byte]) {
 
-  def intHash: Int = {
+  def intHash(bytes: Array[Byte]): Int = {
     val n = math.min(bytes.length, 4)
     var h = 0
     var i = 0
@@ -21,7 +19,7 @@ final case class Hash(bytes: Array[Byte]) {
     h
   }
 
-  def longHash: Long = {
+  def longHash(bytes: Array[Byte]): Long = {
     val n = math.min(bytes.length, 8)
     var h = 0L
     var i = 0
@@ -32,7 +30,8 @@ final case class Hash(bytes: Array[Byte]) {
     }
     h
   }
-
+}
+final case class Hash(bytes: Array[Byte]) {
   def value = new java.math.BigInteger(1, bytes)
 
   def length = bytes.length
@@ -41,7 +40,7 @@ final case class Hash(bytes: Array[Byte]) {
 
   def hexString: String = Hex.toHexString(bytes)
 
-  override def hashCode: Int = intHash
+  override def hashCode: Int = Hash.intHash(bytes)
 
   override def equals(any: Any) = {
     any match {

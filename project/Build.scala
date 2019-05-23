@@ -27,6 +27,7 @@ object Build extends sbt.Build {
     .dependsOn(kesque)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
+    .settings(unmanagedJars in Compile ++= Seq(baseDirectory.value / "lib" / "db-5.3.28.jar").classpath)
     .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.snappy ++ Dependencies.caffeine)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
