@@ -28,7 +28,7 @@ object Build extends sbt.Build {
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
     .settings(unmanagedJars in Compile ++= Seq(baseDirectory.value / "lib" / "db-5.3.28.jar").classpath)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.snappy ++ Dependencies.caffeine)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.lmdb ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.snappy ++ Dependencies.caffeine)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
     .settings(Packaging.settings)
@@ -96,6 +96,8 @@ object Dependencies {
     "com.typesafe.akka" %% "akka-http-spray-json" % AKKA_HTTP_VERSION,
     "com.lightbend.akka" %% "akka-management-cluster-http" % "0.6"
   )
+
+  val lmdb = Seq("org.lmdbjava" % "lmdbjava" % "0.6.1") // akka-distributed-data also includes this lib
 
   val circe = Seq(
     "io.circe" %% "circe-core" % CIRCE_VERSION,

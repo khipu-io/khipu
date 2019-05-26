@@ -1,39 +1,35 @@
 package khipu.tools
 
-import com.sleepycat.db.Database
-import com.sleepycat.db.DatabaseConfig
-import com.sleepycat.db.DatabaseEntry
-import com.sleepycat.db.DatabaseException
-import com.sleepycat.db.DatabaseType
-import com.sleepycat.db.Environment
-import com.sleepycat.db.EnvironmentConfig
-import com.sleepycat.db.Hasher
-import com.sleepycat.db.MultipleDataEntry
-import com.sleepycat.db.OperationStatus
 import java.io.File
 import java.nio.ByteBuffer
 import khipu.Hash
 import khipu.crypto
 import scala.util.Random
+import org.lmdbjava.EnvFlags
+import org.lmdbjava.Env
+import org.lmdbjava.Dbi
+import org.lmdbjava.DbiFlags
+import org.lmdbjava.GetOp
+import org.lmdbjava.SeekOp
 import scala.collection.mutable
 
-object KhipuHasher extends Hasher {
-  def hash(db: Database, data: Array[Byte], len: Int) = Hash.intHash(data)
-}
-
-object BDBTool {
+/**
+ * Fill memory:
+ * # stress -m 1 --vm-bytes 25G --vm-keep
+ */
+object LMDBTool {
   def main(args: Array[String]) {
-    val bdbTool = new BDBTool(DatabaseType.BTREE, isTransactional = false)
+    val bdbTool = new LMDBTool()
 
-    bdbTool.test(num = 100000000, isBulk = true)
+    bdbTool.test(100000000)
   }
 }
-class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
+class LMDBTool() {
   private def xf(n: Double) = "%1$10.1f".format(n)
 
-  val byteOrder = 4321 // big endian
-  val cacheSize = 3 * 1024 * 1024 * 1024L // 3G
+  val cacheSize = 1024 * 1024 * 1024L // 1G
   val bufLen = 1024 * 1024
+  val mapSize = 100 * 1024 * 1024 * 1024L
 
   val averKeySize = 4
   val averDataSize = 64
@@ -47,52 +43,26 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
     tableDir.mkdirs()
   }
 
-  val envconf = new EnvironmentConfig()
-  envconf.setAllowCreate(true)
-  envconf.setInitializeCache(true) // must set otherwise "BDB0595 environment did not include a memory pool"
-  envconf.setInitializeCDB(true)
-  envconf.addDataDir(tableDir)
-  envconf.setCacheSize(cacheSize)
-  if (isTransactional) {
-    envconf.setLogAutoRemove(true)
-    envconf.setTransactional(true)
-  }
+  val env = Env.create()
+    .setMapSize(mapSize)
+    .setMaxDbs(6)
+    .open(tableDir, EnvFlags.MDB_NOLOCK, EnvFlags.MDB_NORDAHEAD)
 
-  val dbenv = new Environment(home, envconf)
+  def test(num: Int) = {
+    val table = env.openDbi(tableName, DbiFlags.MDB_CREATE, DbiFlags.MDB_DUPSORT)
 
-  val dbconf = new DatabaseConfig()
-  dbconf.setAllowCreate(true)
-  dbconf.setByteOrder(byteOrder)
-  dbconf.setType(databaseType)
-  dbconf.setSortedDuplicates(true)
-  dbconf.setCreateDir(tableDir)
-  if (isTransactional) {
-    dbconf.setTransactional(true)
-  }
-
-  databaseType match {
-    case DatabaseType.HASH =>
-      dbconf.setHasher(KhipuHasher)
-      dbconf.setHashNumElements(hashNumElements)
-      val pageSize = 4096
-      dbconf.setPageSize(pageSize)
-      dbconf.setHashFillFactor((pageSize - 32) / (averKeySize + averDataSize + 8))
-
-    case DatabaseType.BTREE =>
-  }
-
-  def test(num: Int, isBulk: Boolean) = {
-    val table = dbenv.openDatabase(null, tableName + "1", null, dbconf)
-
-    val keys = write(table, num, isBulk, isTransactional)
+    val keys = write(table, num)
     read(table, keys)
 
     table.close()
-    dbenv.close()
+    env.close()
     System.exit(0)
   }
 
-  def write(table: Database, num: Int, isBulk: Boolean, isTransactional: Boolean) = {
+  def write(table: Dbi[ByteBuffer], num: Int) = {
+    val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
+    val valBuf = ByteBuffer.allocateDirect(100 * 1024) // will grow when needed
+
     val keys = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
@@ -103,22 +73,8 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
     val keyInterval = math.max(num / nKeysToRead, 1)
     while (i < num) {
 
-      val (keySet, dataSet) = if (isBulk) {
-        val keySet = new MultipleDataEntry()
-        keySet.setData(Array.ofDim[Byte](bufLen))
-        keySet.setUserBuffer(bufLen, true)
-
-        val dataSet = new MultipleDataEntry()
-        dataSet.setData(Array.ofDim[Byte](bufLen))
-        dataSet.setUserBuffer(bufLen, true)
-
-        (keySet, dataSet)
-      } else {
-        (null, null)
-      }
-
       var j = 0
-      val txn = if (isTransactional) dbenv.beginTransaction(null, null) else null
+      val txn = env.txnWrite()
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](64)
         Random.nextBytes(v)
@@ -127,22 +83,19 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
         start = System.nanoTime
 
         val sKey = sliceBytes(k)
-        if (isBulk) {
-          keySet.append(sKey)
-          dataSet.append(v)
-        } else {
-          try {
-            table.put(txn, new DatabaseEntry(sKey), new DatabaseEntry(v)) match {
-              case OperationStatus.SUCCESS =>
-              case x                       => println(s"put failed: $x")
-            }
-          } catch {
-            case ex: DatabaseException =>
-              if (isTransactional) {
-                txn.abort()
-              }
-              println(ex)
+        try {
+          keyBuf.put(sKey).flip()
+          valBuf.put(v).flip()
+          if (!table.put(txn, keyBuf, valBuf)) {
+            println(s"put failed: ${khipu.toHexString(sKey)}")
           }
+        } catch {
+          case ex: Throwable =>
+            txn.abort()
+            println(ex)
+        } finally {
+          keyBuf.clear()
+          valBuf.clear()
         }
 
         val duration = System.nanoTime - start
@@ -160,19 +113,10 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
       start = System.nanoTime
 
       try {
-        if (isBulk) {
-          // use putMultiple instead of putMultipleKey for bulk insert _duplicate_ key/data pairs
-          table.putMultiple(txn, keySet, dataSet, true)
-        }
-        if (isTransactional) {
-          txn.commit()
-        }
-        table.sync() // flush to disk
+        txn.commit()
       } catch {
-        case ex: DatabaseException =>
-          if (isTransactional) {
-            txn.abort()
-          }
+        case ex: Throwable =>
+          txn.abort()
           println(ex)
       }
 
@@ -196,8 +140,10 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
     keys
   }
 
-  def read(table: Database, keys: java.util.ArrayList[Array[Byte]]) {
+  def read(table: Dbi[ByteBuffer], keys: java.util.ArrayList[Array[Byte]]) {
     java.util.Collections.shuffle(keys)
+
+    val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
 
     val start0 = System.nanoTime
     var start = System.nanoTime
@@ -205,43 +151,46 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
     var i = 0
     while (itr.hasNext) {
       val k = itr.next
-      val shortKey = sliceBytes(k)
-      val key = new DatabaseEntry(shortKey)
+      val sKey = sliceBytes(k)
+      keyBuf.put(sKey).flip()
 
-      val cursor = try {
-        table.openCursor(null, null)
-      } catch {
-        case ex: DatabaseException =>
-          println(ex)
-          null
-      }
+      val txn = env.txnRead()
+      try {
+        val cursor = table.openCursor(txn)
+        cursor.get(keyBuf, GetOp.MDB_SET_KEY)
 
-      var data = new DatabaseEntry()
-      var gotData: Option[Array[Byte]] = None
-      if (cursor.getSearchKey(key, data, null) == OperationStatus.SUCCESS) {
-        val dataBytes = data.getData
-        val fullKey = crypto.kec256(dataBytes)
-
-        if (java.util.Arrays.equals(fullKey, k)) {
-          gotData = Some(dataBytes)
-        }
-
-        data = new DatabaseEntry()
-        while (gotData.isEmpty && cursor.getNextDup(key, data, null) == OperationStatus.SUCCESS) {
-          val dataBytes = data.getData
+        var gotData: Option[Array[Byte]] = None
+        if (cursor.get(keyBuf, GetOp.MDB_SET_KEY)) {
+          val dataBytes = Array.ofDim[Byte](cursor.`val`.remaining)
+          cursor.`val`.get(dataBytes)
           val fullKey = crypto.kec256(dataBytes)
+
           if (java.util.Arrays.equals(fullKey, k)) {
             gotData = Some(dataBytes)
           }
-          data = new DatabaseEntry()
+
+          while (gotData.isEmpty && cursor.seek(SeekOp.MDB_NEXT_DUP)) {
+            val dataBytes = Array.ofDim[Byte](cursor.`val`.remaining)
+            cursor.`val`.get(dataBytes)
+            val fullKey = crypto.kec256(dataBytes)
+            if (java.util.Arrays.equals(fullKey, k)) {
+              gotData = Some(dataBytes)
+            }
+          }
         }
-      }
 
-      cursor.close()
+        cursor.close()
 
-      if (gotData.isEmpty) {
-        println(s"===> no data for ${khipu.toHexString(shortKey)} of ${khipu.toHexString(k)}")
+        if (gotData.isEmpty) {
+          println(s"===> no data for ${khipu.toHexString(sKey)} of ${khipu.toHexString(k)}")
+        }
+      } catch {
+        case ex: Throwable =>
+          txn.abort()
+          println(ex)
+          null
       }
+      txn.commit()
 
       if (i % 10000 == 0) {
         val elapsed = (System.nanoTime - start) / 1000000000.0 // sec
@@ -251,6 +200,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
         start = System.nanoTime
       }
 
+      keyBuf.clear()
       i += 1
     }
 
