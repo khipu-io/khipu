@@ -184,7 +184,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
       elapsed += duration
       totalElapsed += duration
 
-      if (i % 100000 == 0) {
+      if (i > 0 && i % 100000 == 0) {
         val speed = 100000 / (elapsed / 1000000000.0)
         println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - write")
         start = System.nanoTime
@@ -247,7 +247,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
         println(s"===> no data for ${khipu.toHexString(sKey)} of ${khipu.toHexString(k)}")
       }
 
-      if (i % 10000 == 0) {
+      if (i > 0 && i % 10000 == 0) {
         val elapsed = (System.nanoTime - start) / 1000000000.0 // sec
         val speed = 10000 / elapsed
         val hashKey = Hash(k)

@@ -19,9 +19,9 @@ import scala.collection.mutable
  */
 object LMDBTool {
   def main(args: Array[String]) {
-    val bdbTool = new LMDBTool()
+    val dbTool = new LMDBTool()
 
-    bdbTool.test(100000000)
+    dbTool.test(100000000)
   }
 }
 class LMDBTool() {
@@ -124,7 +124,7 @@ class LMDBTool() {
       elapsed += duration
       totalElapsed += duration
 
-      if (i % 100000 == 0) {
+      if (i > 0 && i % 100000 == 0) {
         val speed = 100000 / (elapsed / 1000000000.0)
         println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - write")
         start = System.nanoTime
@@ -132,8 +132,6 @@ class LMDBTool() {
       }
     }
 
-    //val stats = table.getStats(null, null).asInstanceOf[HashStats]
-    //println(s"stats: $stats")
     val speed = i / (totalElapsed / 1000000000.0)
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - write all in ${xf((totalElapsed / 1000000000.0))}s")
 
@@ -164,7 +162,6 @@ class LMDBTool() {
           val dataBytes = Array.ofDim[Byte](cursor.`val`.remaining)
           cursor.`val`.get(dataBytes)
           val fullKey = crypto.kec256(dataBytes)
-
           if (java.util.Arrays.equals(fullKey, k)) {
             gotData = Some(dataBytes)
           }
@@ -192,7 +189,7 @@ class LMDBTool() {
       }
       txn.commit()
 
-      if (i % 10000 == 0) {
+      if (i > 0 && i % 10000 == 0) {
         val elapsed = (System.nanoTime - start) / 1000000000.0 // sec
         val speed = 10000 / elapsed
         val hashKey = Hash(k)
