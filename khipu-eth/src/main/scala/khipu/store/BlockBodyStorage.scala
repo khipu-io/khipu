@@ -3,7 +3,7 @@ package khipu.store
 import kesque.TVal
 import khipu.Hash
 import khipu.network.p2p.messages.PV62.BlockBody
-import khipu.store.datasource.KesqueDataSource
+import khipu.store.datasource.HeavyDataSource
 import khipu.util.SimpleMap
 import scala.collection.mutable
 
@@ -12,7 +12,9 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockBody belong
  *   Value: the block body
  */
-final class BlockBodyStorage(val source: KesqueDataSource) extends SimpleMap[Hash, BlockBody, BlockBodyStorage] {
+final class BlockBodyStorage(val source: HeavyDataSource) extends SimpleMap[Hash, BlockBody] {
+  type This = BlockBodyStorage
+
   import BlockBody.BlockBodyDec
 
   val namespace: Array[Byte] = Namespaces.BodyNamespace
@@ -32,7 +34,7 @@ final class BlockBodyStorage(val source: KesqueDataSource) extends SimpleMap[Has
     this
   }
 
-  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingBlockNumber(writingBlockNumber)
+  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingTimestamp(writingBlockNumber)
 
-  protected def apply(source: KesqueDataSource): BlockBodyStorage = new BlockBodyStorage(source)
+  protected def apply(source: HeavyDataSource): BlockBodyStorage = new BlockBodyStorage(source)
 }

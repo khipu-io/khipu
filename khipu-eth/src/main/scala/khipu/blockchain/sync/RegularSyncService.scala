@@ -19,7 +19,6 @@ import khipu.network.p2p.messages.CommonMessages.NewBlock
 import khipu.network.p2p.messages.PV62
 import khipu.network.rlpx.Peer
 import khipu.network.rlpx.PeerEntity
-import khipu.store.datasource.KesqueDataSource
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
 import khipu.util
@@ -329,8 +328,8 @@ trait RegularSyncService { _: SyncService =>
                   requestingNodeData(nodeOkPeer.getOrElse(peer), hash)(3.seconds) andThen {
                     case Success(Some(NodeDataResponse(peerId, value))) =>
                       table match {
-                        case KesqueDataSource.account => accountNodeStorage.put(hash, value.toArray)
-                        case KesqueDataSource.storage => storageNodeStorage.put(hash, value.toArray)
+                        case util.Config.Db.account => accountNodeStorage.put(hash, value.toArray)
+                        case util.Config.Db.storage => storageNodeStorage.put(hash, value.toArray)
                       }
 
                     case Success(None) =>

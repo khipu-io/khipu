@@ -68,7 +68,7 @@ object Khipu {
       log.info("Khipu db stopped")
     }
 
-    val genesisDataLoader = new GenesisDataLoader(serviceBoard.storages.dataSource, serviceBoard.blockchain, serviceBoard.storages.pruningMode, serviceBoard.blockchainConfig, serviceBoard.db)
+    val genesisDataLoader = new GenesisDataLoader(serviceBoard.storages.dataSource, serviceBoard.blockchain, serviceBoard.storages.pruningMode, serviceBoard.blockchainConfig, serviceBoard.dbConfig)
     genesisDataLoader.loadGenesisData()
 
     //new khipu.store.HashedKeyValueStorage(serviceBoard.blockchain).loadAndSeekFromKafka(5000000)

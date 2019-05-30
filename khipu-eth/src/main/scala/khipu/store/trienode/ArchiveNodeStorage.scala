@@ -8,6 +8,7 @@ import khipu.Hash
  * Value: the RLP encoded node
  */
 final class ArchiveNodeStorage(source: NodeStorage) extends NodeKeyValueStorage {
+  type This = ArchiveNodeStorage
 
   override def get(key: Hash): Option[Array[Byte]] = source.get(key)
 

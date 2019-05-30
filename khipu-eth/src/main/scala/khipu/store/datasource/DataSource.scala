@@ -4,10 +4,6 @@ import khipu.util.Clock
 
 trait DataSource {
 
-  type Key = Array[Byte]
-  type Value = Array[Byte]
-  type Namespace = Array[Byte]
-
   /**
    * This function obtains the associated value to a key. It requires the (key-value) pair to be in the DataSource
    *
@@ -15,7 +11,7 @@ trait DataSource {
    * @param key
    * @return the value associated with the passed key.
    */
-  def apply(namespace: Namespace, key: Key): Value = get(namespace, key).get
+  def apply(namespace: Array[Byte], key: Array[Byte]): Array[Byte] = get(namespace, key).get
 
   /**
    * This function obtains the associated value to a key, if there exists one.
@@ -24,7 +20,7 @@ trait DataSource {
    * @param key
    * @return the value associated with the passed key.
    */
-  def get(namespace: Namespace, key: Key): Option[Value]
+  def get(namespace: Array[Byte], key: Array[Byte]): Option[Array[Byte]]
 
   /**
    * This function updates the DataSource by deleting, updating and inserting new (key-value) pairs.
@@ -39,7 +35,7 @@ trait DataSource {
    *                 If a key is already in the DataSource its value will be updated.
    * @return the new DataSource after the removals and insertions were done.
    */
-  def update(namespace: Namespace, toRemove: Iterable[Key], toUpsert: Iterable[(Key, Value)]): DataSource
+  def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource
 
   /**
    * This function updates the DataSource by deleting all the (key-value) pairs in it.

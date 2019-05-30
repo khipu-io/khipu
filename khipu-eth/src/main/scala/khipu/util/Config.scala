@@ -19,7 +19,6 @@ import scala.concurrent.duration._
 import scala.util.Try
 
 object Config {
-
   val config = ConfigFactory.load().getConfig("khipu")
 
   val clientId = config.getString("client-id")
@@ -125,11 +124,26 @@ object Config {
     val batchSize: Int
   }
   object Db extends DbConfig {
+    trait DBEngine
+    case object LMDB extends DBEngine
+    case object KESQUE extends DBEngine
 
     private val dbConfig = config.getConfig("db")
-    private val leveldbConfig = dbConfig.getConfig("leveldb")
-
+    val dbEngine: DBEngine = dbConfig.getString("engine") match {
+      case "lmdb"   => LMDB
+      case "kesque" => KESQUE
+    }
     val batchSize = dbConfig.getInt("batch-size")
+
+    val account = "account"
+    val storage = "storage"
+    val evmcode = "evmcode"
+    val header = "header"
+    val body = "body"
+    val td = "td" // total difficulty
+    val receipts = "receipts"
+
+    private val leveldbConfig = dbConfig.getConfig("leveldb")
 
     object Leveldb extends LeveldbConfig {
       val path = datadir + "/" + leveldbConfig.getString("path")

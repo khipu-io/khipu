@@ -1,8 +1,6 @@
 package khipu.store.trienode
 
 import akka.actor.ActorSystem
-import khipu.store.datasource.KesqueDataSource
-import kesque.TVal
 import khipu.Hash
 import khipu.util.cache.sync.Cache
 
@@ -10,6 +8,8 @@ import khipu.util.cache.sync.Cache
  * Global node cache
  */
 final class CachedNodeStorage(source: NodeStorage, cache: Cache[Hash, Array[Byte]])(implicit system: ActorSystem) extends NodeKeyValueStorage {
+  type This = CachedNodeStorage
+
   import system.dispatcher
 
   override def get(key: Hash): Option[Array[Byte]] = {

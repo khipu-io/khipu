@@ -7,7 +7,9 @@ import khipu.store.datasource.DataSource
  * This class is used to store discovered nodes
  *   Value: stored nodes list
  */
-final class KnownNodesStorage(val source: DataSource) extends KeyValueStorage[String, Set[String], KnownNodesStorage] {
+final class KnownNodesStorage(val source: DataSource) extends KeyValueStorage[String, Set[String]] {
+  type This = KnownNodesStorage
+
   val key = "KnownNodes"
 
   val namespace: Array[Byte] = Namespaces.KnownNodesNamespace

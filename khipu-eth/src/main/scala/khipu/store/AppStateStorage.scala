@@ -23,7 +23,8 @@ object AppStateStorage {
  *   Value: stored string value
  */
 import AppStateStorage._
-final class AppStateStorage(val source: DataSource) extends KeyValueStorage[Key, Long, AppStateStorage] {
+final class AppStateStorage(val source: DataSource) extends KeyValueStorage[Key, Long] {
+  type This = AppStateStorage
 
   val namespace: Array[Byte] = Namespaces.AppStateNamespace
   def keySerializer: Key => Array[Byte] = _.name.getBytes

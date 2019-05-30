@@ -15,7 +15,9 @@ import khipu.store.datasource.DataSource
 object FastSyncStateStorage {
   val syncStateKey: String = "fast-sync-state"
 }
-final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage[String, SyncState, FastSyncStateStorage] {
+final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage[String, SyncState] {
+  type This = FastSyncStateStorage
+
   import FastSyncStateStorage._
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 

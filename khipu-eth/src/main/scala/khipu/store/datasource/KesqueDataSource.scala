@@ -12,7 +12,6 @@ import kesque.TKeyVal
 import kesque.TVal
 import khipu.Hash
 import khipu.util.Clock
-import khipu.util.SimpleMap
 import org.apache.kafka.common.record.CompressionType
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -88,13 +87,13 @@ final case class NodeRecord(flag: Byte, key: Array[Byte], value: Array[Byte]) {
  * during block execution, and are a bit too many.
  */
 object KesqueDataSource {
-  val account = "account"
-  val storage = "storage"
-  val evmcode = "evmcode"
-  val header = "header"
-  val body = "body"
-  val td = "td" // total difficulty
-  val receipts = "receipts"
+  private val account = "account"
+  private val storage = "storage"
+  private val evmcode = "evmcode"
+  private val header = "header"
+  private val body = "body"
+  private val td = "td" // total difficulty
+  private val receipts = "receipts"
 
   def kafkaProps(system: ActorSystem) = {
     val props = new Properties()
@@ -224,12 +223,19 @@ object KesqueDataSource {
   }
 
 }
-final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(implicit system: ActorSystem) extends SimpleMap[Hash, TVal, KesqueDataSource] {
+final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(implicit system: ActorSystem) extends HeavyDataSource {
+  type This = KesqueDataSource
+
   import KesqueDataSource._
 
   private var _currWritingBlockNumber: Long = _
-  def setWritingBlockNumber(writingBlockNumber: Long) {
+  def setWritingTimestamp(writingBlockNumber: Long) {
     this._currWritingBlockNumber = writingBlockNumber
+  }
+
+  def getKeyByTimestamp(time: Long): Option[Hash] = table.getKeyByTime(time).map(Hash(_))
+  def putTimestampToKey(time: Long, key: Hash) {
+    table.putTimeToKey(time, key.bytes)
   }
 
   val clock = new Clock()

@@ -72,7 +72,9 @@ final class MerklePatriciaTrie[K, V] private (
     rootHashOpt:          Option[Array[Byte]],
     nodeStorage:          NodeKeyValueStorage,
     private var nodeLogs: Map[Hash, Log[Array[Byte]]]
-)(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]) extends SimpleMap[K, V, MerklePatriciaTrie[K, V]] {
+)(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]) extends SimpleMap[K, V] {
+  type This = MerklePatriciaTrie[K, V]
+
   import MerklePatriciaTrie._
 
   // The root hash will be already here via a series of put/remove operations

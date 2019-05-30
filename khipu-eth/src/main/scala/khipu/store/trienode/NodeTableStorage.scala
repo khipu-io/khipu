@@ -3,9 +3,11 @@ package khipu.store.trienode
 import akka.actor.ActorSystem
 import kesque.TVal
 import khipu.Hash
-import khipu.store.datasource.KesqueDataSource
+import khipu.store.datasource.HeavyDataSource
 
-final class NodeTableStorage(source: KesqueDataSource)(implicit system: ActorSystem) extends NodeKeyValueStorage {
+final class NodeTableStorage(source: HeavyDataSource)(implicit system: ActorSystem) extends NodeKeyValueStorage {
+  type This = NodeTableStorage
+
   import system.dispatcher
 
   override def get(key: Hash): Option[Array[Byte]] = {
@@ -19,7 +21,7 @@ final class NodeTableStorage(source: KesqueDataSource)(implicit system: ActorSys
     this
   }
 
-  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingBlockNumber(writingBlockNumber)
+  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingTimestamp(writingBlockNumber)
 
   override def tableName = source.topic
 }

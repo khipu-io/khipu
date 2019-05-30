@@ -9,7 +9,9 @@ object TransactionMappingStorage {
   final case class TransactionLocation(blockHash: Hash, txIndex: Int)
 }
 import TransactionMappingStorage._
-final class TransactionMappingStorage(val source: DataSource) extends KeyValueStorage[Hash, TransactionLocation, TransactionMappingStorage] {
+final class TransactionMappingStorage(val source: DataSource) extends KeyValueStorage[Hash, TransactionLocation] {
+  type This = TransactionMappingStorage
+
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
   val namespace: Array[Byte] = Namespaces.TransactionMappingNamespace

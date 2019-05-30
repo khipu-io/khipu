@@ -9,7 +9,7 @@ import khipu.rlp.RLPEncodeable
 import khipu.rlp.RLPImplicitConversions._
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
-import khipu.store.datasource.KesqueDataSource
+import khipu.store.datasource.HeavyDataSource
 import khipu.util.SimpleMap
 
 object ReceiptsStorage {
@@ -57,7 +57,9 @@ object ReceiptsStorage {
  *   Key: hash of the block to which the list of receipts belong
  *   Value: the list of receipts
  */
-final class ReceiptsStorage(val source: KesqueDataSource) extends SimpleMap[Hash, Seq[Receipt], ReceiptsStorage] {
+final class ReceiptsStorage(val source: HeavyDataSource) extends SimpleMap[Hash, Seq[Receipt]] {
+  type This = ReceiptsStorage
+
   import ReceiptsStorage.ReceiptsSerializer._
 
   val namespace: Array[Byte] = Namespaces.ReceiptsNamespace
@@ -77,6 +79,6 @@ final class ReceiptsStorage(val source: KesqueDataSource) extends SimpleMap[Hash
     this
   }
 
-  protected def apply(source: KesqueDataSource): ReceiptsStorage = new ReceiptsStorage(source)
+  protected def apply(source: HeavyDataSource): ReceiptsStorage = new ReceiptsStorage(source)
 }
 

@@ -10,6 +10,8 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 final class DistributedNodeStorage(source: NodeStorage)(implicit system: ActorSystem) extends NodeKeyValueStorage {
+  type This = DistributedNodeStorage
+
   import system.dispatcher
   implicit val timeout: Timeout = 60.seconds
 
@@ -33,7 +35,7 @@ final class DistributedNodeStorage(source: NodeStorage)(implicit system: ActorSy
   }
 
   // TODO return Future
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): NodeKeyValueStorage = {
+  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): DistributedNodeStorage = {
     // TODO pruning mode to delete from source
     source.update(Set(), toUpsert)
 

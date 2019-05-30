@@ -76,6 +76,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
   implicit val materializer = ActorMaterializer()(system)
 
   val config = util.Config.config
+  val dbConfig = util.Config.Db
 
   val secureRandomAlgo = if (config.hasPath("secure-random-algo")) Some(config.getString("secure-random-algo")) else None
   val secureRandom = secureRandomAlgo.map(SecureRandom.getInstance(_)).getOrElse(new SecureRandom())
@@ -119,14 +120,14 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     // account trie node size evalution: account value - 4x256bytes ~ 288 + 1024
     // storage trie node size evalution: storage valye - 256bytes ~ 288 + 256 
     private val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(KesqueDataSource.account), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
-      Future(kesque.getTable(Array(KesqueDataSource.storage), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
-      Future(kesque.getTable(Array(KesqueDataSource.evmcode), 24576)),
+      Future(kesque.getTable(Array(dbConfig.account), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
+      Future(kesque.getTable(Array(dbConfig.storage), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
+      Future(kesque.getTable(Array(dbConfig.evmcode), 24576)),
       Future(kesque.getTimedTable(Array(
-        KesqueDataSource.header,
-        KesqueDataSource.body,
-        KesqueDataSource.receipts,
-        KesqueDataSource.td
+        dbConfig.header,
+        dbConfig.body,
+        dbConfig.receipts,
+        dbConfig.td
       ), 102400))
     ))
     private val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
@@ -135,14 +136,14 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     //private val tdTable = kesque.getTable(Array(KesqueDataSource.td), 1024000)
     //private val receiptTable = kesque.getTable(Array(KesqueDataSource.receipts), 1024000)
 
-    lazy val accountNodeDataSource = new KesqueDataSource(accountTable, KesqueDataSource.account)
-    lazy val storageNodeDataSource = new KesqueDataSource(storageTable, KesqueDataSource.storage)
-    lazy val evmCodeDataSource = new KesqueDataSource(evmcodeTable, KesqueDataSource.evmcode)
+    lazy val accountNodeDataSource = new KesqueDataSource(accountTable, dbConfig.account)
+    lazy val storageNodeDataSource = new KesqueDataSource(storageTable, dbConfig.storage)
+    lazy val evmCodeDataSource = new KesqueDataSource(evmcodeTable, dbConfig.evmcode)
 
-    lazy val blockHeaderDataSource = new KesqueDataSource(blockTable, KesqueDataSource.header)
-    lazy val blockBodyDataSource = new KesqueDataSource(blockTable, KesqueDataSource.body)
-    lazy val receiptsDataSource = new KesqueDataSource(blockTable, KesqueDataSource.receipts)
-    lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, KesqueDataSource.td)
+    lazy val blockHeaderDataSource = new KesqueDataSource(blockTable, dbConfig.header)
+    lazy val blockBodyDataSource = new KesqueDataSource(blockTable, dbConfig.body)
+    lazy val receiptsDataSource = new KesqueDataSource(blockTable, dbConfig.receipts)
+    lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, dbConfig.td)
 
     protected lazy val nodeKeyValueCache = {
       val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
@@ -177,8 +178,6 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     }
 
   }
-
-  val db = util.Config.Db
 
   // There should be only one instance, instant it here or a standalone singleton service
   val blockchain: Blockchain = Blockchain(storages)

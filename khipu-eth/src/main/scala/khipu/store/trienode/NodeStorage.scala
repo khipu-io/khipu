@@ -13,7 +13,8 @@ import khipu.store.datasource.DataSource
  * It's the direct access storage on dataSource, and usually wrapped by
  * NodeKeyValueStorage for various caching/pruning purpose
  */
-final class NodeStorage(val source: DataSource) extends KeyValueStorage[Hash, Array[Byte], NodeStorage] {
+final class NodeStorage(val source: DataSource) extends KeyValueStorage[Hash, Array[Byte]] {
+  type This = NodeStorage
 
   val namespace: Array[Byte] = Namespaces.NodeNamespace
   def keySerializer: Hash => Array[Byte] = _.bytes

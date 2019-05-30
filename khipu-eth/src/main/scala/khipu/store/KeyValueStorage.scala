@@ -17,7 +17,8 @@ object Namespaces {
   val TransactionMappingNamespace = Array[Byte]('l'.toByte)
 }
 
-trait KeyValueStorage[K, V, T <: KeyValueStorage[K, V, T]] extends SimpleMap[K, V, T] {
+trait KeyValueStorage[K, V] extends SimpleMap[K, V] {
+  type This <: KeyValueStorage[K, V]
 
   val source: DataSource
   val namespace: Array[Byte]
@@ -25,7 +26,7 @@ trait KeyValueStorage[K, V, T <: KeyValueStorage[K, V, T]] extends SimpleMap[K, 
   def valueSerializer: V => Array[Byte]
   def valueDeserializer: Array[Byte] => V
 
-  protected def apply(dataSource: DataSource): T
+  protected def apply(dataSource: DataSource): This
 
   /**
    * This function obtains the associated value to a key in the current namespace, if there exists one.
@@ -44,7 +45,7 @@ trait KeyValueStorage[K, V, T <: KeyValueStorage[K, V, T]] extends SimpleMap[K, 
    *                 If a key is already in the DataSource its value will be updated.
    * @return the new KeyValueStorage after the removals and insertions were done.
    */
-  def update(toRemove: Set[K], toUpsert: Map[K, V]): T = {
+  def update(toRemove: Set[K], toUpsert: Map[K, V]): This = {
     val newDataSource = source.update(
       namespace = namespace,
       toRemove = toRemove.map(keySerializer),

@@ -3,7 +3,7 @@ package khipu.store
 import kesque.TVal
 import khipu.Hash
 import khipu.UInt256
-import khipu.store.datasource.KesqueDataSource
+import khipu.store.datasource.HeavyDataSource
 import khipu.util.SimpleMap
 
 /**
@@ -11,7 +11,8 @@ import khipu.util.SimpleMap
  *   Key: hash of the block
  *   Value: the total difficulty
  */
-final class TotalDifficultyStorage(val source: KesqueDataSource) extends SimpleMap[Hash, UInt256, TotalDifficultyStorage] {
+final class TotalDifficultyStorage(val source: HeavyDataSource) extends SimpleMap[Hash, UInt256] {
+  type This = TotalDifficultyStorage
 
   val namespace: Array[Byte] = Namespaces.TotalDifficultyNamespace
   def keySerializer: Hash => Array[Byte] = _.bytes
@@ -30,6 +31,6 @@ final class TotalDifficultyStorage(val source: KesqueDataSource) extends SimpleM
     this
   }
 
-  protected def apply(dataSource: KesqueDataSource): TotalDifficultyStorage = new TotalDifficultyStorage(dataSource)
+  protected def apply(dataSource: HeavyDataSource): TotalDifficultyStorage = new TotalDifficultyStorage(dataSource)
 }
 

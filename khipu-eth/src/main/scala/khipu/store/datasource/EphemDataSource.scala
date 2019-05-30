@@ -10,9 +10,9 @@ object EphemDataSource {
 }
 final class EphemDataSource(private var storage: Map[ByteString, Array[Byte]]) extends DataSource {
 
-  override def get(namespace: Namespace, key: Key): Option[Value] = storage.get(ByteString(namespace ++ key))
+  override def get(namespace: Array[Byte], key: Array[Byte]): Option[Array[Byte]] = storage.get(ByteString(namespace ++ key))
 
-  override def update(namespace: Namespace, toRemove: Iterable[Key], toUpsert: Iterable[(Key, Value)]): DataSource = {
+  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
     val afterRemove = toRemove.foldLeft(storage) { (storage, key) =>
       storage - ByteString(namespace ++ key)
     }

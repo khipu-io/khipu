@@ -45,7 +45,7 @@ final class LeveldbDataSource(
    * @param key
    * @return the value associated with the passed key.
    */
-  override def get(namespace: Namespace, key: Key): Option[Value] = {
+  override def get(namespace: Array[Byte], key: Array[Byte]): Option[Array[Byte]] = {
     val dbKey = BytesUtil.concat(namespace, key)
     val start = System.nanoTime
     val value = db.get(dbKey)
@@ -62,7 +62,7 @@ final class LeveldbDataSource(
    *                  If a key is already in the DataSource its value will be updated.
    * @return the new DataSource after the removals and insertions were done.
    */
-  override def update(namespace: Namespace, toRemove: Iterable[Key], toUpsert: Iterable[(Key, Value)]): DataSource = {
+  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
     val batch = db.createWriteBatch()
     toRemove.foreach { key => batch.delete(BytesUtil.concat(namespace, key)) }
     toUpsert.foreach { case (key, value) => batch.put(BytesUtil.concat(namespace, key), value) }

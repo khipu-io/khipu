@@ -4,7 +4,7 @@ import kesque.TVal
 import khipu.Hash
 import khipu.domain.BlockHeader
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
-import khipu.store.datasource.KesqueDataSource
+import khipu.store.datasource.HeavyDataSource
 import khipu.util.SimpleMap
 import scala.collection.mutable
 
@@ -13,7 +13,9 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockHeader belong
  *   Value: the block header
  */
-final class BlockHeaderStorage(val source: KesqueDataSource) extends SimpleMap[Hash, BlockHeader, BlockHeaderStorage] {
+final class BlockHeaderStorage(val source: HeavyDataSource) extends SimpleMap[Hash, BlockHeader] {
+  type This = BlockHeaderStorage
+
   val namespace: Array[Byte] = Namespaces.HeaderNamespace
   def keySerializer: Hash => Array[Byte] = _.bytes
   def valueSerializer: BlockHeader => Array[Byte] = _.toBytes
@@ -31,11 +33,11 @@ final class BlockHeaderStorage(val source: KesqueDataSource) extends SimpleMap[H
     this
   }
 
-  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingBlockNumber(writingBlockNumber)
+  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingTimestamp(writingBlockNumber)
 
-  def getBlockHash(blockNumber: Long) = source.table.getKeyByTime(blockNumber).map(Hash(_))
-  def putBlockHash(blockNumber: Long, key: Hash) = source.table.putTimeToKey(blockNumber, key.bytes)
+  def getBlockHash(blockNumber: Long) = source.getKeyByTimestamp(blockNumber)
+  def putBlockHash(blockNumber: Long, key: Hash) = source.putTimestampToKey(blockNumber, key)
 
-  protected def apply(source: KesqueDataSource): BlockHeaderStorage = new BlockHeaderStorage(source)
+  protected def apply(source: HeavyDataSource): BlockHeaderStorage = new BlockHeaderStorage(source)
 }
 

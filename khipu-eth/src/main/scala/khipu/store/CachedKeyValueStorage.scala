@@ -2,7 +2,9 @@ package khipu.store
 
 import khipu.util.cache.sync.Cache
 
-trait CachedKeyValueStorage[K, V, T <: CachedKeyValueStorage[K, V, T]] extends KeyValueStorage[K, V, T] {
+trait CachedKeyValueStorage[K, V] extends KeyValueStorage[K, V] {
+  type This <: CachedKeyValueStorage[K, V]
+
   protected val cache: Cache[K, V]
 
   /**
@@ -36,7 +38,7 @@ trait CachedKeyValueStorage[K, V, T <: CachedKeyValueStorage[K, V, T]] extends K
    *                 If a key is already in the DataSource its value will be updated.
    * @return the new KeyValueStorage after the removals and insertions were done.
    */
-  override def update(toRemove: Set[K], toUpsert: Map[K, V]): T = {
+  override def update(toRemove: Set[K], toUpsert: Map[K, V]) = {
     val updated = super.update(toRemove, toUpsert)
     //toUpsert foreach { case (key, value) => cache.put(key, () => Future(value)) }
     toUpsert foreach { case (key, value) => cache.put(key, value) }

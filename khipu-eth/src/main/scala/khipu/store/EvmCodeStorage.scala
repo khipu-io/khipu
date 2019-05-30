@@ -3,7 +3,7 @@ package khipu.store
 import akka.util.ByteString
 import kesque.TVal
 import khipu.Hash
-import khipu.store.datasource.KesqueDataSource
+import khipu.store.datasource.HeavyDataSource
 import khipu.util.SimpleMap
 
 /**
@@ -11,7 +11,8 @@ import khipu.util.SimpleMap
  *   Key: hash of the code
  *   Value: the code
  */
-final class EvmCodeStorage(val source: KesqueDataSource) extends SimpleMap[Hash, ByteString, EvmCodeStorage] {
+final class EvmCodeStorage(val source: HeavyDataSource) extends SimpleMap[Hash, ByteString] {
+  type This = EvmCodeStorage
 
   val namespace: Array[Byte] = Namespaces.CodeNamespace
   def keySerializer: Hash => Array[Byte] = _.bytes
@@ -30,8 +31,8 @@ final class EvmCodeStorage(val source: KesqueDataSource) extends SimpleMap[Hash,
     this
   }
 
-  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingBlockNumber(writingBlockNumber)
+  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingTimestamp(writingBlockNumber)
 
-  protected def apply(source: KesqueDataSource): EvmCodeStorage = new EvmCodeStorage(source)
+  protected def apply(source: HeavyDataSource): EvmCodeStorage = new EvmCodeStorage(source)
 }
 
