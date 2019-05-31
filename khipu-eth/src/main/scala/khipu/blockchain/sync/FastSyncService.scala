@@ -572,7 +572,7 @@ trait FastSyncService { _: SyncService =>
           validateBlocks(receivedHashes, bodies) match {
             case Valid =>
               self ! EnqueueBlockBodies(remainingHashes)
-              (persistenceService ? SaveBodies((receivedHashes zip bodies).toMap, receivedHashes))(20.seconds).mapTo[Option[Long]] andThen {
+              (persistenceService ? SaveBodies((receivedHashes zip bodies).toMap, receivedHashes))(300.seconds).mapTo[Option[Long]] andThen {
                 case Success(syncedBlockNumber) =>
                   log.debug(s"SaveBodies success with syncedBlockNumber=$syncedBlockNumber")
                   self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, syncedBlockNumber))
@@ -811,11 +811,6 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
   }
 
   def receive: Receive = {
-    case SaveDifficulties(kvs) =>
-      val start = System.nanoTime
-      kvs foreach { case (k, v) => blockchain.saveTotalDifficulty(k, v) }
-      log.debug(s"SaveDifficulties ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
-
     case SaveHeaders(kvs) =>
       val start = System.nanoTime
       kvs foreach { case (k, v) => blockchain.saveBlockHeader(v) }
@@ -823,13 +818,18 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
 
     case SaveBodies(kvs, receivedHashes) =>
       val start = System.nanoTime
-      kvs foreach { case (k, v) => blockchain.saveBlockBody(k, v) }
+      blockchain.saveBlockBody(kvs)
       log.debug(s"SaveBodies ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
       sender() ! updateBestBlockIfNeeded(receivedHashes)
 
+    case SaveDifficulties(kvs) =>
+      val start = System.nanoTime
+      blockchain.saveTotalDifficulty(kvs)
+      log.debug(s"SaveDifficulties ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
+
     case SaveReceipts(kvs, receivedHashes) =>
       val start = System.nanoTime
-      kvs foreach { case (k, v) => blockchain.saveReceipts(k, v) }
+      blockchain.saveReceipts(kvs)
       log.debug(s"SaveReceipts ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
 
     case SaveAccountNodes(kvs) =>
@@ -844,7 +844,7 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
 
     case SaveEvmcodes(kvs) =>
       val start = System.nanoTime
-      kvs foreach { case (k, v) => blockchain.saveEvmcode(k, v) }
+      blockchain.saveEvmcode(kvs)
       log.debug(s"SaveEvmcodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
   }
 

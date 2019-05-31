@@ -27,7 +27,9 @@ import khipu.network.rlpx.PeerManager
 import khipu.network.rlpx.discovery.DiscoveryConfig
 import khipu.store.Storages
 import khipu.store.datasource.KesqueDataSource
+import khipu.store.datasource.LmdbHeavyDataSource
 import khipu.store.datasource.SharedLeveldbDataSources
+import khipu.store.datasource.SharedLmdbDataSources
 import khipu.util
 import khipu.util.BlockchainConfig
 import khipu.util.MiningConfig
@@ -41,6 +43,9 @@ import khipu.validators.OmmersValidator
 import khipu.validators.SignedTransactionValidator
 import khipu.validators.Validators
 import org.apache.kafka.common.record.CompressionType
+import org.lmdbjava.DbiFlags
+import org.lmdbjava.Env
+import org.lmdbjava.EnvFlags
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 import scala.concurrent.Await
 import scala.concurrent.Future
@@ -94,89 +99,172 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
 
   val forkResolverOpt = if (blockchainConfig.customGenesisFileOpt.isDefined) None else Some(new ForkResolver.DAOForkResolver(blockchainConfig))
 
-  val storages = new Storages.DefaultStorages with SharedLeveldbDataSources {
-    implicit protected val system = ServiceBoardExtension.this.system
+  val storages = dbConfig.dbEngine match {
+    case dbConfig.LMDB =>
 
-    val pruningMode = PruningConfig(config).mode
+      new Storages.DefaultStorages with SharedLmdbDataSources {
+        implicit protected val system = ServiceBoardExtension.this.system
 
-    private lazy val defaultCachingSettings = CachingSettings(system)
-    private lazy val cacheCfg = util.CacheConfig(config)
+        val pruningMode = PruningConfig(config).mode
 
-    private lazy val khipuPath = new File(classOf[Khipu].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
-    private lazy val configDir = new File(khipuPath, "conf")
-    private lazy val kafkaConfigFile = new File(configDir, "kafka.server.properties")
-    private lazy val kafkaProps = {
-      val props = org.apache.kafka.common.utils.Utils.loadProps(kafkaConfigFile.getAbsolutePath)
-      props.put("log.dirs", util.Config.kesqueDir)
-      props
-    }
-    lazy val kesque = new Kesque(kafkaProps)
-    log.info(s"Kesque started using config file: $kafkaConfigFile")
-    // block size evalution: https://etherscan.io/chart/blocksize, https://ethereum.stackexchange.com/questions/1106/is-there-a-limit-for-transaction-size/1110#1110
-    // trie node size evalution:
-    //   LeafNode - 256bytes(key) + value ~ 256 + value
-    //   ExtensionNode - 256bytes(key) + 256bytes(hash) ~ 512
-    //   BranchNode - 32bytes (children) + (256bytes(key) + value) (terminator with k-v) ~ 288 + value
-    // account trie node size evalution: account value - 4x256bytes ~ 288 + 1024
-    // storage trie node size evalution: storage valye - 256bytes ~ 288 + 256 
-    private val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(dbConfig.account), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
-      Future(kesque.getTable(Array(dbConfig.storage), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
-      Future(kesque.getTable(Array(dbConfig.evmcode), 24576)),
-      Future(kesque.getTimedTable(Array(
-        dbConfig.header,
-        dbConfig.body,
-        dbConfig.receipts,
-        dbConfig.td
-      ), 102400))
-    ))
-    private val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
-    //private val headerTable = kesque.getTimedTable(Array(KesqueDataSource.header), 1024000)
-    //private val bodyTable = kesque.getTable(Array(KesqueDataSource.body), 1024000)
-    //private val tdTable = kesque.getTable(Array(KesqueDataSource.td), 1024000)
-    //private val receiptTable = kesque.getTable(Array(KesqueDataSource.receipts), 1024000)
+        private lazy val defaultCachingSettings = CachingSettings(system)
+        private lazy val cacheCfg = util.CacheConfig(config)
 
-    lazy val accountNodeDataSource = new KesqueDataSource(accountTable, dbConfig.account)
-    lazy val storageNodeDataSource = new KesqueDataSource(storageTable, dbConfig.storage)
-    lazy val evmCodeDataSource = new KesqueDataSource(evmcodeTable, dbConfig.evmcode)
+        private lazy val home = {
+          val h = new File(dbConfig.LmdbConfig.path)
+          if (!h.exists) {
+            h.mkdirs()
+          }
+          h
+        }
 
-    lazy val blockHeaderDataSource = new KesqueDataSource(blockTable, dbConfig.header)
-    lazy val blockBodyDataSource = new KesqueDataSource(blockTable, dbConfig.body)
-    lazy val receiptsDataSource = new KesqueDataSource(blockTable, dbConfig.receipts)
-    lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, dbConfig.td)
+        lazy val env = Env.create()
+          .setMapSize(dbConfig.LmdbConfig.mapSize)
+          .setMaxDbs(dbConfig.LmdbConfig.maxDbs)
+          .setMaxReaders(dbConfig.LmdbConfig.maxReaders)
+          .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD)
 
-    protected lazy val nodeKeyValueCache = {
-      val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
-        .withInitialCapacity(10000)
-        .withMaxCapacity(cacheCfg.cacheSize)
-      val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
-      LfuCache[Hash, Array[Byte]](cachingSettings)
-    }
+        // LMDB defines compile-time constant MDB_MAXKEYSIZE=511 bytes
+        // Key sizes must be between 1 and mdb_env_get_maxkeysize() inclusive. 
+        // The same applies to data sizes in databases with the MDB_DUPSORT flag. 
+        // Other data items can in theory be from 0 to 0xffffffff bytes long. 
+        // Thus, do not add DbiFlags.MDB_DUPSORT on evmcodeDb
+        lazy val accountDb = env.openDbi(dbConfig.account, DbiFlags.MDB_CREATE) // DbiFlags.MDB_DUPSORT
+        lazy val storageDb = env.openDbi(dbConfig.storage, DbiFlags.MDB_CREATE) // DbiFlags.MDB_DUPSORT
+        lazy val evmcodeDb = env.openDbi(dbConfig.evmcode, DbiFlags.MDB_CREATE)
 
-    protected lazy val blockHeaderCache = {
-      val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
-        .withInitialCapacity(2000)
-        .withMaxCapacity(5000)
-      val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
-      LfuCache[Hash, BlockHeader](cachingSettings)
-    }
+        lazy val blockHeaderDb = env.openDbi(dbConfig.header, DbiFlags.MDB_CREATE)
+        lazy val blockBodyDb = env.openDbi(dbConfig.body, DbiFlags.MDB_CREATE)
+        lazy val reaceiptsDb = env.openDbi(dbConfig.receipts, DbiFlags.MDB_CREATE)
+        lazy val totalDifficultyDb = env.openDbi(dbConfig.td, DbiFlags.MDB_CREATE)
 
-    protected lazy val blockBodyCache = {
-      val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
-        .withInitialCapacity(2000)
-        .withMaxCapacity(5000)
-      val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
-      LfuCache[Hash, BlockBody](cachingSettings)
-    }
+        lazy val accountNodeDataSource = new LmdbHeavyDataSource(dbConfig.account, env, accountDb, cacheCfg.cacheSize, isKeyTheValueHash = true)
+        lazy val storageNodeDataSource = new LmdbHeavyDataSource(dbConfig.storage, env, storageDb, cacheCfg.cacheSize, isKeyTheValueHash = true)
+        lazy val evmCodeDataSource = new LmdbHeavyDataSource(dbConfig.evmcode, env, evmcodeDb)
 
-    protected lazy val blockNumberCache = {
-      val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
-        .withInitialCapacity(20000)
-        .withMaxCapacity(1000000)
-      val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
-      LfuCache[Long, Hash](cachingSettings)
-    }
+        lazy val blockHeaderDataSource = new LmdbHeavyDataSource(dbConfig.header, env, blockHeaderDb, isWithTimestamp = true)
+        lazy val blockBodyDataSource = new LmdbHeavyDataSource(dbConfig.body, env, blockBodyDb)
+        lazy val receiptsDataSource = new LmdbHeavyDataSource(dbConfig.receipts, env, reaceiptsDb)
+        lazy val totalDifficultyDataSource = new LmdbHeavyDataSource(dbConfig.td, env, totalDifficultyDb)
 
+        protected lazy val nodeKeyValueCache = {
+          val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
+            .withInitialCapacity(10000)
+            .withMaxCapacity(cacheCfg.cacheSize)
+          val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
+          LfuCache[Hash, Array[Byte]](cachingSettings)
+        }
+
+        protected lazy val blockHeaderCache = {
+          val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
+            .withInitialCapacity(2000)
+            .withMaxCapacity(5000)
+          val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
+          LfuCache[Hash, BlockHeader](cachingSettings)
+        }
+
+        protected lazy val blockBodyCache = {
+          val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
+            .withInitialCapacity(2000)
+            .withMaxCapacity(5000)
+          val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
+          LfuCache[Hash, BlockBody](cachingSettings)
+        }
+
+        protected lazy val blockNumberCache = {
+          val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
+            .withInitialCapacity(20000)
+            .withMaxCapacity(1000000)
+          val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
+          LfuCache[Long, Hash](cachingSettings)
+        }
+      }
+
+    case dbConfig.KESQUE =>
+
+      new Storages.DefaultStorages with SharedLeveldbDataSources {
+        implicit protected val system = ServiceBoardExtension.this.system
+
+        val pruningMode = PruningConfig(config).mode
+
+        private lazy val defaultCachingSettings = CachingSettings(system)
+        private lazy val cacheCfg = util.CacheConfig(config)
+
+        private lazy val khipuPath = new File(classOf[Khipu].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
+        private lazy val configDir = new File(khipuPath, "conf")
+        private lazy val kafkaConfigFile = new File(configDir, "kafka.server.properties")
+        private lazy val kafkaProps = {
+          val props = org.apache.kafka.common.utils.Utils.loadProps(kafkaConfigFile.getAbsolutePath)
+          props.put("log.dirs", util.Config.kesqueDir)
+          props
+        }
+        lazy val kesque = new Kesque(kafkaProps)
+        log.info(s"Kesque started using config file: $kafkaConfigFile")
+        // block size evalution: https://etherscan.io/chart/blocksize, https://ethereum.stackexchange.com/questions/1106/is-there-a-limit-for-transaction-size/1110#1110
+        // trie node size evalution:
+        //   LeafNode - 256bytes(key) + value ~ 256 + value
+        //   ExtensionNode - 256bytes(key) + 256bytes(hash) ~ 512
+        //   BranchNode - 32bytes (children) + (256bytes(key) + value) (terminator with k-v) ~ 288 + value
+        // account trie node size evalution: account value - 4x256bytes ~ 288 + 1024
+        // storage trie node size evalution: storage valye - 256bytes ~ 288 + 256 
+        private val futureTables = Future.sequence(List(
+          Future(kesque.getTable(Array(dbConfig.account), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
+          Future(kesque.getTable(Array(dbConfig.storage), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
+          Future(kesque.getTable(Array(dbConfig.evmcode), 24576)),
+          Future(kesque.getTimedTable(Array(
+            dbConfig.header,
+            dbConfig.body,
+            dbConfig.receipts,
+            dbConfig.td
+          ), 102400))
+        ))
+        private val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
+        //private val headerTable = kesque.getTimedTable(Array(KesqueDataSource.header), 1024000)
+        //private val bodyTable = kesque.getTable(Array(KesqueDataSource.body), 1024000)
+        //private val tdTable = kesque.getTable(Array(KesqueDataSource.td), 1024000)
+        //private val receiptTable = kesque.getTable(Array(KesqueDataSource.receipts), 1024000)
+
+        lazy val accountNodeDataSource = new KesqueDataSource(accountTable, dbConfig.account)
+        lazy val storageNodeDataSource = new KesqueDataSource(storageTable, dbConfig.storage)
+        lazy val evmCodeDataSource = new KesqueDataSource(evmcodeTable, dbConfig.evmcode)
+
+        lazy val blockHeaderDataSource = new KesqueDataSource(blockTable, dbConfig.header)
+        lazy val blockBodyDataSource = new KesqueDataSource(blockTable, dbConfig.body)
+        lazy val receiptsDataSource = new KesqueDataSource(blockTable, dbConfig.receipts)
+        lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, dbConfig.td)
+
+        protected lazy val nodeKeyValueCache = {
+          val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
+            .withInitialCapacity(10000)
+            .withMaxCapacity(cacheCfg.cacheSize)
+          val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
+          LfuCache[Hash, Array[Byte]](cachingSettings)
+        }
+
+        protected lazy val blockHeaderCache = {
+          val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
+            .withInitialCapacity(2000)
+            .withMaxCapacity(5000)
+          val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
+          LfuCache[Hash, BlockHeader](cachingSettings)
+        }
+
+        protected lazy val blockBodyCache = {
+          val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
+            .withInitialCapacity(2000)
+            .withMaxCapacity(5000)
+          val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
+          LfuCache[Hash, BlockBody](cachingSettings)
+        }
+
+        protected lazy val blockNumberCache = {
+          val lfuCacheSettings = defaultCachingSettings.lfuCacheSettings
+            .withInitialCapacity(20000)
+            .withMaxCapacity(1000000)
+          val cachingSettings = defaultCachingSettings.withLfuCacheSettings(lfuCacheSettings)
+          LfuCache[Long, Hash](cachingSettings)
+        }
+      }
   }
 
   // There should be only one instance, instant it here or a standalone singleton service

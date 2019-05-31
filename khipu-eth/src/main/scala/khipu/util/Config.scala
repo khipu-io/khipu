@@ -12,6 +12,7 @@ import khipu.network.rlpx.FastSyncHostConfiguration
 import khipu.network.rlpx.PeerConfiguration
 import khipu.network.rlpx.RLPxConfiguration
 import khipu.store.datasource.LeveldbConfig
+import khipu.store.datasource.LmdbConfig
 import khipu.store.trienode.ArchivePruning
 import khipu.store.trienode.HistoryPruning
 import khipu.store.trienode.PruningMode
@@ -143,9 +144,17 @@ object Config {
     val td = "td" // total difficulty
     val receipts = "receipts"
 
+    private val lmdbConfig = dbConfig.getConfig("lmdb")
     private val leveldbConfig = dbConfig.getConfig("leveldb")
 
-    object Leveldb extends LeveldbConfig {
+    object LmdbConfig extends LmdbConfig {
+      val path = datadir + "/" + lmdbConfig.getString("path")
+      val mapSize = lmdbConfig.getLong("map_size")
+      val maxDbs = lmdbConfig.getInt("max_dbs")
+      val maxReaders = lmdbConfig.getInt("max_readers")
+    }
+
+    object LeveldbConfig extends LeveldbConfig {
       val path = datadir + "/" + leveldbConfig.getString("path")
       val createIfMissing = leveldbConfig.getBoolean("create-if-missing")
       val paranoidChecks = leveldbConfig.getBoolean("paranoid-checks")

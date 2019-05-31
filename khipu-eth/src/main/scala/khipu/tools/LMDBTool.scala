@@ -5,8 +5,8 @@ import java.nio.ByteBuffer
 import khipu.Hash
 import khipu.crypto
 import scala.util.Random
-import org.lmdbjava.EnvFlags
 import org.lmdbjava.Env
+import org.lmdbjava.EnvFlags
 import org.lmdbjava.Dbi
 import org.lmdbjava.DbiFlags
 import org.lmdbjava.GetOp
@@ -21,7 +21,10 @@ object LMDBTool {
   def main(args: Array[String]) {
     val dbTool = new LMDBTool()
 
-    dbTool.test(100000000)
+    dbTool.test("table1", 100000)
+    dbTool.test("table2", 100000)
+    dbTool.closeEnv()
+    System.exit(0)
   }
 }
 class LMDBTool() {
@@ -35,28 +38,27 @@ class LMDBTool() {
   val averDataSize = 64
   val hashNumElements = 300000000
 
-  val home = new File("/home/dcaoyuan/tmp")
-
-  val tableName = "storage"
-  val tableDir = new File(home, tableName)
-  if (!tableDir.exists) {
-    tableDir.mkdirs()
+  val home = {
+    val h = new File("/home/dcaoyuan/tmp")
+    if (!h.exists) {
+      h.mkdirs()
+    }
+    println(s"lmdb home: $h")
+    h
   }
 
   val env = Env.create()
     .setMapSize(mapSize)
     .setMaxDbs(6)
-    .open(tableDir, EnvFlags.MDB_NOLOCK, EnvFlags.MDB_NORDAHEAD)
+    .open(home, EnvFlags.MDB_NORDAHEAD)
 
-  def test(num: Int) = {
+  def test(tableName: String, num: Int) = {
     val table = env.openDbi(tableName, DbiFlags.MDB_CREATE, DbiFlags.MDB_DUPSORT)
 
     val keys = write(table, num)
     read(table, keys)
 
     table.close()
-    env.close()
-    System.exit(0)
   }
 
   def write(table: Dbi[ByteBuffer], num: Int) = {
@@ -118,6 +120,8 @@ class LMDBTool() {
         case ex: Throwable =>
           txn.abort()
           println(ex)
+      } finally {
+        txn.close()
       }
 
       val duration = System.nanoTime - start
@@ -155,23 +159,22 @@ class LMDBTool() {
       val txn = env.txnRead()
       try {
         val cursor = table.openCursor(txn)
-        cursor.get(keyBuf, GetOp.MDB_SET_KEY)
 
         var gotData: Option[Array[Byte]] = None
         if (cursor.get(keyBuf, GetOp.MDB_SET_KEY)) {
-          val dataBytes = Array.ofDim[Byte](cursor.`val`.remaining)
-          cursor.`val`.get(dataBytes)
-          val fullKey = crypto.kec256(dataBytes)
+          val data = Array.ofDim[Byte](cursor.`val`.remaining)
+          cursor.`val`.get(data)
+          val fullKey = crypto.kec256(data)
           if (java.util.Arrays.equals(fullKey, k)) {
-            gotData = Some(dataBytes)
+            gotData = Some(data)
           }
 
           while (gotData.isEmpty && cursor.seek(SeekOp.MDB_NEXT_DUP)) {
-            val dataBytes = Array.ofDim[Byte](cursor.`val`.remaining)
-            cursor.`val`.get(dataBytes)
-            val fullKey = crypto.kec256(dataBytes)
+            val data = Array.ofDim[Byte](cursor.`val`.remaining)
+            cursor.`val`.get(data)
+            val fullKey = crypto.kec256(data)
             if (java.util.Arrays.equals(fullKey, k)) {
-              gotData = Some(dataBytes)
+              gotData = Some(data)
             }
           }
         }
@@ -188,6 +191,7 @@ class LMDBTool() {
           null
       }
       txn.commit()
+      txn.close()
 
       if (i > 0 && i % 10000 == 0) {
         val elapsed = (System.nanoTime - start) / 1000000000.0 // sec
@@ -214,5 +218,9 @@ class LMDBTool() {
 
   final def intToBytes(i: Int) = ByteBuffer.allocate(4).putInt(i).array
   final def bytesToInt(bytes: Array[Byte]) = ByteBuffer.wrap(bytes).getInt
+
+  def closeEnv() {
+    env.close()
+  }
 }
 

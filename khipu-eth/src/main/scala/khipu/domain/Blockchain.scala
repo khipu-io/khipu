@@ -139,9 +139,13 @@ object Blockchain {
      */
     def saveBlockHeader(blockHeader: BlockHeader): Unit
     def saveBlockBody(blockHash: Hash, blockBody: BlockBody): Unit
+    def saveBlockBody(kvs: Map[Hash, BlockBody]): Unit
     def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]): Unit
+    def saveReceipts(kvs: Map[Hash, Seq[Receipt]]): Unit
     def saveEvmcode(hash: Hash, evmCode: ByteString): Unit
+    def saveEvmcode(kvs: Map[Hash, ByteString]): Unit
     def saveTotalDifficulty(blockhash: Hash, totalDifficulty: UInt256): Unit
+    def saveTotalDifficulty(kvs: Map[Hash, UInt256]): Unit
 
     /**
      * Returns a block hash given a block number
@@ -203,14 +207,28 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     saveTxsLocations(blockHash, blockBody)
   }
 
+  def saveBlockBody(kvs: Map[Hash, BlockBody]) = {
+    blockBodyStorage.update(Set(), kvs)
+    kvs foreach { case (blockHash, blockBody) => saveTxsLocations(blockHash, blockBody) }
+  }
+
   def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]) =
     receiptsStorage.put(blockHash, receipts)
+
+  def saveReceipts(kvs: Map[Hash, Seq[Receipt]]) =
+    receiptsStorage.update(Set(), kvs)
 
   def saveEvmcode(hash: Hash, evmCode: ByteString) =
     evmCodeStorage.put(hash, evmCode)
 
-  def saveTotalDifficulty(blockhash: Hash, td: UInt256): Unit =
+  def saveEvmcode(kvs: Map[Hash, ByteString]) =
+    evmCodeStorage.update(Set(), kvs)
+
+  def saveTotalDifficulty(blockhash: Hash, td: UInt256) =
     totalDifficultyStorage.put(blockhash, td)
+
+  def saveTotalDifficulty(kvs: Map[Hash, UInt256]) =
+    totalDifficultyStorage.update(Set(), kvs)
 
   def getWorldState(blockNumber: Long, accountStartNonce: UInt256, stateRootHash: Option[Hash]): BlockWorldState =
     BlockWorldState(
@@ -272,10 +290,12 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   private def saveBlockNumberMapping(number: Long, hash: Hash): Unit =
     blockHeaderStorage.putBlockHash(number, hash)
 
-  private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody): Unit =
-    blockBody.transactionList.zipWithIndex.foreach {
-      case (tx, index) => transactionMappingStorage.put(tx.hash, TransactionLocation(blockHash, index))
+  private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody) {
+    val kvs = blockBody.transactionList.zipWithIndex map {
+      case (tx, index) => (tx.hash, TransactionLocation(blockHash, index))
     }
+    transactionMappingStorage.update(Set(), kvs.toMap)
+  }
 
   private def removeTxsLocations(stxs: Seq[SignedTransaction]) {
     stxs.map(_.hash).foreach(transactionMappingStorage.remove)

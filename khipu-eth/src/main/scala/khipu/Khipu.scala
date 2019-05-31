@@ -59,13 +59,11 @@ object Khipu {
   def main(args: Array[String]) {
 
     CoordinatedShutdown(system).addJvmShutdownHook {
-      log.info("Khipu db stopping ...")
-
+      log.info("db stopping ...")
       serviceBoard.storages.closeAll()
-      serviceBoard.hostService.shutdown()
-      serviceBoard.storages.kesque.shutdown()
+      log.info("db stopped")
 
-      log.info("Khipu db stopped")
+      serviceBoard.hostService.shutdown()
     }
 
     val genesisDataLoader = new GenesisDataLoader(serviceBoard.storages.dataSource, serviceBoard.blockchain, serviceBoard.storages.pruningMode, serviceBoard.blockchainConfig, serviceBoard.dbConfig)

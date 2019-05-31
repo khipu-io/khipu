@@ -5,10 +5,8 @@ import khipu.store.trienode.PruningMode
 trait DataSources {
   val pruningMode: PruningMode
 
-  //val blockHeadersDataSource: DataSource
-  //val blockBodyDataSource: DataSource
-  //val receiptsDataSource: DataSource
-  //val totalDifficultyDataSource: DataSource
+  val dataSource: DataSource
+
   val transactionMappingDataSource: DataSource
 
   val blockHeightsHashesDataSource: DataSource

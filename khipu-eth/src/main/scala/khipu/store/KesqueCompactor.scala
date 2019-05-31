@@ -13,6 +13,7 @@ import khipu.domain.Account
 import khipu.rlp
 import khipu.service.ServiceBoard
 import khipu.store.datasource.KesqueDataSource
+import khipu.store.datasource.SharedLeveldbDataSources
 import khipu.trie
 import khipu.trie.BranchNode
 import khipu.trie.ByteArraySerializable
@@ -189,9 +190,9 @@ object KesqueCompactor {
     //val (kesque, accountTable, storageTable, blockHeaderStorage) = initTableBySelf()
     val serviceBoard = ServiceBoard(system)
     val storages = serviceBoard.storages
-    val kesque = storages.kesque
-    val accountTable = storages.accountNodeDataSource.table
-    val storageTable = storages.storageNodeDataSource.table
+    val kesque = storages.asInstanceOf[SharedLeveldbDataSources].kesque
+    val accountTable = storages.accountNodeDataSource.asInstanceOf[KesqueDataSource].table
+    val storageTable = storages.storageNodeDataSource.asInstanceOf[KesqueDataSource].table
     val blockHeaderStorage = storages.blockHeaderStorage
 
     val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 7225555, 0, 1)

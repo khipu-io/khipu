@@ -1,14 +1,13 @@
 package khipu.store.datasource
 
+import kesque.Kesque
 import khipu.util.Config
 
 trait SharedLeveldbDataSources extends DataSources {
-  val dataSource = LeveldbDataSource(Config.Db.Leveldb)
+  val kesque: Kesque
 
-  //val blockHeadersDataSource = dataSource
-  //val blockBodyDataSource = dataSource
-  //val receiptsDataSource = dataSource
-  //val totalDifficultyDataSource = dataSource
+  val dataSource = LeveldbDataSource(Config.Db.LeveldbConfig)
+
   val transactionMappingDataSource = dataSource
 
   val fastSyncStateDataSource = dataSource
@@ -19,5 +18,6 @@ trait SharedLeveldbDataSources extends DataSources {
 
   def closeAll() {
     dataSource.close()
+    kesque.shutdown()
   }
 }
