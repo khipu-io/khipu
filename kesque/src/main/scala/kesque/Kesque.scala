@@ -1,12 +1,14 @@
 package kesque
 
 import java.io.File
+import java.nio.ByteBuffer
 import java.util.Properties
 import kafka.server.QuotaFactory.UnboundedQuota
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.SimpleRecord
 import org.apache.kafka.common.requests.FetchRequest.PartitionData
+import org.lmdbjava.Env
 import scala.collection.mutable
 
 /**
@@ -64,6 +66,7 @@ final class Kesque(props: Properties) {
   private val replicaManager = kafkaServer.replicaManager
 
   private val topicToTable = mutable.Map[String, HashKeyValueTable]()
+  private val topicToKesqueTable = mutable.Map[String, KesqueTable]()
 
   def getTable(topics: Array[String], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, fetchMaxBytes, compressionType, cacheSize))
@@ -71,6 +74,14 @@ final class Kesque(props: Properties) {
 
   def getTimedTable(topics: Array[String], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes, compressionType, cacheSize))
+  }
+
+  def getKesqueTable(topics: Array[String], lmdbEnv: Env[ByteBuffer], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
+    topicToKesqueTable.getOrElseUpdate(topics.mkString(","), new KesqueTable(topics, this, lmdbEnv, false, fetchMaxBytes, compressionType, cacheSize))
+  }
+
+  def getTimedKesqueTable(topics: Array[String], lmdbEnv: Env[ByteBuffer], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
+    topicToKesqueTable.getOrElseUpdate(topics.mkString(","), new KesqueTable(topics, this, lmdbEnv, true, fetchMaxBytes, compressionType, cacheSize))
   }
 
   private[kesque] def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {

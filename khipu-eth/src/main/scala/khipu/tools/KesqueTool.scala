@@ -1,13 +1,14 @@
 package khipu.tools
 
 import java.io.File
-import java.nio.ByteBuffer
-import kesque.HashKeyValueTable
 import kesque.Kesque
+import kesque.KesqueTable
 import kesque.TKeyVal
 import khipu.Hash
 import khipu.crypto
 import scala.util.Random
+import org.lmdbjava.Env
+import org.lmdbjava.EnvFlags
 import scala.collection.mutable
 
 /**
@@ -18,11 +19,12 @@ object KesqueTool {
   def main(args: Array[String]) {
     val dbtool = new KesqueTool()
 
-    dbtool.test(1000000)
+    dbtool.test(100000)
   }
 }
 class KesqueTool() {
   private def xf(n: Double) = "%1$10.1f".format(n)
+  val mapSize = 30 * 1024 * 1024 * 1024L
 
   val khipuPath = new File(classOf[KesqueTool].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
   val configDir = new File(khipuPath, "../src/main/resources")
@@ -31,15 +33,24 @@ class KesqueTool() {
   val props = org.apache.kafka.common.utils.Utils.loadProps(configFile.getAbsolutePath)
   val kesque = new Kesque(props)
 
-  val home = new File("/home/dcaoyuan/tmp")
-
-  val tableName = "storage"
-  if (!home.exists) {
-    home.mkdirs()
+  val home = {
+    val h = new File("/home/dcaoyuan/tmp")
+    if (!h.exists) {
+      h.mkdirs()
+    }
+    println(s"lmdb home: $h")
+    h
   }
 
+  val env = Env.create()
+    .setMapSize(mapSize)
+    .setMaxDbs(6)
+    .open(home, EnvFlags.MDB_NORDAHEAD)
+
+  val tableName = "ddtest"
+
   def test(num: Int) = {
-    val table = kesque.getTable(Array(tableName), fetchMaxBytes = 4096)
+    val table = kesque.getKesqueTable(Array(tableName), env, fetchMaxBytes = 4096)
 
     val keys = write(table, num)
     read(table, keys)
@@ -47,7 +58,7 @@ class KesqueTool() {
     System.exit(0)
   }
 
-  def write(table: HashKeyValueTable, num: Int) = {
+  def write(table: KesqueTable, num: Int) = {
     val keys = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
@@ -68,8 +79,7 @@ class KesqueTool() {
 
         start = System.nanoTime
 
-        val sKey = sliceBytes(k)
-        kvs += TKeyVal(sKey, v, -1, -1)
+        kvs += TKeyVal(k, v, -1, -1)
 
         val duration = System.nanoTime - start
         elapsed += duration
@@ -107,7 +117,7 @@ class KesqueTool() {
     keys
   }
 
-  def read(table: HashKeyValueTable, keys: java.util.ArrayList[Array[Byte]]) {
+  def read(table: KesqueTable, keys: java.util.ArrayList[Array[Byte]]) {
     java.util.Collections.shuffle(keys)
 
     val start0 = System.nanoTime
@@ -116,10 +126,13 @@ class KesqueTool() {
     var i = 0
     while (itr.hasNext) {
       val k = itr.next
-      val sKey = sliceBytes(k)
 
       // pseudo read only
-      val value = table.read(sKey, tableName)
+      table.read(k, tableName) match {
+        case Some(x) =>
+        case None =>
+          println(s"===> no data for ${khipu.toHexString(k)}")
+      }
 
       if (i > 0 && i % 10000 == 0) {
         val elapsed = (System.nanoTime - start) / 1000000000.0 // sec
@@ -137,13 +150,5 @@ class KesqueTool() {
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - read all in ${xf(totalElapsed)}s")
   }
 
-  final def sliceBytes(bytes: Array[Byte]) = {
-    val slice = Array.ofDim[Byte](4)
-    System.arraycopy(bytes, 0, slice, 0, 4)
-    slice
-  }
-
-  final def intToBytes(i: Int) = ByteBuffer.allocate(4).putInt(i).array
-  final def bytesToInt(bytes: Array[Byte]) = ByteBuffer.wrap(bytes).getInt
 }
 
