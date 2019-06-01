@@ -28,7 +28,7 @@ object Build extends sbt.Build {
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
     .settings(unmanagedJars in Compile ++= Seq(baseDirectory.value / "lib" / "db-5.3.28.jar").classpath)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.lmdb ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.snappy ++ Dependencies.caffeine)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.lmdb ++ Dependencies.rocksdb ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.snappy ++ Dependencies.caffeine)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
     .settings(Packaging.settings)
@@ -98,6 +98,8 @@ object Dependencies {
   )
 
   val lmdb = Seq("org.lmdbjava" % "lmdbjava" % "0.6.1") // akka-distributed-data also includes this lib
+
+  val rocksdb = Seq("org.rocksdb" % "rocksdbjni" % "6.0.1")
 
   val circe = Seq(
     "io.circe" %% "circe-core" % CIRCE_VERSION,

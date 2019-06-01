@@ -25,6 +25,7 @@ object KesqueTool {
 class KesqueTool() {
   private def xf(n: Double) = "%1$10.1f".format(n)
   val mapSize = 30 * 1024 * 1024 * 1024L
+  val averDataSize = 1024
 
   val khipuPath = new File(classOf[KesqueTool].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
   val configDir = new File(khipuPath, "../src/main/resources")
@@ -73,7 +74,7 @@ class KesqueTool() {
 
       var j = 0
       while (j < 4000 && i < num) {
-        val v = Array.ofDim[Byte](64)
+        val v = Array.ofDim[Byte](averDataSize)
         Random.nextBytes(v)
         val k = crypto.kec256(v)
 

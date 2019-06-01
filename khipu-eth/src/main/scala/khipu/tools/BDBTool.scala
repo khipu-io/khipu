@@ -29,7 +29,7 @@ object BDBTool {
   def main(args: Array[String]) {
     val bdbTool = new BDBTool(DatabaseType.BTREE, isTransactional = false)
 
-    bdbTool.test(num = 100000000, isBulk = true)
+    bdbTool.test(num = 50000000, isBulk = true)
   }
 }
 class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
@@ -40,7 +40,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
   val bufLen = 1024 * 1024
 
   val averKeySize = 4
-  val averDataSize = 64
+  val averDataSize = 1024
   val hashNumElements = 300000000
 
   val home = new File("/home/dcaoyuan/tmp")
@@ -124,7 +124,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
       var j = 0
       val txn = if (isTransactional) dbenv.beginTransaction(null, null) else null
       while (j < 4000 && i < num) {
-        val v = Array.ofDim[Byte](64)
+        val v = Array.ofDim[Byte](averDataSize)
         Random.nextBytes(v)
         val k = crypto.kec256(v)
 

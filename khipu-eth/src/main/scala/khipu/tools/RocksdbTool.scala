@@ -5,60 +5,45 @@ import java.nio.ByteBuffer
 import khipu.Hash
 import khipu.crypto
 import scala.util.Random
-import org.lmdbjava.Env
-import org.lmdbjava.EnvFlags
-import org.lmdbjava.Dbi
-import org.lmdbjava.DbiFlags
-import org.lmdbjava.GetOp
-import org.lmdbjava.SeekOp
+import org.rocksdb.OptimisticTransactionDB
+import org.rocksdb.Options
+import org.rocksdb.ReadOptions
+import org.rocksdb.WriteOptions
 import scala.collection.mutable
 
 /**
  * Fill memory:
  * # stress -m 1 --vm-bytes 25G --vm-keep
  */
-object LMDBTool {
+object RocksdbTool {
   def main(args: Array[String]) {
-    val dbTool = new LMDBTool()
+    val dbTool = new RocksdbTool()
 
-    dbTool.test("table1", 50000000)
-    dbTool.closeEnv()
+    dbTool.test("table1", 5000000)
     System.exit(0)
   }
 }
-class LMDBTool() {
+class RocksdbTool() {
   private def xf(n: Double) = "%1$10.1f".format(n)
 
-  val cacheSize = 1024 * 1024 * 1024L // 1G
-  val bufLen = 1024 * 1024
-  val mapSize = 100 * 1024 * 1024 * 1024L
-
-  val COMPILED_MAX_KEY_SIZE = 511
-
-  val averKeySize = 4
   val averDataSize = 1024
-  val hashNumElements = 300000000
 
   val home = {
     val h = new File("/home/dcaoyuan/tmp")
     if (!h.exists) {
       h.mkdirs()
     }
-    println(s"lmdb home: $h")
+    println(s"rocksdb home: $h")
     h
   }
 
-  val env = Env.create()
-    .setMapSize(mapSize)
-    .setMaxDbs(6)
-    .open(home, EnvFlags.MDB_NORDAHEAD)
+  val options = new Options().setCreateIfMissing(true).setMaxOpenFiles(-1)
+  val writeOptions = new WriteOptions()
+  val readOptions = new ReadOptions()
 
   def test(tableName: String, num: Int) = {
-    val table = if (averDataSize > COMPILED_MAX_KEY_SIZE) {
-      env.openDbi(tableName, DbiFlags.MDB_CREATE)
-    } else {
-      env.openDbi(tableName, DbiFlags.MDB_CREATE, DbiFlags.MDB_DUPSORT)
-    }
+    val path = new File(home, tableName)
+    val table = OptimisticTransactionDB.open(options, path.getAbsolutePath)
 
     val keys = write(table, num)
     read(table, keys)
@@ -66,10 +51,7 @@ class LMDBTool() {
     table.close()
   }
 
-  def write(table: Dbi[ByteBuffer], num: Int) = {
-    val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
-    val valBuf = ByteBuffer.allocateDirect(100 * 1024) // will grow when needed
-
+  def write(table: OptimisticTransactionDB, num: Int) = {
     val keys = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
@@ -81,7 +63,7 @@ class LMDBTool() {
     while (i < num) {
 
       var j = 0
-      val txn = env.txnWrite()
+      val txn = table.beginTransaction(writeOptions)
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](averDataSize)
         Random.nextBytes(v)
@@ -89,20 +71,11 @@ class LMDBTool() {
 
         start = System.nanoTime
 
-        val theKey = if (averDataSize > COMPILED_MAX_KEY_SIZE) k else sliceBytes(k)
         try {
-          keyBuf.put(theKey).flip()
-          valBuf.put(v).flip()
-          if (!table.put(txn, keyBuf, valBuf)) {
-            println(s"put failed: ${khipu.toHexString(theKey)}")
-          }
+          txn.put(k, v)
         } catch {
-          case ex: Throwable =>
-            txn.abort()
-            println(ex)
+          case ex: Throwable => println(ex)
         } finally {
-          keyBuf.clear()
-          valBuf.clear()
         }
 
         val duration = System.nanoTime - start
@@ -123,7 +96,7 @@ class LMDBTool() {
         txn.commit()
       } catch {
         case ex: Throwable =>
-          txn.abort()
+          txn.rollback()
           println(ex)
       } finally {
         txn.close()
@@ -147,10 +120,8 @@ class LMDBTool() {
     keys
   }
 
-  def read(table: Dbi[ByteBuffer], keys: java.util.ArrayList[Array[Byte]]) {
+  def read(table: OptimisticTransactionDB, keys: java.util.ArrayList[Array[Byte]]) {
     java.util.Collections.shuffle(keys)
-
-    val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
 
     val start0 = System.nanoTime
     var start = System.nanoTime
@@ -158,45 +129,18 @@ class LMDBTool() {
     var i = 0
     while (itr.hasNext) {
       val k = itr.next
-      val theKey = if (averDataSize > COMPILED_MAX_KEY_SIZE) k else sliceBytes(k)
-      keyBuf.put(theKey).flip()
+      val sKey = sliceBytes(k)
 
-      val txn = env.txnRead()
       try {
-        val cursor = table.openCursor(txn)
-
-        var gotData: Option[Array[Byte]] = None
-        if (cursor.get(keyBuf, GetOp.MDB_SET_KEY)) {
-          val data = Array.ofDim[Byte](cursor.`val`.remaining)
-          cursor.`val`.get(data)
-          val fullKey = crypto.kec256(data)
-          if (java.util.Arrays.equals(fullKey, k)) {
-            gotData = Some(data)
-          }
-
-          while (gotData.isEmpty && cursor.seek(SeekOp.MDB_NEXT_DUP)) {
-            val data = Array.ofDim[Byte](cursor.`val`.remaining)
-            cursor.`val`.get(data)
-            val fullKey = crypto.kec256(data)
-            if (java.util.Arrays.equals(fullKey, k)) {
-              gotData = Some(data)
-            }
-          }
-        }
-
-        cursor.close()
-
+        val gotData = Option(table.get(readOptions, k))
         if (gotData.isEmpty) {
-          println(s"===> no data for ${khipu.toHexString(theKey)} of ${khipu.toHexString(k)}")
+          println(s"===> no data for ${khipu.toHexString(sKey)} of ${khipu.toHexString(k)}")
         }
       } catch {
         case ex: Throwable =>
-          txn.abort()
           println(ex)
           null
       }
-      txn.commit()
-      txn.close()
 
       if (i > 0 && i % 10000 == 0) {
         val elapsed = (System.nanoTime - start) / 1000000000.0 // sec
@@ -206,7 +150,6 @@ class LMDBTool() {
         start = System.nanoTime
       }
 
-      keyBuf.clear()
       i += 1
     }
 
@@ -224,8 +167,5 @@ class LMDBTool() {
   final def intToBytes(i: Int) = ByteBuffer.allocate(4).putInt(i).array
   final def bytesToInt(bytes: Array[Byte]) = ByteBuffer.wrap(bytes).getInt
 
-  def closeEnv() {
-    env.close()
-  }
 }
 
