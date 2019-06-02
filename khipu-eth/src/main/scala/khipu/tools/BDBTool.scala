@@ -18,6 +18,34 @@ import scala.util.Random
 import scala.collection.mutable
 
 /**
+ *
+ * $ sudo dnf install libdb libdb-java
+ *
+ * $ dnf list installed libdb libdb-java
+ * Installed Packages
+ * libdb.x86_64             5.3.28-33.fc29     @fedora
+ * libdb-java.x86_64        5.3.28-33.fc29     @fedora
+ *
+ * $ dnf repoquery -l libdb-java
+ * Last metadata expiration check: 2 days, 16:48:53 ago on Fri 17 May 2019 07:38:08 PM PDT.
+ * /usr/lib/.build-id
+ * /usr/lib/.build-id/90
+ * /usr/lib/.build-id/90/7dd2b4f2118de2f489d5a7b197a9c2c76c1d76
+ * /usr/lib/libdb_java-5.3.so
+ * /usr/lib/libdb_java-5.3_g.so
+ * /usr/lib/libdb_java-5.so
+ * /usr/share/java/db.jar
+ * /usr/lib/.build-id
+ * /usr/lib/.build-id/bd
+ * /usr/lib/.build-id/bd/47738eb043bb06e887ccc2eeb7e6faa8997754
+ * /usr/lib64/libdb_java-5.3.so
+ * /usr/lib64/libdb_java-5.3_g.so
+ * /usr/lib64/libdb_java-5.so
+ * /usr/share/java/db.jar
+ *
+ * $ vi .bash_profile
+ * export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+ *
  * Fill memory:
  * # stress -m 1 --vm-bytes 25G --vm-keep
  */

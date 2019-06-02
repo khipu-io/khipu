@@ -22,6 +22,7 @@ trait SharedLmdbDataSources extends DataSources {
 
   def closeAll() {
     dataSource.close()
+    env.sync(true)
     env.close()
   }
 }
