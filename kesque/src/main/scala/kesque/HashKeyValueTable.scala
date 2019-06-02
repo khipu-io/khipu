@@ -168,7 +168,7 @@ final class HashKeyValueTable private[kesque] (
       writeLock.lock()
 
       if (timestamp > timeIndex.length - 1) {
-        val newArr = Array.ofDim[Array[Byte]]((timeIndex.length * 1.2).toInt)
+        val newArr = Array.ofDim[Array[Byte]]((timestamp * 1.2).toInt)
         System.arraycopy(timeIndex, 0, newArr, 0, timeIndex.length)
         timeIndex = newArr
       }
