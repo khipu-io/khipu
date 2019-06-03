@@ -36,7 +36,7 @@ class LMDBTool() {
   val COMPILED_MAX_KEY_SIZE = 511
 
   val IntIndexKey = true
-  val IntTableKey = true
+  val IntTableKey = false
 
   val INDEX_KEY_SIZE = if (IntIndexKey) 4 else 8 // decide collisons probability
   val TABLE_KEY_SIZE = if (IntTableKey) 4 else 8 // decide max number of records
@@ -432,6 +432,85 @@ class LMDBTool() {
     val totalElapsed = (System.nanoTime - start0) / 1000000000.0 // sec
     val speed = i / totalElapsed
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - read all in ${xf(totalElapsed)}s")
+  }
+
+  def test3(tableName: String) = {
+    val table = env.openDbi(
+      tableName,
+      DbiFlags.MDB_CREATE,
+      DbiFlags.MDB_INTEGERKEY
+    )
+
+    val txn = env.txnRead()
+    val stat = table.stat(txn)
+    val count = stat.entries
+    println(s"number of existed records: $count ")
+    txn.commit()
+    txn.close()
+
+    val tableKey = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder)
+    val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
+
+    var wtx = env.txnWrite()
+    var i = 0
+    while (i < 1010) {
+      val v = Array.ofDim[Byte](DATA_SIZE)
+      Random.nextBytes(v)
+      tableKey.putLong(i).flip()
+      tableVal.put(v).flip()
+      if (!table.put(wtx, tableKey, tableVal, PutFlags.MDB_APPEND)) {
+        println(s"table put failed: $i")
+      }
+      tableKey.clear()
+      tableVal.clear()
+      i += 1
+    }
+    wtx.commit()
+    wtx.close()
+
+    // delete 1000 ~ 1009
+    wtx = env.txnWrite()
+    i = 1000
+    while (i < 1010) {
+      tableKey.putLong(i).flip()
+      table.delete(wtx, tableKey)
+      i += 1
+    }
+    wtx.commit()
+    wtx.close()
+
+    // append 1000 ~ 1009 again with PutFlags.MDB_APPEND, should work
+    wtx = env.txnWrite()
+    i = 1000
+    while (i < 1010) {
+      tableKey.putLong(i).flip()
+      tableVal.put(i.toString.getBytes).flip()
+      table.put(wtx, tableKey, tableVal, PutFlags.MDB_APPEND)
+      i += 1
+    }
+    wtx.commit()
+    wtx.close()
+
+    // read 1000 ~ 1009
+    val rtx = env.txnRead()
+    i = 1000
+    while (i < 1010) {
+      tableKey.putLong(i).flip()
+      val tableVal = table.get(rtx, tableKey)
+      if (tableVal ne null) {
+        val data = Array.ofDim[Byte](tableVal.remaining)
+        tableVal.get(data)
+        println(s"$i: ${new String(data)}")
+      } else {
+        println(s"$i: null")
+      }
+      i += 1
+    }
+    rtx.commit()
+    rtx.close()
+
+    table.close()
+    closeEnv()
   }
 
   private def shortKey(bytes: Array[Byte]) = {
