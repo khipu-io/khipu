@@ -237,12 +237,12 @@ class LMDBTool() {
       DbiFlags.MDB_DUPFIXED
     )
 
-    val txn = env.txnRead()
-    val stat = table.stat(txn)
+    val rtx = env.txnRead()
+    val stat = table.stat(rtx)
     val count = stat.entries
     println(s"number of existed records: $count ")
-    txn.commit()
-    txn.close()
+    rtx.commit()
+    rtx.close()
 
     val keys = write2(table, index, count, num)
     read2(table, index, keys)
@@ -360,17 +360,16 @@ class LMDBTool() {
     var i = 0
     while (itr.hasNext) {
       val k = itr.next
-      indexKey.put(shortKey(k)).flip()
 
       val rtx = env.txnRead()
       try {
         val indexCursor = index.openCursor(rtx)
+        indexKey.put(shortKey(k)).flip()
 
         var gotData: Option[Array[Byte]] = None
         if (indexCursor.get(indexKey, GetOp.MDB_SET_KEY)) {
           val id = Array.ofDim[Byte](indexCursor.`val`.remaining)
           indexCursor.`val`.get(id)
-
           tableKey.put(id).flip()
           val tableVal = table.get(rtx, tableKey)
           if (tableVal ne null) {
@@ -383,9 +382,11 @@ class LMDBTool() {
           }
 
           while (gotData.isEmpty && indexCursor.seek(SeekOp.MDB_NEXT_DUP)) {
+            tableKey.clear()
+
             val id = Array.ofDim[Byte](indexCursor.`val`.remaining)
             indexCursor.`val`.get(id)
-            tableKey.clear().asInstanceOf[ByteBuffer].put(id).flip()
+            tableKey.put(id).flip()
             val tableVal = table.get(rtx, tableKey)
             if (tableVal ne null) {
               val data = Array.ofDim[Byte](tableVal.remaining)

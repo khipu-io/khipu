@@ -9,7 +9,8 @@ import khipu.rlp.RLPEncodeable
 import khipu.rlp.RLPImplicitConversions._
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
-import khipu.store.datasource.HeavyDataSource
+import khipu.store.datasource.BlockDataSource
+import khipu.store.datasource.LmdbBlockDataSource
 import khipu.util.SimpleMap
 
 object ReceiptsStorage {
@@ -57,28 +58,35 @@ object ReceiptsStorage {
  *   Key: hash of the block to which the list of receipts belong
  *   Value: the list of receipts
  */
-final class ReceiptsStorage(val source: HeavyDataSource) extends SimpleMap[Hash, Seq[Receipt]] {
+final class ReceiptsStorage(val source: BlockDataSource) extends SimpleMap[Hash, Seq[Receipt]] {
   type This = ReceiptsStorage
 
   import ReceiptsStorage.ReceiptsSerializer._
 
-  val namespace: Array[Byte] = Namespaces.ReceiptsNamespace
   def keySerializer: Hash => Array[Byte] = _.bytes
   def valueSerializer: Seq[Receipt] => Array[Byte] = toBytes
   def valueDeserializer: Array[Byte] => Seq[Receipt] = toReceipts
 
   override def get(key: Hash): Option[Seq[Receipt]] = {
-    source.get(key).map(x => toReceipts(x.value))
+    LmdbBlockDataSource.getTimestampByKey(key) flatMap {
+      blockNum => source.get(blockNum).map(x => toReceipts(x.value))
+    }
   }
 
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Seq[Receipt]]): ReceiptsStorage = {
-    //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
-    //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
-    toUpsert foreach { case (key, value) => source.put(key, TVal(toBytes(value), -1, -1L)) }
-    toRemove foreach { key => source.remove(key) }
+    val upsert = toUpsert flatMap {
+      case (key, value) =>
+        LmdbBlockDataSource.getTimestampByKey(key) map {
+          blockNum => (blockNum -> TVal(toBytes(value), -1, blockNum))
+        }
+    }
+    val remove = toRemove flatMap {
+      key => LmdbBlockDataSource.getTimestampByKey(key)
+    }
+    source.update(remove, upsert)
     this
   }
 
-  protected def apply(source: HeavyDataSource): ReceiptsStorage = new ReceiptsStorage(source)
+  protected def apply(source: BlockDataSource): ReceiptsStorage = new ReceiptsStorage(source)
 }
 

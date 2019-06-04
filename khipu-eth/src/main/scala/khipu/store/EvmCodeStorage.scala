@@ -1,9 +1,8 @@
 package khipu.store
 
 import akka.util.ByteString
-import kesque.TVal
 import khipu.Hash
-import khipu.store.datasource.HeavyDataSource
+import khipu.store.datasource.DataSource
 import khipu.util.SimpleMap
 
 /**
@@ -11,28 +10,25 @@ import khipu.util.SimpleMap
  *   Key: hash of the code
  *   Value: the code
  */
-final class EvmCodeStorage(val source: HeavyDataSource) extends SimpleMap[Hash, ByteString] {
+final class EvmCodeStorage(val source: DataSource) extends SimpleMap[Hash, ByteString] {
   type This = EvmCodeStorage
 
-  val namespace: Array[Byte] = Namespaces.CodeNamespace
+  val namespace: Array[Byte] = Array[Byte]()
   def keySerializer: Hash => Array[Byte] = _.bytes
   def valueSerializer: ByteString => Array[Byte] = _.toArray
   def valueDeserializer: Array[Byte] => ByteString = (code: Array[Byte]) => ByteString(code)
 
   override def get(key: Hash): Option[ByteString] = {
-    source.get(key).map(x => ByteString(x.value))
+    source.get(namespace, key.bytes).map(x => ByteString(x))
   }
 
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, ByteString]): EvmCodeStorage = {
-    //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
-    //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
-    toUpsert foreach { case (key, value) => source.put(key, TVal(value.toArray, -1, -1L)) }
-    toRemove foreach { key => source.remove(key) }
+    val upsert = toUpsert map { case (key, value) => (key.bytes -> value.toArray) }
+    val remove = toRemove map { key => key.bytes }
+    source.update(namespace, remove, upsert)
     this
   }
 
-  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingTimestamp(writingBlockNumber)
-
-  protected def apply(source: HeavyDataSource): EvmCodeStorage = new EvmCodeStorage(source)
+  protected def apply(source: DataSource): EvmCodeStorage = new EvmCodeStorage(source)
 }
 

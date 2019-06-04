@@ -179,8 +179,9 @@ object KesqueCompactor {
     ))
     val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
 
-    val blockHeaderDataSource = new KesqueDataSource(blockTable, dbConfig.header)
-    val blockHeaderStorage = new BlockHeaderStorage(blockHeaderDataSource)
+    // TODO
+    val blockHeaderDataSource = null // new KesqueDataSource(blockTable, dbConfig.header)
+    val blockHeaderStorage = null // new BlockHeaderStorage(blockHeaderDataSource)
 
     (kesque, accountTable, storageTable, blockHeaderStorage)
   }

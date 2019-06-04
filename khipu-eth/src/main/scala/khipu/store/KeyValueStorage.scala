@@ -4,17 +4,12 @@ import khipu.util.SimpleMap
 import khipu.store.datasource.DataSource
 
 object Namespaces {
-  val ReceiptsNamespace = Array[Byte]('r'.toByte)
-  val HeaderNamespace = Array[Byte]('h'.toByte)
-  val BodyNamespace = Array[Byte]('b'.toByte)
-  val NodeNamespace = Array[Byte]('n'.toByte)
-  val CodeNamespace = Array[Byte]('c'.toByte)
-  val TotalDifficultyNamespace = Array[Byte]('t'.toByte)
-  val AppStateNamespace = Array[Byte]('s'.toByte)
-  val KnownNodesNamespace = Array[Byte]('k'.toByte)
-  val HeightsNamespace = Array[Byte]('i'.toByte)
-  val FastSyncStateNamespace = Array[Byte]('h'.toByte)
-  val TransactionMappingNamespace = Array[Byte]('l'.toByte)
+  val Node = Array[Byte]('n'.toByte)
+  val AppState = Array[Byte]('s'.toByte)
+  val KnownNodes = Array[Byte]('k'.toByte)
+  val Heights = Array[Byte]('i'.toByte)
+  val FastSyncState = Array[Byte]('h'.toByte)
+  val TransactionMapping = Array[Byte]('l'.toByte)
 }
 
 trait KeyValueStorage[K, V] extends SimpleMap[K, V] {

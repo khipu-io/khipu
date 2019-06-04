@@ -197,9 +197,8 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
 
   def saveBlockHeader(blockHeader: BlockHeader) {
     val hash = blockHeader.hash
-    blockHeaderStorage.setWritingBlockNumber(blockHeader.number)
     blockHeaderStorage.put(hash, blockHeader)
-    saveBlockNumberMapping(blockHeader.number, hash)
+    //saveBlockNumberMapping(blockHeader.number, hash)
   }
 
   def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {
@@ -287,8 +286,8 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getTransactionLocation(txHash: Hash): Option[TransactionLocation] =
     transactionMappingStorage.get(txHash)
 
-  private def saveBlockNumberMapping(number: Long, hash: Hash): Unit =
-    blockHeaderStorage.putBlockHash(number, hash)
+  //  private def saveBlockNumberMapping(number: Long, hash: Hash): Unit =
+  //    blockHeaderStorage.putBlockHash(number, hash)
 
   private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody) {
     val kvs = blockBody.transactionList.zipWithIndex map {

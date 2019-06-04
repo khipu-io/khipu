@@ -101,6 +101,9 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
 
   override def postStop() {
     super.postStop()
+
+    serviceBoard.storages.closeAll()
+
     log.info("SyncService stopped")
   }
 

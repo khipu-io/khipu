@@ -1,29 +1,19 @@
 package khipu.store
 
-import khipu.Hash
-import khipu.domain.BlockHeader
-import khipu.network.p2p.messages.PV62.BlockBody
-import khipu.store.datasource.HeavyDataSource
+import khipu.store.datasource.BlockDataSource
+import khipu.store.datasource.DataSource
+import khipu.store.datasource.NodeDataSource
 import khipu.store.trienode.NodeKeyValueStorage
-import khipu.util.cache.sync.Cache
 
 trait BlockchainStorages {
-  // share nodeKeyValueCache instance for all CachedNodeStorage
-  def accountNodeDataSource: HeavyDataSource
-  def storageNodeDataSource: HeavyDataSource
-  def evmCodeDataSource: HeavyDataSource
+  def accountNodeDataSource: NodeDataSource
+  def storageNodeDataSource: NodeDataSource
+  def evmCodeDataSource: DataSource
 
-  def blockHeaderDataSource: HeavyDataSource
-  def blockBodyDataSource: HeavyDataSource
-  def receiptsDataSource: HeavyDataSource
-  def totalDifficultyDataSource: HeavyDataSource
-
-  protected def nodeKeyValueCache: Cache[Hash, Array[Byte]]
-  protected def blockHeaderCache: Cache[Hash, BlockHeader]
-  protected def blockBodyCache: Cache[Hash, BlockBody]
-  protected def blockNumberCache: Cache[Long, Hash]
-
-  def cacheSize = nodeKeyValueCache.size
+  def blockHeaderDataSource: BlockDataSource
+  def blockBodyDataSource: BlockDataSource
+  def receiptsDataSource: BlockDataSource
+  def totalDifficultyDataSource: BlockDataSource
 
   def transactionMappingStorage: TransactionMappingStorage
   def totalDifficultyStorage: TotalDifficultyStorage

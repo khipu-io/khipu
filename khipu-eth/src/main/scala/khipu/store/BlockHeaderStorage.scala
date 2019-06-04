@@ -1,11 +1,16 @@
 package khipu.store
 
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kesque.TVal
 import khipu.Hash
 import khipu.domain.BlockHeader
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
-import khipu.store.datasource.HeavyDataSource
+import khipu.store.datasource.BlockDataSource
+import khipu.store.datasource.LmdbBlockDataSource
 import khipu.util.SimpleMap
+import org.lmdbjava.Dbi
+import org.lmdbjava.Env
 import scala.collection.mutable
 
 /**
@@ -13,31 +18,61 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockHeader belong
  *   Value: the block header
  */
-final class BlockHeaderStorage(val source: HeavyDataSource) extends SimpleMap[Hash, BlockHeader] {
+final class BlockHeaderStorage(val source: BlockDataSource) extends SimpleMap[Hash, BlockHeader] {
   type This = BlockHeaderStorage
 
-  val namespace: Array[Byte] = Namespaces.HeaderNamespace
   def keySerializer: Hash => Array[Byte] = _.bytes
   def valueSerializer: BlockHeader => Array[Byte] = _.toBytes
   def valueDeserializer: Array[Byte] => BlockHeader = b => b.toBlockHeader
 
+  {
+    val blockHeaderSource = source.asInstanceOf[LmdbBlockDataSource]
+    loadTimeIndex(blockHeaderSource.env, blockHeaderSource.table)
+  }
+
+  private def loadTimeIndex(env: Env[ByteBuffer], table: Dbi[ByteBuffer]) {
+    val start = System.nanoTime
+    val txn = env.txnRead()
+    val itr = table.iterate(txn)
+    while (itr.hasNext) {
+      val entry = itr.next()
+
+      val timestamp = entry.key.order(ByteOrder.nativeOrder).getLong()
+
+      val data = new Array[Byte](entry.`val`.remaining)
+      entry.`val`.get(data)
+
+      LmdbBlockDataSource.putTimestampToKey(timestamp, data.toBlockHeader.hash)
+    }
+    itr.close()
+    txn.commit()
+    txn.close()
+  }
+
   override def get(key: Hash): Option[BlockHeader] = {
-    source.get(key).map(_.value.toBlockHeader)
+    LmdbBlockDataSource.getTimestampByKey(key) flatMap {
+      blockNum => source.get(blockNum).map(_.value.toBlockHeader)
+    }
   }
 
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockHeader]): BlockHeaderStorage = {
-    //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
-    //toUpsert foreach { case (key, value) => nodeTable.put(key, () => Future(value)) }
-    toUpsert foreach { case (key, value) => source.put(key, TVal(value.toBytes, -1, -1L)) }
-    toRemove foreach { key => source.remove(key) }
+    val upsert = toUpsert map {
+      case (key, value) =>
+        LmdbBlockDataSource.putTimestampToKey(value.number, key)
+        (value.number -> TVal(value.toBytes, -1, value.number))
+    }
+    val remove = toRemove flatMap {
+      key =>
+        val blockNum = LmdbBlockDataSource.getTimestampByKey(key)
+        LmdbBlockDataSource.removeTimestamp(key)
+        blockNum
+    }
+    source.update(remove, upsert)
     this
   }
 
-  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingTimestamp(writingBlockNumber)
+  def getBlockHash(blockNumber: Long) = LmdbBlockDataSource.getKeyByTimestamp(blockNumber)
 
-  def getBlockHash(blockNumber: Long) = source.getKeyByTimestamp(blockNumber)
-  def putBlockHash(blockNumber: Long, key: Hash) = source.putTimestampToKey(blockNumber, key)
-
-  protected def apply(source: HeavyDataSource): BlockHeaderStorage = new BlockHeaderStorage(source)
+  protected def apply(source: BlockDataSource): BlockHeaderStorage = new BlockHeaderStorage(source)
 }
 

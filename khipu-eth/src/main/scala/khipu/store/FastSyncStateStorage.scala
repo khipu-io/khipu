@@ -21,7 +21,7 @@ final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage
   import FastSyncStateStorage._
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
-  override val namespace: Array[Byte] = Namespaces.FastSyncStateNamespace
+  override val namespace: Array[Byte] = Namespaces.FastSyncState
 
   override def keySerializer: String => Array[Byte] = _.getBytes
   override def valueSerializer: SyncState => Array[Byte] = syncState => {

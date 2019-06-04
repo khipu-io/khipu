@@ -3,7 +3,8 @@ package khipu.store.datasource
 import akka.actor.ActorSystem
 import akka.event.Logging
 import java.nio.ByteBuffer
-import java.util.concurrent.locks.ReentrantReadWriteLock
+import kesque.FIFOCache
+import khipu.Hash
 import khipu.util.BytesUtil
 import org.lmdbjava.Env
 import org.lmdbjava.Dbi
@@ -17,12 +18,14 @@ trait LmdbConfig {
   val maxReaders: Int
 }
 
-final case class LmdbDataSource(env: Env[ByteBuffer], lmdbConfig: LmdbConfig)(implicit system: ActorSystem) extends DataSource {
+final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: Int = 10000)(implicit system: ActorSystem) extends DataSource {
   private val log = Logging(system, this.getClass)
 
-  private var db = createDb()
+  private val cache = new FIFOCache[Hash, Array[Byte]](cacheSize)
 
-  private def createDb(): Dbi[ByteBuffer] = env.openDbi("shared", DbiFlags.MDB_CREATE)
+  private var table = createTable()
+
+  private def createTable(): Dbi[ByteBuffer] = env.openDbi(topic, DbiFlags.MDB_CREATE)
 
   /**
    * This function obtains the associated value to a key, if there exists one.
@@ -34,37 +37,48 @@ final case class LmdbDataSource(env: Env[ByteBuffer], lmdbConfig: LmdbConfig)(im
   override def get(namespace: Array[Byte], key: Array[Byte]): Option[Array[Byte]] = {
     val start = System.nanoTime
 
-    // TODO fetch keyBuf from a pool?
-    val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
+    val combKey = BytesUtil.concat(namespace, key)
 
-    var txn: Txn[ByteBuffer] = null
-    var ret: Option[Array[Byte]] = None
-    try {
-      txn = env.txnRead()
+    cache.get(Hash(combKey)) match {
+      case None =>
+        // TODO fetch keyBuf from a pool?
+        val tableKey = ByteBuffer.allocateDirect(env.getMaxKeySize)
 
-      keyBuf.put(BytesUtil.concat(namespace, key)).flip()
-      val data = db.get(txn, keyBuf)
-      val ret = if (data ne null) {
-        val value = Array.ofDim[Byte](data.remaining)
-        data.get(value)
-        Some(value)
-      } else {
-        None
-      }
-      keyBuf.clear()
+        var ret: Option[Array[Byte]] = None
+        var rtx: Txn[ByteBuffer] = null
+        try {
+          rtx = env.txnRead()
 
-      txn.commit()
-    } catch {
-      case ex: Throwable =>
-        if (txn ne null) txn.abort()
-        log.error(ex, ex.getMessage)
-    } finally {
-      if (txn ne null) txn.close()
+          tableKey.put(combKey).flip()
+          val data = table.get(rtx, tableKey)
+          ret = if (data ne null) {
+            val value = Array.ofDim[Byte](data.remaining)
+            data.get(value)
+            Some(value)
+          } else {
+            None
+          }
+          tableKey.clear()
+
+          rtx.commit()
+        } catch {
+          case ex: Throwable =>
+            if (rtx ne null) {
+              rtx.abort()
+            }
+            log.error(ex, ex.getMessage)
+        } finally {
+          if (rtx ne null) {
+            rtx.close()
+          }
+        }
+
+        clock.elapse(System.nanoTime - start)
+
+        ret
+
+      case x => x
     }
-
-    clock.elapse(System.nanoTime - start)
-
-    ret
   }
 
   /**
@@ -78,36 +92,43 @@ final case class LmdbDataSource(env: Env[ByteBuffer], lmdbConfig: LmdbConfig)(im
    */
   override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
     // TODO fetch keyBuf from a pool?
-    val keyWriteBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
-    var dataWriteBuf = ByteBuffer.allocateDirect(100 * 1024) // will grow when needed
+    val tableKey = ByteBuffer.allocateDirect(env.getMaxKeySize)
+    var tableVal = ByteBuffer.allocateDirect(100 * 1024) // will grow when needed
 
-    var txn: Txn[ByteBuffer] = null
+    var wtx: Txn[ByteBuffer] = null
     try {
-      txn = env.txnWrite()
+      wtx = env.txnWrite()
 
       toRemove foreach { key =>
-        keyWriteBuf.put(BytesUtil.concat(namespace, key)).flip()
-        db.delete(txn, keyWriteBuf)
-        keyWriteBuf.clear()
+        tableKey.put(BytesUtil.concat(namespace, key)).flip()
+        table.delete(wtx, tableKey)
+        tableKey.clear()
       }
 
       toUpsert foreach {
         case (key, value) =>
-          keyWriteBuf.put(BytesUtil.concat(namespace, key)).flip()
-          dataWriteBuf = ensureValueBufferSize(dataWriteBuf, value.length)
-          dataWriteBuf.put(value).flip()
-          db.put(txn, keyWriteBuf, dataWriteBuf)
-          keyWriteBuf.clear()
-          dataWriteBuf.clear()
+          val combKey = BytesUtil.concat(namespace, key)
+          cache.put(Hash(combKey), value)
+
+          tableKey.put(combKey).flip()
+          tableVal = ensureValueBufferSize(tableVal, value.length)
+          tableVal.put(value).flip()
+          table.put(wtx, tableKey, tableVal)
+          tableKey.clear()
+          tableVal.clear()
       }
 
-      txn.commit()
+      wtx.commit()
     } catch {
       case ex: Throwable =>
-        if (txn ne null) txn.abort()
+        if (wtx ne null) {
+          wtx.abort()
+        }
         log.error(ex, ex.getMessage)
     } finally {
-      if (txn ne null) txn.close()
+      if (wtx ne null) {
+        wtx.close()
+      }
     }
 
     this
@@ -120,14 +141,14 @@ final case class LmdbDataSource(env: Env[ByteBuffer], lmdbConfig: LmdbConfig)(im
    */
   override def clear(): DataSource = {
     destroy()
-    this.db = createDb()
+    this.table = createTable()
     this
   }
 
   /**
    * This function closes the DataSource, without deleting the files used by it.
    */
-  override def close() = db.close()
+  override def close() = table.close()
 
   /**
    * This function closes the DataSource, if it is not yet closed, and deletes all the files used by it.
@@ -146,6 +167,27 @@ final case class LmdbDataSource(env: Env[ByteBuffer], lmdbConfig: LmdbConfig)(im
     } else {
       buf
     }
+  }
+
+  def printTable(namespace: Array[Byte]) {
+    val txn = env.txnRead()
+    val itr = table.iterate(txn)
+    while (itr.hasNext) {
+      val entry = itr.next()
+
+      val key = new Array[Byte](entry.key.remaining)
+      entry.key.get(key)
+      val (ns, k) = BytesUtil.split(key, namespace.length)
+      if (java.util.Arrays.equals(ns, namespace)) {
+        val data = new Array[Byte](entry.`val`.remaining)
+        entry.`val`.get(data)
+
+        println(s"${new String(k)} -> ${data.mkString(",")}")
+      }
+    }
+    itr.close()
+    txn.commit()
+    txn.close()
   }
 }
 

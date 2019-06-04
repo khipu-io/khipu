@@ -16,18 +16,15 @@ import org.lmdbjava.GetOp
 import org.lmdbjava.SeekOp
 import org.lmdbjava.Txn
 
-final class LmdbHeavyDataSource(
+final class PlainLmdbHeavyDataSource(
     val topic:         String,
     env:               Env[ByteBuffer],
     table:             Dbi[ByteBuffer],
     cacheSize:         Int             = 10000,
     isKeyTheValueHash: Boolean         = false,
-    isShortKey:        Boolean         = false,
     isWithTimestamp:   Boolean         = false
 )(implicit system: ActorSystem) extends HeavyDataSource {
-  type This = LmdbHeavyDataSource
-
-  require((isShortKey && isKeyTheValueHash || !isShortKey), "When use short key, the key must be hash of value")
+  type This = PlainLmdbHeavyDataSource
 
   private val log = Logging(system, this.getClass)
 
@@ -35,7 +32,9 @@ final class LmdbHeavyDataSource(
 
   private val keyWriteBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
   private var dataWriteBuf = ByteBuffer.allocateDirect(100 * 1024) // will grow when needed
+
   private var timeIndex = if (isWithTimestamp) Array.ofDim[Array[Byte]](200) else Array.ofDim[Array[Byte]](0)
+  private var keyToTimestamp = if (isWithTimestamp) Map[Hash, Long]() else Map[Hash, Long]()
 
   private val lock = new ReentrantReadWriteLock()
   private val readLock = lock.readLock
@@ -70,6 +69,10 @@ final class LmdbHeavyDataSource(
     this._currWritingTimestamp = writingTimestamp
   }
 
+  def getTimestampByKey(key: Hash): Option[Long] = {
+    keyToTimestamp.get(key)
+  }
+
   def getKeyByTimestamp(timestamp: Long): Option[Hash] = {
     try {
       readLock.lock()
@@ -98,6 +101,7 @@ final class LmdbHeavyDataSource(
         timeIndex = newArr
       }
       timeIndex(timestamp.toInt) = key.bytes
+      keyToTimestamp += (key -> timestamp)
     } finally {
       writeLock.unlock()
     }
@@ -109,7 +113,7 @@ final class LmdbHeavyDataSource(
     cache.get(key) match {
       case None =>
         val start = System.nanoTime
-        if (isShortKey) {
+        if (isKeyTheValueHash) {
           val sKey = sliceBytes(key.bytes)
           keyReadBuf.put(sKey).flip()
         } else {
@@ -126,30 +130,22 @@ final class LmdbHeavyDataSource(
           if (cursor.get(keyReadBuf, GetOp.MDB_SET_KEY)) {
             val data = Array.ofDim[Byte](cursor.`val`.remaining)
             cursor.`val`.get(data)
-            if (isShortKey) {
-              if (isKeyTheValueHash) {
-                val fullKey = crypto.kec256(data)
-                if (java.util.Arrays.equals(fullKey, key.bytes)) {
-                  gotData = Some(data)
-                }
-              } else {
-                log.error("When use short key, the key must be hash of value")
+            if (isKeyTheValueHash) {
+              val fullKey = crypto.kec256(data)
+              if (java.util.Arrays.equals(fullKey, key.bytes)) {
+                gotData = Some(data)
               }
             } else {
               gotData = Some(data)
             }
 
-            if (isShortKey) { // duplicate values should only happen in case of short key
+            if (isKeyTheValueHash) { // duplicate values should only happen in case of short key
               while (gotData.isEmpty && cursor.seek(SeekOp.MDB_NEXT_DUP)) {
                 val data = Array.ofDim[Byte](cursor.`val`.remaining)
                 cursor.`val`.get(data)
-                if (isKeyTheValueHash) {
-                  val fullKey = crypto.kec256(data)
-                  if (java.util.Arrays.equals(fullKey, key.bytes)) {
-                    gotData = Some(data)
-                  }
-                } else {
-                  log.error("When use short key, the key must be hash of value")
+                val fullKey = crypto.kec256(data)
+                if (java.util.Arrays.equals(fullKey, key.bytes)) {
+                  gotData = Some(data)
                 }
               }
             }
@@ -186,7 +182,7 @@ final class LmdbHeavyDataSource(
     }
   }
 
-  def update(toRemove: Set[Hash], toUpsert: Map[Hash, TVal]): LmdbHeavyDataSource = {
+  def update(toRemove: Set[Hash], toUpsert: Map[Hash, TVal]): PlainLmdbHeavyDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
 
@@ -195,7 +191,7 @@ final class LmdbHeavyDataSource(
       txn = env.txnWrite()
       toUpsert foreach {
         case (key, tval @ TVal(data, _, _)) =>
-          if (isShortKey) {
+          if (isKeyTheValueHash) {
             val sKey = sliceBytes(key.bytes)
             keyWriteBuf.put(sKey).flip()
           } else {
@@ -242,5 +238,9 @@ final class LmdbHeavyDataSource(
     if (dataWriteBuf.remaining < size) {
       dataWriteBuf = ByteBuffer.allocateDirect(size * 2)
     }
+  }
+
+  def close() {
+    table.close()
   }
 }

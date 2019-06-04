@@ -3,9 +3,9 @@ package khipu.store.trienode
 import akka.actor.ActorSystem
 import kesque.TVal
 import khipu.Hash
-import khipu.store.datasource.HeavyDataSource
+import khipu.store.datasource.NodeDataSource
 
-final class NodeTableStorage(source: HeavyDataSource)(implicit system: ActorSystem) extends NodeKeyValueStorage {
+final class NodeTableStorage(source: NodeDataSource)(implicit system: ActorSystem) extends NodeKeyValueStorage {
   type This = NodeTableStorage
 
   import system.dispatcher
@@ -20,8 +20,6 @@ final class NodeTableStorage(source: HeavyDataSource)(implicit system: ActorSyst
     source.update(toRemove, toUpsert map { case (key, value) => key -> TVal(value, -1, -1L) })
     this
   }
-
-  def setWritingBlockNumber(writingBlockNumber: Long) = source.setWritingTimestamp(writingBlockNumber)
 
   override def tableName = source.topic
 }

@@ -111,7 +111,7 @@ final class DataLoader(blockchain: Blockchain)(implicit system: ActorSystem) {
               nodeCount += 1
               val elapsed = (System.nanoTime - start) / 1000000000
               val speed = nodeCount / math.max(1, elapsed)
-              println(s"${java.time.LocalTime.now} $nodeCount cache ${blockchain.storages.cacheSize} ${speed}/s")
+              println(s"${java.time.LocalTime.now} $nodeCount ${speed}/s")
 
               Some(bytes)
             case None => throw MPTException(s"Node not found ${khipu.toHexString(nodeId)}, trie is inconsistent")

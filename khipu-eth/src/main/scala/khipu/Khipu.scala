@@ -59,9 +59,6 @@ object Khipu {
   def main(args: Array[String]) {
 
     CoordinatedShutdown(system).addJvmShutdownHook {
-      log.info("db stopping ...")
-      serviceBoard.storages.closeAll()
-      log.info("db stopped")
 
       serviceBoard.hostService.shutdown()
     }

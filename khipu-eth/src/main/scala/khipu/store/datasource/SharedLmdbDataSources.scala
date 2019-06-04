@@ -2,7 +2,6 @@ package khipu.store.datasource
 
 import akka.actor.ActorSystem
 import java.nio.ByteBuffer
-import khipu.util.Config
 import org.lmdbjava.Env
 
 trait SharedLmdbDataSources extends DataSources {
@@ -10,7 +9,7 @@ trait SharedLmdbDataSources extends DataSources {
 
   val env: Env[ByteBuffer]
 
-  lazy val dataSource = LmdbDataSource(env, Config.Db.LmdbConfig)
+  lazy val dataSource = LmdbDataSource("shared", env)
 
   lazy val transactionMappingDataSource = dataSource
 
@@ -20,9 +19,4 @@ trait SharedLmdbDataSources extends DataSources {
   lazy val blockHeightsHashesDataSource = dataSource
   lazy val knownNodesDataSource = dataSource
 
-  def closeAll() {
-    dataSource.close()
-    env.sync(true)
-    env.close()
-  }
 }

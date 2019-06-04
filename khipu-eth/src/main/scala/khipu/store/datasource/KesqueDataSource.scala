@@ -257,4 +257,6 @@ final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(im
   def cacheHitRate = table.cacheHitRate(topic)
   def cacheReadCount = table.cacheReadCount(topic)
   def resetCacheHitRate() = table.resetCacheHitRate(topic)
+
+  def close() {}
 }

@@ -26,15 +26,14 @@ import AppStateStorage._
 final class AppStateStorage(val source: DataSource) extends KeyValueStorage[Key, Long] {
   type This = AppStateStorage
 
-  val namespace: Array[Byte] = Namespaces.AppStateNamespace
+  val namespace: Array[Byte] = Namespaces.AppState
   def keySerializer: Key => Array[Byte] = _.name.getBytes
   def valueSerializer: Long => Array[Byte] = longToBytes
   def valueDeserializer: Array[Byte] => Long = bytesToLong
 
   protected def apply(dataSource: DataSource): AppStateStorage = new AppStateStorage(dataSource)
 
-  def getBestBlockNumber(): Long =
-    get(Keys.BestBlockNumber).getOrElse(0)
+  def getBestBlockNumber(): Long = get(Keys.BestBlockNumber).getOrElse(0)
 
   def putBestBlockNumber(bestBlockNumber: Long): AppStateStorage = {
     // FIXME We need to decouple pruning from best block number storing in this fn
@@ -44,28 +43,20 @@ final class AppStateStorage(val source: DataSource) extends KeyValueStorage[Key,
     put(Keys.BestBlockNumber, bestBlockNumber)
   }
 
-  def isFastSyncDone(): Boolean =
-    get(Keys.FastSyncDone).isDefined
+  def isFastSyncDone(): Boolean = get(Keys.FastSyncDone).isDefined
 
-  def fastSyncDone(): AppStateStorage =
-    put(Keys.FastSyncDone, 1L)
+  def fastSyncDone(): AppStateStorage = put(Keys.FastSyncDone, 1L)
 
-  def getEstimatedHighestBlock(): Long =
-    get(Keys.EstimatedHighestBlock).getOrElse(0)
+  def getEstimatedHighestBlock(): Long = get(Keys.EstimatedHighestBlock).getOrElse(0)
 
-  def putEstimatedHighestBlock(n: Long): AppStateStorage =
-    put(Keys.EstimatedHighestBlock, n)
+  def putEstimatedHighestBlock(n: Long): AppStateStorage = put(Keys.EstimatedHighestBlock, n)
 
-  def getSyncStartingBlock(): Long =
-    get(Keys.SyncStartingBlock).getOrElse(0)
+  def getSyncStartingBlock(): Long = get(Keys.SyncStartingBlock).getOrElse(0)
 
-  def putSyncStartingBlock(n: Long): AppStateStorage =
-    put(Keys.SyncStartingBlock, n)
+  def putSyncStartingBlock(n: Long): AppStateStorage = put(Keys.SyncStartingBlock, n)
 
-  def putLastPrunedBlock(n: Long): AppStateStorage =
-    put(Keys.LastPrunedBlock, n)
+  def putLastPrunedBlock(n: Long): AppStateStorage = put(Keys.LastPrunedBlock, n)
 
-  def getLastPrunedBlock(): Long =
-    get(Keys.LastPrunedBlock).getOrElse(0)
+  def getLastPrunedBlock(): Long = get(Keys.LastPrunedBlock).getOrElse(0)
 }
 

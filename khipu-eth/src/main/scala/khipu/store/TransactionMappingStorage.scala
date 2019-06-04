@@ -14,7 +14,7 @@ final class TransactionMappingStorage(val source: DataSource) extends KeyValueSt
 
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
-  val namespace: Array[Byte] = Namespaces.TransactionMappingNamespace
+  val namespace: Array[Byte] = Namespaces.TransactionMapping
   def keySerializer: Hash => Array[Byte] = _.bytes
 
   override def valueSerializer: TransactionLocation => Array[Byte] = tl => {
