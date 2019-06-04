@@ -79,7 +79,7 @@ object FastSyncService {
   )
 
   sealed trait Work
-  final case class BlockBodiesWork(hashes: List[Hash], syncedBlockNumber: Option[Long]) extends Work
+  final case class BlockBodiesWork(hashes: List[Hash]) extends Work
   final case class ReceiptsWork(hashes: List[Hash]) extends Work
   final case class NodesWork(hashes: List[NodeHash], downloadedCount: Option[Int]) extends Work
 
@@ -327,9 +327,9 @@ trait FastSyncService { _: SyncService =>
         workingPeers -= peerId
 
         work match {
-          case BlockBodiesWork(hashes, syncedBlockNumber) =>
+          case BlockBodiesWork(hashes) =>
             syncState.workingBlockBodies --= hashes
-            syncedBlockNumber foreach (currSyncedBlockNumber = _)
+            currSyncedBlockNumber = appStateStorage.getBestBlockNumber
 
           case ReceiptsWork(hashes) =>
             syncState.workingReceipts --= hashes
@@ -571,20 +571,15 @@ trait FastSyncService { _: SyncService =>
           log.debug(s"Got block bodies ${bodies.size} from ${peer.id} in ${(System.nanoTime - start) / 1000000}ms")
           validateBlocks(receivedHashes, bodies) match {
             case Valid =>
+              persistenceService ! SaveBodies((receivedHashes zip bodies).toMap, receivedHashes)
+
               self ! EnqueueBlockBodies(remainingHashes)
-              (persistenceService ? SaveBodies((receivedHashes zip bodies).toMap, receivedHashes))(300.seconds).mapTo[Option[Long]] andThen {
-                case Success(syncedBlockNumber) =>
-                  log.debug(s"SaveBodies success with syncedBlockNumber=$syncedBlockNumber")
-                  self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, syncedBlockNumber))
-                case Failure(e) =>
-                  log.error(e, e.getMessage)
-                  self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, None))
-              }
+              self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes))
 
             case Invalid =>
               self ! EnqueueBlockBodies(requestingHashes)
               self ! BlacklistPeer(peerId, s"$peerId responded with invalid block bodies that are not matching block headers")
-              self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, None))
+              self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes))
 
             case DbError =>
               log.error("DbError")
@@ -593,23 +588,23 @@ trait FastSyncService { _: SyncService =>
               //todo adjust the formula to minimize redownloaded block headers
               syncState.bestBlockHeaderNumber = syncState.bestBlockHeaderNumber - 2 * blockHeadersPerRequest
               log.warning("missing block header for known hash")
-              self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, None))
+              self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes))
           }
 
         case Success(None) =>
           self ! BlacklistPeer(peer.id, s"Got block bodies empty response for known hashes from ${peer.id}: $requestingHashes")
           self ! EnqueueBlockBodies(requestingHashes)
-          self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, None))
+          self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes))
 
         case Failure(e: AskTimeoutException) =>
           self ! EnqueueBlockBodies(requestingHashes)
           self ! BlacklistPeer(peer.id, s"${e.getMessage}")
-          self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, None))
+          self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes))
 
         case Failure(e) =>
           self ! EnqueueBlockBodies(requestingHashes)
           self ! BlacklistPeer(peer.id, s"${e.getMessage}")
-          self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes, None))
+          self ! PeerWorkDone(peer, BlockBodiesWork(requestingHashes))
       }
     }
 
@@ -819,8 +814,8 @@ class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorag
     case SaveBodies(kvs, receivedHashes) =>
       val start = System.nanoTime
       blockchain.saveBlockBody(kvs)
+      updateBestBlockIfNeeded(receivedHashes)
       log.debug(s"SaveBodies ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
-      sender() ! updateBestBlockIfNeeded(receivedHashes)
 
     case SaveDifficulties(kvs) =>
       val start = System.nanoTime
