@@ -402,6 +402,21 @@ trait FastSyncService { _: SyncService =>
           log.debug("There are no available peers, waiting for ProcessSyncingTick or working peers done")
         }
       } else {
+        val headerWork = if (syncState.pendingBlockBodies.size + syncState.pendingReceipts.size < 10000) {
+          if (isThereHeaderToDownload && headerWorkingPeer.isEmpty) {
+            val candicates = headerWhitePeers -- workingPeers
+            nextPeer(candicates.toArray) map { peer =>
+              headerWorkingPeer = Some(peer.id)
+              workingPeers += peer
+              peer
+            }
+          } else {
+            None
+          }
+        } else {
+          None
+        }
+
         val nodeWorks = if (syncState.pendingNonMptNodes.nonEmpty || syncState.pendingMptNodes.nonEmpty) {
           val blockchainOnlys = blockchainOnlyPeers.values.toSet
           unassignedPeers.filterNot(blockchainOnlys.contains)
@@ -470,17 +485,6 @@ trait FastSyncService { _: SyncService =>
             }
         } else {
           Vector()
-        }
-
-        val headerWork = if (isThereHeaderToDownload && headerWorkingPeer.isEmpty) {
-          val candicates = headerWhitePeers -- workingPeers
-          nextPeer(candicates.toArray) map { peer =>
-            headerWorkingPeer = Some(peer.id)
-            workingPeers += peer
-            peer
-          }
-        } else {
-          None
         }
 
         // node work is priority since nodes are the most waiting in queue

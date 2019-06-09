@@ -154,6 +154,7 @@ object Blockchain {
      * @return Block hash if found
      */
     def getHashByBlockNumber(number: Long): Option[Hash]
+    def getNumberByBlockHash(hash: Hash): Option[Long]
 
     def getWorldState(blockNumber: Long, accountStartNonce: UInt256, stateRootHash: Option[Hash] = None): W
     def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: UInt256, stateRootHash: Option[Hash] = None): W
@@ -179,6 +180,9 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
 
   def getHashByBlockNumber(number: Long): Option[Hash] =
     blockHeaderStorage.getBlockHash(number)
+
+  def getNumberByBlockHash(hash: Hash): Option[Long] =
+    blockHeaderStorage.getBlockNumber(hash)
 
   def getBlockHeaderByHash(hash: Hash): Option[BlockHeader] =
     blockHeaderStorage.get(hash)

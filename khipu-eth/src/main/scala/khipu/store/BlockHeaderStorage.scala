@@ -72,6 +72,7 @@ final class BlockHeaderStorage(val source: BlockDataSource) extends SimpleMap[Ha
   }
 
   def getBlockHash(blockNumber: Long) = LmdbBlockDataSource.getKeyByTimestamp(blockNumber)
+  def getBlockNumber(hash: Hash) = LmdbBlockDataSource.getTimestampByKey(hash)
 
   protected def apply(source: BlockDataSource): BlockHeaderStorage = new BlockHeaderStorage(source)
 }
