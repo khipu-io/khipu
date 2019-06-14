@@ -1,6 +1,7 @@
 package khipu.store.datasource
 
 import akka.util.ByteString
+import khipu.Hash
 
 /**
  * Storage's key should be gettable with same elements, do not use Array[Byte] as map key
@@ -13,12 +14,11 @@ final class EphemDataSource(private var storage: Map[ByteString, Array[Byte]]) e
   override def get(namespace: Array[Byte], key: Array[Byte]): Option[Array[Byte]] = storage.get(ByteString(namespace ++ key))
 
   override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
-    val afterRemove = toRemove.foldLeft(storage) { (storage, key) =>
-      storage - ByteString(namespace ++ key)
+    val afterRemove = toRemove.foldLeft(storage) {
+      (storage, key) => storage - ByteString(namespace ++ key)
     }
     val afterUpdate = toUpsert.foldLeft(afterRemove) {
-      case (storage, (key, value)) =>
-        storage + (ByteString(namespace ++ key) -> value)
+      case (storage, (key, value)) => storage + (ByteString(namespace ++ key) -> value)
     }
     storage = afterUpdate
     this
@@ -34,5 +34,7 @@ final class EphemDataSource(private var storage: Map[ByteString, Array[Byte]]) e
   override def destroy(): Unit = ()
 
   def toSeq = storage.toSeq.map(x => x._1.toArray -> x._2)
+
+  def toMap = storage.map(x => Hash(x._1.toArray) -> x._2)
 }
 

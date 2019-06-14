@@ -792,9 +792,9 @@ object PersistenceService {
 class PersistenceService(blockchain: Blockchain, appStateStorage: AppStateStorage) extends Actor with ActorLogging {
   import FastSyncService._
 
-  private val blockchainStorages = blockchain.storages
-  private val accountNodeStorage = blockchainStorages.accountNodeStorageFor(None)
-  private val storageNodeStorage = blockchainStorages.storageNodeStorageFor(None)
+  private val storages = blockchain.storages
+  private val accountNodeStorage = storages.accountNodeStorageFor(None)
+  private val storageNodeStorage = storages.storageNodeStorageFor(None)
 
   val accountNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()
   val storageNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()

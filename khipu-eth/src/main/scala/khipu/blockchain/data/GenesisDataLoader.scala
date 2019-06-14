@@ -84,8 +84,8 @@ class GenesisDataLoader(
   private val hashLength = 64
   private val addressLength = 40
 
-  private val emptyTrieRootHash = Hash(crypto.kec256(rlp.encode(Array.emptyByteArray)))
-  private val emptyEvmHash: Hash = Hash(crypto.kec256(Array.emptyByteArray))
+  private val EMPTY_TRIE_ROOT_HASH = Hash(crypto.kec256(rlp.encode(Array.emptyByteArray)))
+  private val EMPTY_EVM_HASH: Hash = Hash(crypto.kec256(Array.emptyByteArray))
 
   def loadGenesisData(): Unit = {
     log.debug("Loading genesis data")
@@ -148,7 +148,7 @@ class GenesisDataLoader(
         val ephemNodeStorage = new ArchiveNodeStorage(nodeStorage)
         val mpt = MerklePatriciaTrie[Array[Byte], Account](rootHash, ephemNodeStorage)(trie.byteArraySerializable, Account.accountSerializer)
         val paddedAddress = address.reverse.padTo(addressLength, "0").reverse.mkString
-        val account = Account(blockchainConfig.accountStartNonce, UInt256(new BigInteger(balance)), emptyTrieRootHash, emptyEvmHash)
+        val account = Account(blockchainConfig.accountStartNonce, UInt256(new BigInteger(balance)), EMPTY_TRIE_ROOT_HASH, EMPTY_EVM_HASH)
 
         mpt.put(crypto.kec256(khipu.hexDecode(paddedAddress)), account).persist().rootHash
     }
@@ -158,8 +158,8 @@ class GenesisDataLoader(
       ommersHash = Hash(crypto.kec256(rlp.encode(RLPList()))),
       beneficiary = genesisData.coinbase,
       stateRoot = Hash(stateMptRootHash),
-      transactionsRoot = emptyTrieRootHash,
-      receiptsRoot = emptyTrieRootHash,
+      transactionsRoot = EMPTY_TRIE_ROOT_HASH,
+      receiptsRoot = EMPTY_TRIE_ROOT_HASH,
       logsBloom = ByteString(zeros(bloomLength)),
       difficulty = UInt256(new BigInteger(genesisData.difficulty.replace("0x", ""), 16)),
       number = 0,
@@ -182,9 +182,8 @@ class GenesisDataLoader(
         Failure(new RuntimeException("Genesis data present in the database does not match genesis block from file." +
           " Use different directory for running private blockchains."))
       case None =>
-        // using empty namespace because ephemDataSource.storage already has the namespace-prefixed keys
-        // TODO deal it with kesque, otherwise the regular sync from scrath won't work because of lack these initial nodes
-        ephemDataSource.toSeq.grouped(dbConfig.batchSize).foreach(toStore => dataSource.update(Array.emptyByteArray, Nil, toStore))
+        val accountNodeStorage = blockchain.storages.accountNodeStorageFor(None)
+        accountNodeStorage.update(Set(), ephemDataSource.toMap)
         blockchain.saveBlock(Block(header, BlockBody(Nil, Nil)))
         blockchain.saveReceipts(header.hash, Nil)
         blockchain.saveTotalDifficulty(header.hash, header.difficulty)

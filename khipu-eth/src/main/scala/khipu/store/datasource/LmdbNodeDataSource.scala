@@ -98,6 +98,9 @@ final class LmdbNodeDataSource(
               val data = Array.ofDim[Byte](tableVal.remaining)
               tableVal.get(data)
               val fullKey = crypto.kec256(data)
+
+              log.debug(s"get0 $key -> ${shortKey(key.bytes).mkString(",")} -> $id -> ${Hash(crypto.kec256(data))} -> ${Hash(fullKey)}")
+
               if (java.util.Arrays.equals(fullKey, key.bytes)) {
                 ret = Some(data)
               }
@@ -114,6 +117,9 @@ final class LmdbNodeDataSource(
                 val data = Array.ofDim[Byte](tableVal.remaining)
                 tableVal.get(data)
                 val fullKey = crypto.kec256(data)
+
+                log.debug(s"get2 $key -> ${shortKey(key.bytes).mkString(",")} -> $id -> ${Hash(crypto.kec256(data))} -> ${Hash(fullKey)}")
+
                 if (java.util.Arrays.equals(fullKey, key.bytes)) {
                   ret = Some(data)
                 }
@@ -157,6 +163,9 @@ final class LmdbNodeDataSource(
       toUpsert foreach {
         case (key, tval @ TVal(data, _, _)) =>
           id += 1
+
+          log.debug(s"put $key -> ${shortKey(key.bytes).mkString(",")} -> $id -> ${Hash(crypto.kec256(data))}")
+
           indexKey.put(shortKey(key.bytes)).flip()
           indexVal.putLong(id).flip()
           tableKey.putLong(id).flip()

@@ -2,7 +2,6 @@ package khipu.store.trienode
 
 import khipu.Hash
 import khipu.store.KeyValueStorage
-import khipu.store.Namespaces
 import khipu.store.datasource.DataSource
 
 /**
@@ -16,7 +15,7 @@ import khipu.store.datasource.DataSource
 final class NodeStorage(val source: DataSource) extends KeyValueStorage[Hash, Array[Byte]] {
   type This = NodeStorage
 
-  val namespace: Array[Byte] = Namespaces.Node
+  val namespace: Array[Byte] = Array.emptyByteArray
   def keySerializer: Hash => Array[Byte] = _.bytes
   def valueSerializer: Array[Byte] => Array[Byte] = identity
   def valueDeserializer: Array[Byte] => Array[Byte] = identity
