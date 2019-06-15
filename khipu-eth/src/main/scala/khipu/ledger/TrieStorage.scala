@@ -57,12 +57,12 @@ final class TrieStorage private (
     new TrieStorage(underlyingTrie, updatedLogs)
   }
 
-  def commit(): TrieStorage = {
-    val committed = this.logs.foldLeft(this.underlyingTrie) {
+  def flush(): TrieStorage = {
+    val flushed = this.logs.foldLeft(this.underlyingTrie) {
       case (acc, (k, Deleted(_))) => acc - k
       case (acc, (k, Updated(v))) => acc + (k -> v)
       case (acc, _)               => acc
     }
-    new TrieStorage(committed, Map())
+    new TrieStorage(flushed, Map())
   }
 }

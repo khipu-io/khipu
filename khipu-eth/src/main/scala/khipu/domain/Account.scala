@@ -11,10 +11,10 @@ import khipu.trie.ByteArraySerializable
 
 object Account {
   // 56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421
-  val EmptyStorageRootHash = Hash(kec256(rlp.encode(Array.emptyByteArray)))
+  val EMPTY_STATE_ROOT_HASH = Hash(kec256(rlp.encode(Array.emptyByteArray)))
 
   // c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
-  val EmptyCodeHash = Hash(kec256(ByteString()))
+  val EMPTY_CODE_HASH = Hash(kec256(ByteString()))
 
   def empty(startNonce: UInt256) = Account(nonce = startNonce)
 
@@ -55,8 +55,8 @@ object Account {
 final case class Account(
     nonce:     UInt256,
     balance:   UInt256 = UInt256.Zero,
-    stateRoot: Hash    = Account.EmptyStorageRootHash,
-    codeHash:  Hash    = Account.EmptyCodeHash
+    stateRoot: Hash    = Account.EMPTY_STATE_ROOT_HASH,
+    codeHash:  Hash    = Account.EMPTY_CODE_HASH
 ) {
 
   def increaseNonce(value: UInt256 = UInt256.One): Account =
@@ -72,7 +72,7 @@ final case class Account(
     copy(stateRoot = stateRoot)
 
   def isEmpty =
-    codeHash == Account.EmptyCodeHash && nonce.isZero && balance.isZero
+    codeHash == Account.EMPTY_CODE_HASH && nonce.isZero && balance.isZero
 
   override def toString: String = s"Account(nonce: $nonce, balance: $balance, stateRoot: ${stateRoot.hexString}, codeHash: ${codeHash.hexString})"
 

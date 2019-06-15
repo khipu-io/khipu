@@ -231,7 +231,7 @@ final class KesqueCompactor(
   private val accountReader = new NodeReader[Account](dbConfig.account, accountTable)(Account.accountSerializer) {
     override def entityGot(account: Account, blocknumber: Long) {
       // try to extracted storage node hash
-      if (account.stateRoot != Account.EmptyStorageRootHash) {
+      if (account.stateRoot != Account.EMPTY_STATE_ROOT_HASH) {
         storageReader.getNode(account.stateRoot.bytes, blocknumber) map storageReader.processNode
       }
     }

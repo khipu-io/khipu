@@ -38,5 +38,5 @@ package object trie {
   def toHash(bytes: Array[Byte]): Array[Byte] = crypto.kec256(bytes)
 
   import khipu.rlp.RLPImplicits._
-  val EmptyTrieHash = toHash(rlp.encode(Array.ofDim[Byte](0)))
+  val EMPTY_TRIE_HASH = crypto.kec256(rlp.encode(Array.emptyByteArray))
 }

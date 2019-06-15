@@ -314,7 +314,9 @@ class EthService(
               data = txLog.data,
               topics = txLog.logTopics
             )
-        }
+        },
+        logsBloom = receipt.logsBloomFilter.toArray,
+        status = receipt.postTxState
       )
     }
 

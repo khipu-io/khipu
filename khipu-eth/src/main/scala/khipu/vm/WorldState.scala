@@ -57,7 +57,7 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
     getAccount(address).map(_.isEmpty).getOrElse(true)
 
   def isAccountNonEmptyNonceOrCode(account: Account) =
-    account.nonce.nonZero || account.codeHash != Account.EmptyCodeHash
+    account.nonce.nonZero || account.codeHash != Account.EMPTY_CODE_HASH
 
   def getBalance(address: Address): UInt256 =
     getAccount(address).map(a => a.balance).getOrElse(UInt256.Zero)
@@ -89,6 +89,7 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
 
   /**
    * Creates a new address based on the address and nonce of the creator. YP equation 82
+   * by using one fewer than the sender’s nonce value.
    *
    * @param creatorAddr, the address of the creator of the new address
    * @return the new address

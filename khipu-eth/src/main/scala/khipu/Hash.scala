@@ -52,6 +52,7 @@ object Hash {
   }
 }
 final case class Hash(bytes: Array[Byte]) extends Hash.I {
+
   override def equals(any: Any) = {
     any match {
       case that: Hash => (this eq that) || Arrays.equals(this.bytes, that.bytes)

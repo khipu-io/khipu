@@ -1,6 +1,5 @@
 package khipu.trie
 
-import akka.util.ByteString
 import java.util.Arrays
 import khipu.Changed
 import khipu.Deleted
@@ -60,11 +59,11 @@ object MerklePatriciaTrie {
   def apply[K, V](source: NodeKeyValueStorage)(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]): MerklePatriciaTrie[K, V] =
     new MerklePatriciaTrie[K, V](None, source, Map())(kSerializer, vSerializer)
 
-  def apply[K, V](rootHash: Array[Byte], source: NodeKeyValueStorage)(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]): MerklePatriciaTrie[K, V] = {
-    if (Arrays.equals(EmptyTrieHash, rootHash)) {
-      new MerklePatriciaTrie[K, V](None, source, Map())(kSerializer, vSerializer)
+  def apply[K, V](rootHash: Array[Byte], storage: NodeKeyValueStorage)(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]): MerklePatriciaTrie[K, V] = {
+    if (Arrays.equals(EMPTY_TRIE_HASH, rootHash)) {
+      new MerklePatriciaTrie[K, V](None, storage, Map())(kSerializer, vSerializer)
     } else {
-      new MerklePatriciaTrie[K, V](Some(rootHash), source, Map())(kSerializer, vSerializer)
+      new MerklePatriciaTrie[K, V](Some(rootHash), storage, Map())(kSerializer, vSerializer)
     }
   }
 }
@@ -78,7 +77,7 @@ final class MerklePatriciaTrie[K, V] private (
   import MerklePatriciaTrie._
 
   // The root hash will be already here via a series of put/remove operations
-  lazy val rootHash: Array[Byte] = rootHashOpt.getOrElse(EmptyTrieHash)
+  def rootHash: Array[Byte] = rootHashOpt.getOrElse(EMPTY_TRIE_HASH)
 
   /**
    * Obtains the value asociated with the key passed, if there exists one.
@@ -160,7 +159,7 @@ final class MerklePatriciaTrie[K, V] private (
       new MerklePatriciaTrie(
         Some(newRoot.hash),
         nodeStorage,
-        updateNodesToLogs(previousRootHash = ByteString(rootHash), newRoot = Some(newRoot), changes = changes)
+        updateNodesToLogs(previousRootHash = Hash(rootHash), newRoot = Some(newRoot), changes = changes)
       )(kSerializer, vSerializer)
 
     } getOrElse {
@@ -168,7 +167,7 @@ final class MerklePatriciaTrie[K, V] private (
       new MerklePatriciaTrie(
         Some(newRoot.hash),
         nodeStorage,
-        updateNodesToLogs(ByteString(rootHash), Some(newRoot), Vector(Updated(newRoot)))
+        updateNodesToLogs(Hash(rootHash), Some(newRoot), Vector(Updated(newRoot)))
       )(kSerializer, vSerializer)
     }
   }
@@ -189,14 +188,14 @@ final class MerklePatriciaTrie[K, V] private (
           new MerklePatriciaTrie(
             Some(newRoot.hash),
             nodeStorage,
-            updateNodesToLogs(previousRootHash = ByteString(rootHash), newRoot = Some(newRoot), changes = changes)
+            updateNodesToLogs(previousRootHash = Hash(rootHash), newRoot = Some(newRoot), changes = changes)
           )(kSerializer, vSerializer)
 
         case NodeRemoveResult(true, None, changes) =>
           new MerklePatriciaTrie(
             None,
             nodeStorage,
-            updateNodesToLogs(previousRootHash = ByteString(rootHash), newRoot = None, changes = changes)
+            updateNodesToLogs(previousRootHash = Hash(rootHash), newRoot = None, changes = changes)
           )(kSerializer, vSerializer)
 
         case NodeRemoveResult(false, _, _) => this
@@ -494,7 +493,7 @@ final class MerklePatriciaTrie[K, V] private (
   }
 
   private def updateNodesToLogs(
-    previousRootHash: ByteString,
+    previousRootHash: Hash,
     newRoot:          Option[Node],
     changes:          Vector[Changed[Node]]
   ): Map[Hash, Log[Array[Byte]]] = {
@@ -515,7 +514,7 @@ final class MerklePatriciaTrie[K, V] private (
         }
       case ((toRemove, toUpdate), (hash, Updated(node))) =>
         val nCapped = node.capped
-        if (nCapped.length == 32 || nCapped == rootCapped) {
+        if (nCapped.length == 32 || Arrays.equals(nCapped, rootCapped)) {
           (toRemove, toUpdate + (hash -> Updated(node.encoded)))
         } else {
           (toRemove, toUpdate)
@@ -557,6 +556,10 @@ final class MerklePatriciaTrie[K, V] private (
     }
     nodeStorage.update(changes)
     this
+  }
+
+  def copy: MerklePatriciaTrie[K, V] = {
+    new MerklePatriciaTrie[K, V](rootHashOpt, nodeStorage, nodeLogs)(kSerializer, vSerializer)
   }
 
 }

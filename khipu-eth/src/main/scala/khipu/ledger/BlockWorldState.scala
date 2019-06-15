@@ -63,8 +63,8 @@ object BlockWorldState {
   final class AccountDelta {
     private var _nonce = UInt256.Zero
     private var _balance = UInt256.Zero
-    private var _stateRoot = Account.EmptyStorageRootHash
-    private var _codeHash = Account.EmptyCodeHash
+    private var _stateRoot = Account.EMPTY_STATE_ROOT_HASH
+    private var _codeHash = Account.EMPTY_CODE_HASH
 
     def nonce = _nonce
     def balance = _balance
@@ -112,7 +112,7 @@ object BlockWorldState {
      * See [[http://paper.gavwood.com YP 4.1]]
      */
     val underlyingAccountsTrie = MerklePatriciaTrie[Address, Account](
-      stateRootHash.getOrElse(Hash(trie.EmptyTrieHash)).bytes,
+      stateRootHash.getOrElse(Hash(trie.EMPTY_TRIE_HASH)).bytes,
       accountNodeStorage
     )(Address.hashedAddressEncoder, Account.accountSerializer)
 
@@ -167,7 +167,7 @@ final class BlockWorldState private (
   /**
    * Returns world state root hash. This value is only updated/accessing after committed.
    */
-  def stateRootHash: Hash = Hash(trieAccounts.underlying.rootHash)
+  def rootHash: Hash = Hash(trieAccounts.rootHash)
 
   def getBlockHash(number: Long): Option[UInt256] = blockchain.getHashByBlockNumber(number).map(UInt256(_))
 
@@ -176,6 +176,7 @@ final class BlockWorldState private (
   def getAccount(address: Address): Option[Account] = trieAccounts.get(address)
 
   def saveAccount(address: Address, account: Account): BlockWorldState = {
+    // accountDelta is not used by far, should we improve account increamental update?
     accountDeltas += (address -> (accountDeltas.getOrElse(address, Vector()) :+ toAccountDelta(address, account)))
 
     // should be added to trieAccounts after account delta calculated since toAccountDelta() is upon the original account
@@ -235,15 +236,15 @@ final class BlockWorldState private (
   }
 
   private def getStateRoot(address: Address): Hash = {
-    getAccount(address).map(_.stateRoot).getOrElse(Account.EmptyStorageRootHash)
+    getAccount(address).map(_.stateRoot).getOrElse(Account.EMPTY_STATE_ROOT_HASH)
   }
 
   def saveStorage(address: Address, storage: TrieStorage): BlockWorldState = {
-    val committedStorage = storage.commit()
-    trieStorages += (address -> committedStorage)
+    val flushedStorage = storage.flush()
+    trieStorages += (address -> flushedStorage)
     addRaceCondition(OnStorage, address)
 
-    trieAccounts += (address -> getGuaranteedAccount(address).withStateRoot(stateRoot = Hash(committedStorage.underlying.rootHash)))
+    trieAccounts += (address -> getGuaranteedAccount(address).withStateRoot(stateRoot = Hash(flushedStorage.underlying.rootHash)))
     addRaceCondition(OnAccount, address)
 
     this
@@ -291,15 +292,15 @@ final class BlockWorldState private (
 
   /**
    * Updates state trie with current changes but does not persist them into the storages. To do so it:
-   *   - Commits code (to get account's code hashes)
-   *   - Commits constract storages (to get account's contract storage root)
+   *   - Flush code (to get account's code hashes)
+   *   - Flush constract storages (to get account's contract storage root)
    *   - Updates state tree
    *
-   * @param worldState to commit
+   * @param worldState to flush
    * @return Updated world
    */
-  private[ledger] def commit(): BlockWorldState = {
-    trieAccounts = trieAccounts.commit()
+  private[ledger] def flush(): BlockWorldState = {
+    trieAccounts = trieAccounts.flush()
     this
   }
 

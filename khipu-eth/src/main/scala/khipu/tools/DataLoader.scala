@@ -129,11 +129,11 @@ final class DataLoader(blockchain: Blockchain)(implicit system: ActorSystem) {
         case Account(_, _, stateRoot, codeHash) =>
           accountCount += 1
           println(s"got account $accountCount")
-          if (stateRoot != Account.EmptyStorageRootHash) {
+          if (stateRoot != Account.EMPTY_STATE_ROOT_HASH) {
             storageReader.getNode(stateRoot.bytes) map storageReader.processNode
           }
 
-          if (codeHash != Account.EmptyCodeHash && !loadedEvmcodeKeys.contains(codeHash)) {
+          if (codeHash != Account.EMPTY_CODE_HASH && !loadedEvmcodeKeys.contains(codeHash)) {
             loadedEvmcodeKeys += codeHash
             evmcodeStorage.get(codeHash) map { evmcode =>
               evmcodeCount += 1

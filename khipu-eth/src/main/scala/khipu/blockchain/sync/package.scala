@@ -119,12 +119,12 @@ package object sync {
         case node @ PV63.MptLeaf(keyNibbles, value) =>
           val account = node.getAccount
           val codeHash = account.codeHash match {
-            case Account.EmptyCodeHash => Nil
-            case hash                  => List(EvmcodeHash(hash.bytes))
+            case Account.EMPTY_CODE_HASH => Nil
+            case hash                    => List(EvmcodeHash(hash.bytes))
           }
           val storageHash = account.stateRoot match {
-            case Account.EmptyStorageRootHash => Nil
-            case hash                         => List(StorageRootHash(hash.bytes))
+            case Account.EMPTY_STATE_ROOT_HASH => Nil
+            case hash                          => List(StorageRootHash(hash.bytes))
           }
 
           codeHash ::: storageHash

@@ -163,7 +163,7 @@ final class AddressEntity(nodeStorage: NodeKeyValueStorage) extends Actor with T
       val commander = sender()
       lastActiveTime = LocalDateTime.now()
 
-      val stateRoot = account.map(_.stateRoot).getOrElse(Account.EmptyStorageRootHash)
+      val stateRoot = account.map(_.stateRoot).getOrElse(Account.EMPTY_STATE_ROOT_HASH)
 
       promiseLoad() map { _ =>
         commander ! (storage orElse persistedStorage)

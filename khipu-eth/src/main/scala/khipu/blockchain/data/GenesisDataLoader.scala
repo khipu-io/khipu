@@ -85,7 +85,7 @@ class GenesisDataLoader(
   private val addressLength = 40
 
   private val EMPTY_TRIE_ROOT_HASH = Hash(crypto.kec256(rlp.encode(Array.emptyByteArray)))
-  private val EMPTY_EVM_HASH: Hash = Hash(crypto.kec256(Array.emptyByteArray))
+  private val EMPTY_EVM_HASH = Hash(crypto.kec256(Array.emptyByteArray))
 
   def loadGenesisData(): Unit = {
     log.debug("Loading genesis data")
@@ -141,7 +141,7 @@ class GenesisDataLoader(
   private def loadGenesisData(genesisData: GenesisData): Try[Unit] = {
     val ephemDataSource = EphemDataSource()
     val nodeStorage = new NodeStorage(ephemDataSource)
-    val initalRootHash = trie.EmptyTrieHash
+    val initalRootHash = trie.EMPTY_TRIE_HASH
 
     val stateMptRootHash = genesisData.alloc.zipWithIndex.foldLeft(initalRootHash) {
       case (rootHash, (((address, AllocAccount(balance)), idx))) =>
