@@ -1,5 +1,6 @@
 package khipu
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.actor.CoordinatedShutdown
 import akka.event.Logging
@@ -28,6 +29,7 @@ import khipu.network.rlpx.discovery.NodeDiscoveryService
 import khipu.service.ServiceBoard
 import khipu.transactions.PendingTransactionsService
 import khipu.util.FilterConfig
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
@@ -58,9 +60,13 @@ object Khipu {
 
   def main(args: Array[String]) {
 
-    CoordinatedShutdown(system).addJvmShutdownHook {
-
-      serviceBoard.hostService.shutdown()
+    CoordinatedShutdown(system).addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close storage") { () =>
+      import system.dispatcher
+      Future {
+        log.info("Actor system is going to terminate...")
+      } map { _ =>
+        Done
+      }
     }
 
     val genesisDataLoader = new GenesisDataLoader(serviceBoard.storages.dataSource, serviceBoard.blockchain, serviceBoard.storages.pruningMode, serviceBoard.blockchainConfig, serviceBoard.dbConfig)

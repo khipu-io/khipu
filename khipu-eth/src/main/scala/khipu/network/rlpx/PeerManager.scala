@@ -19,7 +19,6 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Success
-import scala.util.Try
 
 object PeerManager {
   def props(peerConfiguration: PeerConfiguration) =

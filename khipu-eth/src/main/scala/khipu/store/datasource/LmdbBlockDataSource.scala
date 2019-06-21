@@ -13,10 +13,11 @@ import khipu.util.Clock
 import org.lmdbjava.DbiFlags
 import org.lmdbjava.Env
 import org.lmdbjava.Txn
+import scala.collection.mutable
 
 object LmdbBlockDataSource {
   private var timestampToKey = Array.ofDim[Array[Byte]](200)
-  private var keyToTimestamp = Map[Hash, Long]()
+  private val keyToTimestamp = new mutable.HashMap[Hash, Long]()
 
   private val lock = new ReentrantReadWriteLock()
   private val readLock = lock.readLock

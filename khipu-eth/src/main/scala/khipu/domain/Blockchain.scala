@@ -138,6 +138,9 @@ object Blockchain {
      * @param blockHeader Block to be saved
      */
     def saveBlockHeader(blockHeader: BlockHeader): Unit
+    def saveBlockHeader(blockHeaders: Seq[BlockHeader]): Unit
+    def saveBlockHeader(hash: Hash, blockHeader: BlockHeader)
+    def saveBlockHeader(kvs: Map[Hash, BlockHeader])
     def saveBlockBody(blockHash: Hash, blockBody: BlockBody): Unit
     def saveBlockBody(kvs: Map[Hash, BlockBody]): Unit
     def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]): Unit
@@ -200,9 +203,22 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     totalDifficultyStorage.get(blockhash)
 
   def saveBlockHeader(blockHeader: BlockHeader) {
-    val hash = blockHeader.hash
+    blockHeaderStorage.put(blockHeader.hash, blockHeader)
+    //saveBlockNumberMapping(blockHeader.number, hash)
+  }
+
+  def saveBlockHeader(blockHeaders: Seq[BlockHeader]) {
+    val kvs = blockHeaders.map(x => x.hash -> x).toMap
+    blockHeaderStorage.update(Set(), kvs)
+  }
+
+  def saveBlockHeader(hash: Hash, blockHeader: BlockHeader) {
     blockHeaderStorage.put(hash, blockHeader)
     //saveBlockNumberMapping(blockHeader.number, hash)
+  }
+
+  def saveBlockHeader(kvs: Map[Hash, BlockHeader]) {
+    blockHeaderStorage.update(Set(), kvs)
   }
 
   def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {

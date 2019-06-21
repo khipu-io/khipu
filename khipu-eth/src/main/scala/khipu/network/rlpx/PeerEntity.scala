@@ -89,7 +89,7 @@ class PeerEntity(peer: Peer) extends Actor with Timers with ActorLogging {
   /**
    * stores information which tx hashes are "known" by which peers Seq[peerId]
    */
-  private var knownTransactions = Set[Hash]()
+  private val knownTransactions = mutable.HashSet[Hash]()
 
   val mediator = DistributedPubSub(context.system).mediator
   mediator ! Subscribe(khipu.TxTopic, self)
@@ -134,7 +134,7 @@ class PeerEntity(peer: Peer) extends Actor with Timers with ActorLogging {
       }
 
     case ProcessedTransactions(transactions) => // from khipu.TxTopic
-      knownTransactions = knownTransactions.filterNot(transactions.map(_.hash).contains)
+      knownTransactions.filterNot(transactions.map(_.hash).contains)
 
     case PeerHandshaked(peer, peerInfo) =>
       this.peerInfo = Some(peerInfo)
@@ -174,7 +174,7 @@ class PeerEntity(peer: Peer) extends Actor with Timers with ActorLogging {
       }
 
     case msg @ MessageFromPeer(_, message) =>
-      val hasRespondedToRequest = currRequest match {
+      currRequest match {
         case Some((commander, request)) =>
           val response = (request, message) match {
             case (r: BlockHeadersRequest, m: PV62.BlockHeaders) => Some(r.processResponse(m))
@@ -246,6 +246,7 @@ class PeerEntity(peer: Peer) extends Actor with Timers with ActorLogging {
   private def isTxKnown(transactions: SignedTransaction): Boolean =
     knownTransactions.contains(transactions.hash)
 
+  // !!!!! TODO - how to avoid memory leak when some entries in knownTransactions are never removed
   private def setTxKnown(transactions: Seq[SignedTransaction]) {
     knownTransactions ++= transactions.map(_.hash)
   }

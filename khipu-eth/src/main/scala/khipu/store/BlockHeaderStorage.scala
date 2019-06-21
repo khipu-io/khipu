@@ -1,5 +1,7 @@
 package khipu.store
 
+import akka.actor.ActorSystem
+import akka.event.Logging
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kesque.TVal
@@ -18,31 +20,37 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockHeader belong
  *   Value: the block header
  */
-final class BlockHeaderStorage(val source: BlockDataSource) extends SimpleMap[Hash, BlockHeader] {
+final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, BlockHeader] {
   type This = BlockHeaderStorage
 
   def keySerializer: Hash => Array[Byte] = _.bytes
   def valueSerializer: BlockHeader => Array[Byte] = _.toBytes
   def valueDeserializer: Array[Byte] => BlockHeader = b => b.toBlockHeader
 
+  private val log = Logging(system, this.getClass)
+
   {
+    val start = System.nanoTime
+
     val blockHeaderSource = source.asInstanceOf[LmdbBlockDataSource]
-    loadTimeIndex(blockHeaderSource.env, blockHeaderSource.table)
+    loadBlockNumberIndex(blockHeaderSource.env, blockHeaderSource.table)
+
+    log.info(s"loaded blocknumber index in ${(System.nanoTime - start) / 1000000000}s ")
   }
 
-  private def loadTimeIndex(env: Env[ByteBuffer], table: Dbi[ByteBuffer]) {
+  private def loadBlockNumberIndex(env: Env[ByteBuffer], table: Dbi[ByteBuffer]) {
     val start = System.nanoTime
     val txn = env.txnRead()
     val itr = table.iterate(txn)
     while (itr.hasNext) {
       val entry = itr.next()
 
-      val timestamp = entry.key.order(ByteOrder.nativeOrder).getLong()
+      val blockNumber = entry.key.order(ByteOrder.nativeOrder).getLong()
 
       val data = new Array[Byte](entry.`val`.remaining)
       entry.`val`.get(data)
 
-      LmdbBlockDataSource.putTimestampToKey(timestamp, data.toBlockHeader.hash)
+      LmdbBlockDataSource.putTimestampToKey(blockNumber, data.toBlockHeader.hash)
     }
     itr.close()
     txn.commit()

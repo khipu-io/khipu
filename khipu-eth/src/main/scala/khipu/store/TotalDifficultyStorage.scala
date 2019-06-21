@@ -4,7 +4,6 @@ import kesque.TVal
 import khipu.Hash
 import khipu.UInt256
 import khipu.store.datasource.BlockDataSource
-import khipu.store.datasource.HeavyDataSource
 import khipu.store.datasource.LmdbBlockDataSource
 import khipu.util.SimpleMap
 

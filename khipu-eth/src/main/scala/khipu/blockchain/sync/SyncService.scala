@@ -26,7 +26,7 @@ import khipu.network.rlpx.Peer
 import khipu.ommers.OmmersPool
 import khipu.service.ServiceBoard
 import khipu.transactions.PendingTransactionsService
-import khipu.util.Config.Sync._
+import khipu.util.Config
 import scala.concurrent.duration._
 
 object SyncService {
@@ -102,6 +102,10 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
   override def postStop() {
     super.postStop()
 
+    if (!appStateStorage.isFastSyncDone) {
+      saveSyncState()
+    }
+
     serviceBoard.storages.closeAll()
 
     log.info("SyncService stopped")
@@ -112,12 +116,12 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
   def idle: Receive = peerUpdateBehavior orElse {
     case StartSync =>
       appStateStorage.putSyncStartingBlock(appStateStorage.getBestBlockNumber)
-      (appStateStorage.isFastSyncDone, doFastSync) match {
+      (appStateStorage.isFastSyncDone, Config.Sync.doFastSync) match {
         case (false, true) =>
           startFastSync()
 
         case (true, true) =>
-          log.debug(s"do-fast-sync is set to $doFastSync but fast sync won't start because it already completed")
+          log.debug(s"do-fast-sync is set to ${Config.Sync.doFastSync} but fast sync won't start because it already completed")
           startRegularSync()
 
         case (true, false) =>
