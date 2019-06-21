@@ -97,7 +97,6 @@ object KesqueCompactor {
             if (nodeCount % 1000 == 0) {
               val elapsed = (System.nanoTime - start) / 1000000000
               val speed = nodeCount / math.max(1, elapsed)
-              nodeTable.size
               log.info(s"[comp] $topic nodes $nodeCount $speed/s, at #$blockNumber, table size ${nodeTable.size}")
             }
 
@@ -189,7 +188,6 @@ object KesqueCompactor {
   // --- simple test
   def main(args: Array[String]) {
     //val (kesque, accountTable, storageTable, blockHeaderStorage) = initTableBySelf()
-    val serviceBoard = ServiceBoard(system)
     val storages = serviceBoard.storages
     val kesque = storages.asInstanceOf[SharedLeveldbDataSources].kesque
     val accountTable = storages.accountNodeDataSource.asInstanceOf[KesqueDataSource].table

@@ -64,6 +64,7 @@ final class LmdbNodeDataSource(
     val rtx = env.txnRead()
     val stat = table.stat(rtx)
     val ret = stat.entries
+    log.info(s"Table $topic last id is $ret")
     rtx.commit()
     rtx.close()
     ret
@@ -99,7 +100,7 @@ final class LmdbNodeDataSource(
               tableVal.get(data)
               val fullKey = crypto.kec256(data)
 
-              log.debug(s"get0 $key -> ${shortKey(key.bytes).mkString(",")} -> $id -> ${Hash(crypto.kec256(data))} -> ${Hash(fullKey)}")
+              log.debug(s"get1 $key -> ${shortKey(key.bytes).mkString(",")} -> $id -> ${Hash(crypto.kec256(data))} -> ${Hash(fullKey)}")
 
               if (java.util.Arrays.equals(fullKey, key.bytes)) {
                 ret = Some(data)
