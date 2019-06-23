@@ -21,5 +21,7 @@ final class NodeTableStorage(source: NodeDataSource)(implicit system: ActorSyste
     this
   }
 
+  def count = source.count
+
   override def tableName = source.topic
 }

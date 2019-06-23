@@ -31,6 +31,7 @@ final class LmdbNodeDataSource(
   import LmdbNodeDataSource._
 
   private val log = Logging(system, this.getClass)
+  private val keyPool = DirectByteBufferPool.KeyPool
 
   private val cache = new FIFOCache[Hash, TVal](cacheSize)
 
@@ -53,35 +54,19 @@ final class LmdbNodeDataSource(
     DbiFlags.MDB_DUPFIXED
   )
 
-  private val indexKey = ByteBuffer.allocateDirect(INDEX_KEY_SIZE)
-  private val indexVal = ByteBuffer.allocateDirect(TABLE_KEY_SIZE).order(ByteOrder.nativeOrder)
-  private val tableKey = ByteBuffer.allocateDirect(TABLE_KEY_SIZE).order(ByteOrder.nativeOrder)
-  private var tableVal = ByteBuffer.allocateDirect(100 * 1024) // will grow when needed
-
   val clock = new Clock()
 
-  private var _currId: Long = {
-    val rtx = env.txnRead()
-    val stat = table.stat(rtx)
-    val ret = stat.entries
-    log.info(s"Table $topic last id is $ret")
-    rtx.commit()
-    rtx.close()
-    ret
-  }
-  private def currId = _currId
-  def currId_=(_currId: Long) {
-    this._currId = _currId
-  }
+  private var nextId: Long = count
+
+  log.info(s"Table $topic nodes $count")
 
   def get(key: Hash): Option[TVal] = {
-    val indexKey = ByteBuffer.allocateDirect(INDEX_KEY_SIZE)
-    val tableKey = ByteBuffer.allocateDirect(TABLE_KEY_SIZE)
 
     cache.get(key) match {
       case None =>
         val start = System.nanoTime
 
+        var keyBufs: List[ByteBuffer] = Nil
         var ret: Option[Array[Byte]] = None
         var rtx: Txn[ByteBuffer] = null
         var indexCursor: Cursor[ByteBuffer] = null
@@ -89,6 +74,10 @@ final class LmdbNodeDataSource(
           rtx = env.txnRead()
 
           indexCursor = index.openCursor(rtx)
+
+          val indexKey = keyPool.acquire()
+          val tableKey = keyPool.acquire()
+
           indexKey.put(shortKey(key.bytes)).flip()
           if (indexCursor.get(indexKey, GetOp.MDB_SET_KEY)) {
             val id = Array.ofDim[Byte](indexCursor.`val`.remaining)
@@ -128,20 +117,18 @@ final class LmdbNodeDataSource(
             }
           }
 
+          keyBufs ::= indexKey
+          keyBufs ::= tableKey
           rtx.commit()
         } catch {
           case ex: Throwable =>
-            if (rtx ne null) {
-              rtx.abort()
-            }
+            if (rtx ne null) rtx.abort()
             log.error(ex, ex.getMessage)
         } finally {
-          if (indexCursor ne null) {
-            indexCursor.close()
-          }
-          if (rtx ne null) {
-            rtx.close()
-          }
+          if (indexCursor ne null) indexCursor.close()
+          if (rtx ne null) rtx.close()
+
+          keyBufs foreach keyPool.release
         }
 
         clock.elapse(System.nanoTime - start)
@@ -156,54 +143,52 @@ final class LmdbNodeDataSource(
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
 
-    var id = currId
+    var byteBufs: List[ByteBuffer] = Nil
     var wtx: Txn[ByteBuffer] = null
     try {
       wtx = env.txnWrite()
 
-      toUpsert foreach {
-        case (key, tval @ TVal(data, _, _)) =>
-          id += 1
-
+      val (newNextId, bufs) = toUpsert.foldLeft(nextId, List[ByteBuffer]()) {
+        case ((id, bufs), (key, tval @ TVal(data, _, _))) =>
           log.debug(s"put $key -> ${shortKey(key.bytes).mkString(",")} -> $id -> ${Hash(crypto.kec256(data))}")
 
-          indexKey.put(shortKey(key.bytes)).flip()
-          indexVal.putLong(id).flip()
-          tableKey.putLong(id).flip()
-
-          ensureValueBufferSize(data.length)
-          tableVal.put(data).flip()
+          val sKey = shortKey(key.bytes)
+          val indexKey = keyPool.acquire().put(sKey).flip().asInstanceOf[ByteBuffer]
+          val indexVal = keyPool.acquire().order(ByteOrder.nativeOrder).putLong(id).flip().asInstanceOf[ByteBuffer]
+          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder).putLong(id).flip().asInstanceOf[ByteBuffer]
+          val tableVal = ByteBuffer.allocateDirect(data.length).put(data).flip().asInstanceOf[ByteBuffer]
 
           cache.put(key, tval)
 
           index.put(wtx, indexKey, indexVal)
           table.put(wtx, tableKey, tableVal, PutFlags.MDB_APPEND)
 
-          indexKey.clear()
-          indexVal.clear()
-          tableKey.clear()
-          tableVal.clear()
+          (id + 1, indexKey :: indexVal :: tableKey :: bufs)
       }
 
+      byteBufs = bufs
       wtx.commit()
-      currId = id
+
+      nextId = newNextId
     } catch {
       case ex: Throwable =>
-        if (wtx ne null) {
-          wtx.abort()
-        }
-        log.error(ex, s"{ex.getMessage} at id: $id")
+        if (wtx ne null) wtx.abort()
+        log.error(ex, s"$topic ${ex.getMessage}")
     } finally {
-      if (wtx ne null) {
-        wtx.close()
-      }
-      indexKey.clear()
-      indexVal.clear()
-      tableKey.clear()
-      tableVal.clear()
+      if (wtx ne null) wtx.close()
+      byteBufs foreach keyPool.release
     }
 
     this
+  }
+
+  def count = {
+    val rtx = env.txnRead()
+    val stat = table.stat(rtx)
+    val ret = stat.entries
+    rtx.commit()
+    rtx.close()
+    ret
   }
 
   def cacheHitRate = cache.hitRate
@@ -214,12 +199,6 @@ final class LmdbNodeDataSource(
     val slice = Array.ofDim[Byte](INDEX_KEY_SIZE)
     System.arraycopy(bytes, 0, slice, 0, INDEX_KEY_SIZE)
     slice
-  }
-
-  private def ensureValueBufferSize(size: Int): Unit = {
-    if (tableVal.remaining < size) {
-      tableVal = ByteBuffer.allocateDirect(size * 2)
-    }
   }
 
   def close() {

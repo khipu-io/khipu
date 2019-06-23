@@ -284,7 +284,7 @@ trait RegularSyncService { _: SyncService =>
               val elapsed = (System.nanoTime - start) / 1000000000.0
 
               if (newBlocks.nonEmpty) {
-                val (nTx, _gasUsed, nTxInParallel) = newBlocks.foldLeft((0, 0L, 0)) {
+                val (nTx, _gasUsed, nTxInParallel) = newBlocks.foldLeft(0, 0L, 0) {
                   case ((accTx, accGasUsed, accParallel), b) =>
                     val nTx = b.block.body.transactionList.size
                     (accTx + nTx, accGasUsed + b.block.header.gasUsed, accParallel + b.txInParallel)

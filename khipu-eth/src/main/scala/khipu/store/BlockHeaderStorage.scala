@@ -29,19 +29,22 @@ final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: Act
 
   private val log = Logging(system, this.getClass)
 
+  private val lmdbSource = source.asInstanceOf[LmdbBlockDataSource]
+  private val env = lmdbSource.env
+  private val table = lmdbSource.table
+
   {
     val start = System.nanoTime
 
-    val blockHeaderSource = source.asInstanceOf[LmdbBlockDataSource]
-    loadBlockNumberIndex(blockHeaderSource.env, blockHeaderSource.table)
+    loadBlockNumberIndex(env, table)
 
     log.info(s"loaded blocknumber index in ${(System.nanoTime - start) / 1000000000}s ")
   }
 
   private def loadBlockNumberIndex(env: Env[ByteBuffer], table: Dbi[ByteBuffer]) {
     val start = System.nanoTime
-    val txn = env.txnRead()
-    val itr = table.iterate(txn)
+    val rtx = env.txnRead()
+    val itr = table.iterate(rtx)
     while (itr.hasNext) {
       val entry = itr.next()
 
@@ -53,8 +56,8 @@ final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: Act
       LmdbBlockDataSource.putTimestampToKey(blockNumber, data.toBlockHeader.hash)
     }
     itr.close()
-    txn.commit()
-    txn.close()
+    rtx.commit()
+    rtx.close()
   }
 
   override def get(key: Hash): Option[BlockHeader] = {
@@ -79,8 +82,9 @@ final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: Act
     this
   }
 
-  def getBlockHash(blockNumber: Long) = LmdbBlockDataSource.getKeyByTimestamp(blockNumber)
   def getBlockNumber(hash: Hash) = LmdbBlockDataSource.getTimestampByKey(hash)
+  def getBlockHash(blockNumber: Long) = LmdbBlockDataSource.getKeyByTimestamp(blockNumber)
+  def getBlockHashs(from: Long, to: Long) = LmdbBlockDataSource.getKeysByTimestamp(from, to)
 
   protected def apply(source: BlockDataSource): BlockHeaderStorage = new BlockHeaderStorage(source)
 }

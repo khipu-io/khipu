@@ -12,6 +12,7 @@ trait NodeDataSource extends SimpleMap[Hash, TVal] {
 
   def clock: Clock
 
+  def count: Long
   def cacheHitRate: Double
   def cacheReadCount: Long
   def resetCacheHitRate(): Unit

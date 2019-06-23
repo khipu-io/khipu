@@ -19,12 +19,20 @@ object LmdbBlockDataSource {
   private var timestampToKey = Array.ofDim[Array[Byte]](200)
   private val keyToTimestamp = new mutable.HashMap[Hash, Long]()
 
+  val KEY_SIZE = 8 // long - blocknumber
+
   private val lock = new ReentrantReadWriteLock()
   private val readLock = lock.readLock
   private val writeLock = lock.writeLock
 
   def getTimestampByKey(key: Hash): Option[Long] = {
-    keyToTimestamp.get(key)
+    try {
+      readLock.lock()
+
+      keyToTimestamp.get(key)
+    } finally {
+      readLock.unlock()
+    }
   }
 
   def getKeyByTimestamp(timestamp: Long): Option[Hash] = {
@@ -36,6 +44,28 @@ object LmdbBlockDataSource {
       } else {
         None
       }
+    } finally {
+      readLock.unlock()
+    }
+  }
+
+  def getKeysByTimestamp(from: Long, to: Long): (Long, List[Hash]) = {
+    try {
+      readLock.lock()
+
+      val ret = new mutable.ListBuffer[Hash]()
+      var lastNumber = from
+      var i = from
+      while (i <= to && i < timestampToKey.length) {
+        val key = timestampToKey(i.toInt)
+        if (key ne null) {
+          ret += Hash(key)
+          lastNumber = i
+        }
+        i += 1
+      }
+
+      (lastNumber, ret.toList)
     } finally {
       readLock.unlock()
     }
@@ -69,9 +99,8 @@ final class LmdbBlockDataSource(
 )(implicit system: ActorSystem) extends BlockDataSource {
   type This = LmdbBlockDataSource
 
-  private val KEY_SIZE = 8 // long - blocknumber
-
   private val log = Logging(system, this.getClass)
+  private val keyPool = DirectByteBufferPool.KeyPool
 
   private val cache = new FIFOCache[Long, TVal](cacheSize)
 
@@ -81,24 +110,20 @@ final class LmdbBlockDataSource(
     DbiFlags.MDB_INTEGERKEY
   )
 
-  private val tableKey = ByteBuffer.allocateDirect(KEY_SIZE).order(ByteOrder.nativeOrder)
-  private var tableVal = ByteBuffer.allocateDirect(100 * 1024) // will grow when needed
-
   val clock = new Clock()
 
   def get(key: Long): Option[TVal] = {
-    val tableKey = ByteBuffer.allocateDirect(KEY_SIZE).order(ByteOrder.nativeOrder)
-
     cache.get(key) match {
       case None =>
         val start = System.nanoTime
-        tableKey.putLong(key).flip()
 
+        var keyBufs: List[ByteBuffer] = Nil
         var ret: Option[Array[Byte]] = None
         var txn: Txn[ByteBuffer] = null
         try {
           txn = env.txnRead()
 
+          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder).putLong(key).flip().asInstanceOf[ByteBuffer]
           val tableVal = table.get(txn, tableKey)
           if (tableVal ne null) {
             val data = Array.ofDim[Byte](tableVal.remaining)
@@ -106,6 +131,7 @@ final class LmdbBlockDataSource(
             ret = Some(data)
           }
 
+          keyBufs ::= tableKey
           txn.commit()
         } catch {
           case ex: Throwable =>
@@ -117,6 +143,8 @@ final class LmdbBlockDataSource(
           if (txn ne null) {
             txn.close()
           }
+
+          keyBufs foreach keyPool.release
         }
 
         clock.elapse(System.nanoTime - start)
@@ -131,22 +159,22 @@ final class LmdbBlockDataSource(
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
 
+    var keyBufs: List[ByteBuffer] = Nil
     var wxn: Txn[ByteBuffer] = null
     try {
       wxn = env.txnWrite()
+
       toUpsert foreach {
         case (key, tval @ TVal(data, _, _)) =>
           cache.put(key, tval)
 
-          tableKey.putLong(key).flip()
-
-          ensureValueBufferSize(data.length)
-          tableVal.put(data).flip()
-
+          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder).putLong(key).flip().asInstanceOf[ByteBuffer]
+          val tableVal = ByteBuffer.allocateDirect(data.length).put(data).flip().asInstanceOf[ByteBuffer]
           table.put(wxn, tableKey, tableVal)
-          tableKey.clear()
-          tableVal.clear()
+
+          keyBufs ::= tableKey
       }
+
       wxn.commit()
     } catch {
       case ex: Throwable =>
@@ -154,20 +182,24 @@ final class LmdbBlockDataSource(
         log.error(ex, ex.getMessage)
     } finally {
       if (wxn ne null) wxn.close()
+      keyBufs foreach keyPool.release
     }
 
     this
   }
 
+  def count = {
+    val rtx = env.txnRead()
+    val stat = table.stat(rtx)
+    val ret = stat.entries
+    rtx.commit()
+    rtx.close()
+    ret
+  }
+
   def cacheHitRate = cache.hitRate
   def cacheReadCount = cache.readCount
   def resetCacheHitRate() = cache.resetHitRate()
-
-  private def ensureValueBufferSize(size: Int): Unit = {
-    if (tableVal.remaining < size) {
-      tableVal = ByteBuffer.allocateDirect(size * 2)
-    }
-  }
 
   def close() = table.close()
 }

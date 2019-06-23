@@ -70,7 +70,7 @@ package object sync {
   /**
    * https://blog.ethereum.org/2015/06/26/state-tree-pruning/
    */
-  final case class NodeDatasResponse(peerId: String, nDownloadedNodes: Int, remainingHashes: List[NodeHash], childrenHashes: List[NodeHash], receviceAccounts: List[(Hash, ByteString)], receivedStorages: List[(Hash, ByteString)], receivdeEvmcodes: List[(Hash, ByteString)]) extends PeerResponse
+  final case class NodeDatasResponse(peerId: String, nDownloadedNodes: Int, remainingHashes: List[NodeHash], childrenHashes: List[NodeHash], receviceAccounts: List[(Hash, Array[Byte])], receivedStorages: List[(Hash, Array[Byte])], receivdeEvmcodes: List[(Hash, ByteString)]) extends PeerResponse
   final case class NodeDatasRequest(peerId: String, message: PV63.GetNodeData, requestNodeHashes: List[NodeHash]) extends RequestToPeer[PV63.NodeData, NodeDatasResponse] {
     def messageToSend = message
 
@@ -80,8 +80,8 @@ package object sync {
       } else {
         val requestHashes = requestNodeHashes.map(x => x.toHash -> x).toMap
 
-        val (receivedNodeHashes, childrenHashes, receivedAccounts, receivedStorages, receivedEvmcodes) =
-          nodeData.values.foldLeft((Set[NodeHash](), List[NodeHash](), List[(Hash, ByteString)](), List[(Hash, ByteString)](), List[(Hash, ByteString)]())) {
+        val (receivedHashes, childHashes, receivedAccounts, receivedStorages, receivedEvmcodes) =
+          nodeData.values.foldLeft(Set[NodeHash](), List[NodeHash](), List[(Hash, Array[Byte])](), List[(Hash, Array[Byte])](), List[(Hash, ByteString)]()) {
             case ((receivedHashes, childHashes, receivedAccounts, receivedStorages, receivedEvmcodes), value) =>
               val receivedHash = Hash(crypto.kec256(value.toArray))
               requestHashes.get(receivedHash) match {
@@ -91,26 +91,26 @@ package object sync {
                 case Some(x: StateMptNodeHash) =>
                   val node = nodeData.toMptNode(value)
                   val hashes = getStateNodeChildren(node)
-                  (receivedHashes + x, childHashes ::: hashes, (x.toHash, value) :: receivedAccounts, receivedStorages, receivedEvmcodes)
+                  (receivedHashes + x, childHashes ::: hashes, (x.toHash, value.toArray) :: receivedAccounts, receivedStorages, receivedEvmcodes)
 
                 case Some(x: StorageRootHash) =>
                   val node = nodeData.toMptNode(value)
                   val hashes = getContractMptNodeChildren(node)
-                  (receivedHashes + x, childHashes ::: hashes, receivedAccounts, (x.toHash, value) :: receivedStorages, receivedEvmcodes)
+                  (receivedHashes + x, childHashes ::: hashes, receivedAccounts, (x.toHash, value.toArray) :: receivedStorages, receivedEvmcodes)
 
                 case Some(x: ContractStorageMptNodeHash) =>
                   val node = nodeData.toMptNode(value)
                   val hashes = getContractMptNodeChildren(node)
-                  (receivedHashes + x, childHashes ::: hashes, receivedAccounts, (x.toHash, value) :: receivedStorages, receivedEvmcodes)
+                  (receivedHashes + x, childHashes ::: hashes, receivedAccounts, (x.toHash, value.toArray) :: receivedStorages, receivedEvmcodes)
 
                 case Some(x: EvmcodeHash) =>
                   (receivedHashes + x, childHashes, receivedAccounts, receivedStorages, (x.toHash, value) :: receivedEvmcodes)
               }
           }
 
-        val remainingHashes = requestNodeHashes filterNot receivedNodeHashes.contains
+        val remainingHashes = requestNodeHashes filterNot receivedHashes.contains
 
-        Some(NodeDatasResponse(peerId, receivedNodeHashes.size, remainingHashes, childrenHashes, receivedAccounts, receivedStorages, receivedEvmcodes))
+        Some(NodeDatasResponse(peerId, receivedHashes.size, remainingHashes, childHashes, receivedAccounts, receivedStorages, receivedEvmcodes))
       }
     }
 

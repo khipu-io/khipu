@@ -63,7 +63,7 @@ trait SimpleMap[K, V] {
    * in both toRemove and toUpsert
    */
   final def update(changes: Iterable[(K, Option[V])]): This = {
-    val (toRemove, toUpsert) = changes.foldLeft((Set[K](), Map[K, V]())) {
+    val (toRemove, toUpsert) = changes.foldLeft(Set[K](), Map[K, V]()) {
       case ((toRemove, toUpsert), (k, None))    => (toRemove + k, toUpsert)
       case ((toRemove, toUpsert), (k, Some(v))) => (toRemove, toUpsert + (k -> v))
     }

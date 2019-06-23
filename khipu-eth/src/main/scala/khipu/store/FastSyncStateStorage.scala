@@ -37,6 +37,7 @@ final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage
         builder.putInt(0)
     }
     builder.putLong(syncState.bestBlockHeaderNumber)
+    builder.putLong(syncState.enqueuedBlockNumber)
 
     builder.putInt(syncState.downloadedNodesCount)
 
@@ -87,6 +88,7 @@ final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage
         Some(data.getBytes(targetBlockHeaderLength).toBlockHeader)
       }
       val bestBlockHeaderNumber = data.getLong
+      val enqueuedBlockNumber = data.getLong
 
       val downloadedNodesCount = data.getInt
 
@@ -144,7 +146,7 @@ final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage
         i += 1
       }
 
-      SyncState(targetBlockNumber, targetBlockHeader, bestBlockHeaderNumber, downloadedNodesCount, mptNodes.reverse, nonMptNodes.reverse, blockBodies.reverse, receipts.reverse)
+      SyncState(targetBlockNumber, targetBlockHeader, bestBlockHeaderNumber, enqueuedBlockNumber, downloadedNodesCount, mptNodes.reverse, nonMptNodes.reverse, blockBodies.reverse, receipts.reverse)
     }
   }
 

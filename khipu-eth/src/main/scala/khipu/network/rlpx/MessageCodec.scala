@@ -15,7 +15,7 @@ final class MessageCodec(frameCodec: FrameCodec, messageDecoder: MessageDecoder,
   def decodeMessages(data: ByteString): (Seq[Message], Seq[Throwable]) = {
     try {
       val frames = frameCodec.readFrames(data)
-      (frames.foldLeft((Vector[Message](), Vector[Throwable]())) {
+      (frames.foldLeft(Vector[Message](), Vector[Throwable]()) {
         case ((ss, es), Frame(_, tpe, payload)) =>
           messageDecoder.fromBytes(tpe, payload.toArray, protocolVersion) match {
             case Success(m) => (ss :+ m, es)

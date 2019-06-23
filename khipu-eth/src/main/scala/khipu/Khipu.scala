@@ -63,13 +63,14 @@ object Khipu {
     CoordinatedShutdown(system).addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close storage") { () =>
       import system.dispatcher
       Future {
+        serviceBoard.storages.closeAll()
         log.info("Actor system is going to terminate...")
       } map { _ =>
         Done
       }
     }
 
-    val genesisDataLoader = new GenesisDataLoader(serviceBoard.storages.dataSource, serviceBoard.blockchain, serviceBoard.storages.pruningMode, serviceBoard.blockchainConfig, serviceBoard.dbConfig)
+    val genesisDataLoader = new GenesisDataLoader(serviceBoard.storages.dataSource, serviceBoard.blockchain, serviceBoard.storages.pruningMode, serviceBoard.blockchainConfig)
     genesisDataLoader.loadGenesisData()
 
     //new khipu.store.HashedKeyValueStorage(serviceBoard.blockchain).loadAndSeekFromKafka(5000000)

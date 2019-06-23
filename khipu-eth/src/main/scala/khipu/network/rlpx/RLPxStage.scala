@@ -319,7 +319,7 @@ final class RLPxStage(
     }
 
     def processReceivedHandshakingMessages(messageCodec: MessageCodec, messages: Seq[Message]): (Boolean, Seq[MessageSerializable]) = {
-      messages.foldLeft((false, Vector[MessageSerializable]())) {
+      messages.foldLeft(false, Vector[MessageSerializable]()) {
         case ((shouldDisconnect, acc), Ping()) =>
           val pong: MessageSerializable = Pong() // MessageSerializable to force implicit convert
           (shouldDisconnect, acc :+ pong)
@@ -427,7 +427,7 @@ final class RLPxStage(
               log.debug(s"[rlpx] Got failed messages ${failed.map(_.getMessage)}")
             }
 
-            val (receivedDisconnect, responses) = messages.foldLeft((None: Option[Disconnect], Vector[Future[Option[MessageSerializable]]]())) {
+            val (receivedDisconnect, responses) = messages.foldLeft(None: Option[Disconnect], Vector[Future[Option[MessageSerializable]]]()) {
               case ((_, acc), x: Disconnect) =>
                 log.debug(s"[rlpx] Received $x from ${peer.id}")
                 (Some(x), acc)

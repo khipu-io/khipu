@@ -504,7 +504,7 @@ final class MerklePatriciaTrie[K, V] private (
       case (acc, nodeToUpdate @ Updated(node)) => acc + (Hash(node.hash) -> nodeToUpdate)
     }
 
-    val (toRemove, toUpdate) = orderlyDedeplucated.foldLeft((Map[Hash, Log[Array[Byte]]](), Map[Hash, Log[Array[Byte]]]())) {
+    val (toRemove, toUpdate) = orderlyDedeplucated.foldLeft(Map[Hash, Log[Array[Byte]]](), Map[Hash, Log[Array[Byte]]]()) {
       case ((toRemove, toUpdate), (hash, Deleted(node))) =>
         val nCapped = node.capped
         if (nCapped.length == 32 || hash == previousRootHash) {

@@ -42,14 +42,13 @@ final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: 
     cache.get(Hash(combKey)) match {
       case None =>
         // TODO fetch keyBuf from a pool?
-        val tableKey = ByteBuffer.allocateDirect(env.getMaxKeySize)
 
         var ret: Option[Array[Byte]] = None
         var rtx: Txn[ByteBuffer] = null
         try {
           rtx = env.txnRead()
 
-          tableKey.put(combKey).flip()
+          val tableKey = ByteBuffer.allocateDirect(combKey.length).put(combKey).flip().asInstanceOf[ByteBuffer]
           val data = table.get(rtx, tableKey)
           ret = if (data ne null) {
             val value = Array.ofDim[Byte](data.remaining)
@@ -58,19 +57,14 @@ final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: 
           } else {
             None
           }
-          tableKey.clear()
 
           rtx.commit()
         } catch {
           case ex: Throwable =>
-            if (rtx ne null) {
-              rtx.abort()
-            }
+            if (rtx ne null) rtx.abort()
             log.error(ex, ex.getMessage)
         } finally {
-          if (rtx ne null) {
-            rtx.close()
-          }
+          if (rtx ne null) rtx.close()
         }
 
         clock.elapse(System.nanoTime - start)
@@ -92,17 +86,15 @@ final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: 
    */
   override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
     // TODO fetch keyBuf from a pool?
-    val tableKey = ByteBuffer.allocateDirect(env.getMaxKeySize)
-    var tableVal = ByteBuffer.allocateDirect(100 * 1024) // will grow when needed
 
     var wtx: Txn[ByteBuffer] = null
     try {
       wtx = env.txnWrite()
 
       toRemove foreach { key =>
-        tableKey.put(BytesUtil.concat(namespace, key)).flip()
+        val combKey = BytesUtil.concat(namespace, key)
+        val tableKey = ByteBuffer.allocateDirect(combKey.length).put(combKey).flip().asInstanceOf[ByteBuffer]
         table.delete(wtx, tableKey)
-        tableKey.clear()
       }
 
       toUpsert foreach {
@@ -110,28 +102,30 @@ final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: 
           val combKey = BytesUtil.concat(namespace, key)
           cache.put(Hash(combKey), value)
 
-          tableKey.put(combKey).flip()
-          tableVal = ensureValueBufferSize(tableVal, value.length)
-          tableVal.put(value).flip()
+          val tableKey = ByteBuffer.allocateDirect(combKey.length).put(combKey).flip().asInstanceOf[ByteBuffer]
+          val tableVal = ByteBuffer.allocateDirect(value.length).put(value).flip().asInstanceOf[ByteBuffer]
           table.put(wtx, tableKey, tableVal)
-          tableKey.clear()
-          tableVal.clear()
       }
 
       wtx.commit()
     } catch {
       case ex: Throwable =>
-        if (wtx ne null) {
-          wtx.abort()
-        }
+        if (wtx ne null) wtx.abort()
         log.error(ex, ex.getMessage)
     } finally {
-      if (wtx ne null) {
-        wtx.close()
-      }
+      if (wtx ne null) wtx.close()
     }
 
     this
+  }
+
+  def count = {
+    val rtx = env.txnRead()
+    val stat = table.stat(rtx)
+    val ret = stat.entries
+    rtx.commit()
+    rtx.close()
+    ret
   }
 
   /**

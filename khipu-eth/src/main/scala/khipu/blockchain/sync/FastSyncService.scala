@@ -61,6 +61,7 @@ object FastSyncService {
     targetBlockNumber:         Long,
     targetBlockHeader:         Option[BlockHeader]                     = None,
     var bestBlockHeaderNumber: Long                                    = 0,
+    var enqueuedBlockNumber:   Long                                    = 0,
     var downloadedNodesCount:  Int                                     = 0,
     var pendingMptNodes:       List[NodeHash]                          = Nil,
     var pendingNonMptNodes:    List[NodeHash]                          = Nil,
@@ -76,7 +77,7 @@ object FastSyncService {
   final case class HeadersWork(enqueueHashs: List[Hash], headers: Map[Hash, BlockHeader], tds: Map[Hash, UInt256], lastNumber: Option[Long]) extends Work
   final case class BodiesWork(workHashes: List[Hash], enqueueHashs: List[Hash], bodies: Map[Hash, PV62.BlockBody], receivedHashes: List[Hash]) extends Work
   final case class ReceiptsWork(workHashes: List[Hash], enqueueHashs: List[Hash], receipts: Map[Hash, Seq[Receipt]]) extends Work
-  final case class NodesWork(workHashes: List[NodeHash], enqueueHashs: List[NodeHash], downloadedCount: Option[Int], accountNodes: Map[Hash, Array[Byte]], storageNodes: Map[Hash, Array[Byte]], evmcodes: Map[Hash, ByteString]) extends Work
+  final case class NodesWork(workHashes: List[NodeHash], enqueueHashs: List[NodeHash], downloadedCount: Int, accountNodes: Map[Hash, Array[Byte]], storageNodes: Map[Hash, Array[Byte]], evmcodes: Map[Hash, ByteString]) extends Work
 
   final case class PeerWorkDone(peer: Peer, work: Work)
 
@@ -98,15 +99,17 @@ trait FastSyncService { _: SyncService =>
   protected def startFastSync() {
     log.info("Trying to start block synchronization (fast mode)")
     fastSyncStateStorage.getSyncState match {
-      case Some(syncState) =>
-        this.syncState = Some(syncState)
-        startFastSync(syncState)
-      case None =>
-        startFastSyncFromScratch()
+      case Some(syncState) => startFastSyncWithSyncState(syncState, isInitialSyncState = false)
+      case None            => startFastSyncFromScratch()
     }
   }
 
-  private def startFastSync(syncState: SyncState) {
+  private def startFastSyncWithSyncState(syncState: SyncState, isInitialSyncState: Boolean) {
+    this.syncState = Some(syncState)
+    if (isInitialSyncState) {
+      saveSyncState()
+    }
+
     log.info("Start fast synchronization")
     context become ((new SyncingHandler(syncState).receive) orElse peerUpdateBehavior orElse ommersBehavior)
     self ! ProcessSyncingTick
@@ -236,7 +239,7 @@ trait FastSyncService { _: SyncService =>
               targetBlockHeader = Some(targetBlockHeader),
               pendingMptNodes = List(StateMptNodeHash(targetBlockHeader.stateRoot.bytes))
             )
-            startFastSync(initialSyncState)
+            startFastSyncWithSyncState(initialSyncState, isInitialSyncState = true)
           } else {
             log.info(s"Could not get enough block headers that have the same stateRoot, requires ${nSameHeadersRequired}, but only found ${peerToBlockHeader.size}")
             scheduleStartRetry(startRetryInterval)
@@ -266,7 +269,7 @@ trait FastSyncService { _: SyncService =>
     syncState foreach { syncState =>
       val start = System.nanoTime
       fastSyncStateStorage.putSyncState(syncState)
-      log.info(s"[fast] Saved sync state in ${(System.nanoTime - start) / 1000000}ms, best header number: ${syncState.bestBlockHeaderNumber}, bodies queue: ${syncState.pendingBlockBodies.size + syncState.workingBlockBodies.size}, receipts queue: ${syncState.pendingReceipts.size + syncState.workingReceipts.size}, nodes queue: ${syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size + syncState.workingMptNodes.size + syncState.workingNonMptNodes.size}, downloaded nodes: ${syncState.downloadedNodesCount} ")
+      log.info(s"[fast] Saved sync state in ${(System.nanoTime - start) / 1000000}ms, header/enqueued number: ${syncState.bestBlockHeaderNumber}/${syncState.enqueuedBlockNumber}, bodies queue: ${syncState.pendingBlockBodies.size + syncState.workingBlockBodies.size}, receipts queue: ${syncState.pendingReceipts.size + syncState.workingReceipts.size}, nodes queue: ${syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size + syncState.workingMptNodes.size + syncState.workingNonMptNodes.size}, downloaded nodes: ${syncState.downloadedNodesCount} ")
     }
   }
 
@@ -282,6 +285,8 @@ trait FastSyncService { _: SyncService =>
     private var prevSyncedBlockNumber = currSyncedBlockNumber
     private var prevDownloadeNodes = syncState.downloadedNodesCount
     private var prevReportTime = System.nanoTime
+
+    log.info(s"[fast] sync to target block header: \n${syncState.targetBlockHeader.get}")
 
     timers.startPeriodicTimer(ProcessSyncingTask, ProcessSyncingTick, syncRetryInterval)
     timers.startPeriodicTimer(PersistSyncStateTask, PersistSyncStateTick, persistStateSnapshotInterval)
@@ -313,6 +318,8 @@ trait FastSyncService { _: SyncService =>
             saveStorageNodes(storageNodes)
             saveEvmcodes(evmcodes)
 
+            log.debug(s"Saved acccount: ${accountNodes.size}, storage: ${storageNodes.size}, evmcode: ${evmcodes.size}. Total ${accountNodes.size + storageNodes.size + evmcodes.size} - downloaded: ${downloadedCount}")
+
             workHashes foreach {
               case h: EvmcodeHash                => syncState.workingNonMptNodes -= h
               case h: StorageRootHash            => syncState.workingNonMptNodes -= h
@@ -328,7 +335,7 @@ trait FastSyncService { _: SyncService =>
               case h: ContractStorageMptNodeHash => syncState.pendingMptNodes = h :: syncState.pendingMptNodes
             }
 
-            downloadedCount foreach (syncState.downloadedNodesCount += _)
+            syncState.downloadedNodesCount += downloadedCount
 
           case HeadersWork(enqueueHashs, headers, tds, lastNumber) =>
             saveHeaders(headers)
@@ -338,9 +345,6 @@ trait FastSyncService { _: SyncService =>
               case Some(n) if (n > syncState.bestBlockHeaderNumber) => syncState.bestBlockHeaderNumber = n
               case None =>
             }
-
-            syncState.pendingBlockBodies = enqueueHashs ::: syncState.pendingBlockBodies
-            syncState.pendingReceipts = enqueueHashs ::: syncState.pendingReceipts
 
             headerWorkingPeer = None
         }
@@ -366,7 +370,7 @@ trait FastSyncService { _: SyncService =>
         reportStatus()
         val bestBlockNumber = appStateStorage.getBestBlockNumber
         if (bestBlockNumber == syncState.targetBlockNumber) {
-          log.info("s[fast] Block synchronization in fast mode finished, switching to regular mode")
+          log.info(s"[fast] Block synchronization in fast mode finished, switching to regular mode")
           finishFastSync()
         } else {
           log.info(s"[fast] Waiting for assigning works left $bestBlockNumber/${syncState.targetBlockNumber}")
@@ -400,6 +404,7 @@ trait FastSyncService { _: SyncService =>
           log.debug("There are no available peers, waiting for ProcessSyncingTick or working peers done")
         }
       } else {
+
         val headerWork = if (syncState.pendingBlockBodies.size + syncState.pendingReceipts.size < 10000) {
           if (isThereHeaderToDownload && headerWorkingPeer.isEmpty) {
             val candicates = headerWhitePeers -- workingPeers
@@ -439,6 +444,18 @@ trait FastSyncService { _: SyncService =>
             }
         } else {
           Vector()
+        }
+
+        if (syncState.pendingBlockBodies.size + syncState.pendingReceipts.size < 10000) {
+          val from = syncState.enqueuedBlockNumber + 1
+          val to = math.min(syncState.enqueuedBlockNumber + 200, syncState.bestBlockHeaderNumber)
+          val (lastNumber, enqueueHashs) = blockHeaderStorage.getBlockHashs(from, to)
+          if (enqueueHashs.nonEmpty) {
+            syncState.enqueuedBlockNumber = lastNumber
+
+            syncState.pendingReceipts = enqueueHashs ::: syncState.pendingReceipts
+            syncState.pendingBlockBodies = enqueueHashs ::: syncState.pendingBlockBodies
+          }
         }
 
         val receiptWorks = if (syncState.pendingReceipts.nonEmpty) {
@@ -485,11 +502,10 @@ trait FastSyncService { _: SyncService =>
           Vector()
         }
 
-        // node work is priority since nodes are the most waiting in queue
-        nodeWorks foreach { case (peer, requestingNodes) => requestNodes(peer, requestingNodes) }
         receiptWorks foreach { case (peer, requestingReceipts) => requestReceipts(peer, requestingReceipts) }
         bodyWorks foreach { case (peer, requestingHashes) => requestBlockBodies(peer, requestingHashes) }
         headerWork foreach { peer => requestBlockHeaders(peer) }
+        nodeWorks foreach { case (peer, requestingNodes) => requestNodes(peer, requestingNodes) }
       }
     }
 
@@ -551,14 +567,11 @@ trait FastSyncService { _: SyncService =>
               self ! BlacklistPeer(peer.id, s"Got block headers empty for known header: ${syncState.bestBlockHeaderNumber + 1}")
               self ! PeerWorkDone(peer, HeadersWork(Nil, Map(), Map(), None))
 
-            case Failure(e: AskTimeoutException) =>
-              self ! BlacklistPeer(peer.id, s"${e.getMessage}")
-              self ! PeerWorkDone(peer, HeadersWork(Nil, Map(), Map(), None))
-
             case Failure(e) =>
               self ! BlacklistPeer(peer.id, s"${e.getMessage}")
               self ! PeerWorkDone(peer, HeadersWork(Nil, Map(), Map(), None))
           }
+
         case None => // TODO
           log.error(s"previous best block ${syncState.bestBlockHeaderNumber} does not exist yet, something wrong !!!")
       }
@@ -594,10 +607,6 @@ trait FastSyncService { _: SyncService =>
           self ! BlacklistPeer(peer.id, s"Got block bodies empty response for known hashes from ${peer.id}: $requestingHashes")
           self ! PeerWorkDone(peer, BodiesWork(requestingHashes, requestingHashes, Map(), Nil))
 
-        case Failure(e: AskTimeoutException) =>
-          self ! BlacklistPeer(peer.id, s"${e.getMessage}")
-          self ! PeerWorkDone(peer, BodiesWork(requestingHashes, requestingHashes, Map(), Nil))
-
         case Failure(e) =>
           self ! BlacklistPeer(peer.id, s"${e.getMessage}")
           self ! PeerWorkDone(peer, BodiesWork(requestingHashes, requestingHashes, Map(), Nil))
@@ -619,10 +628,6 @@ trait FastSyncService { _: SyncService =>
           self ! BlacklistPeer(peer.id, s"Got receipts empty for known hashes from ${peer.id}: $requestingHashes")
           self ! PeerWorkDone(peer, ReceiptsWork(requestingHashes, requestingHashes, Map()))
 
-        case Failure(e: AskTimeoutException) =>
-          self ! BlacklistPeer(peer.id, s"${e.getMessage}")
-          self ! PeerWorkDone(peer, ReceiptsWork(requestingHashes, requestingHashes, Map()))
-
         case Failure(e) =>
           self ! BlacklistPeer(peer.id, s"${e.getMessage}")
           self ! PeerWorkDone(peer, ReceiptsWork(requestingHashes, requestingHashes, Map()))
@@ -637,22 +642,17 @@ trait FastSyncService { _: SyncService =>
         case Success(Some(NodeDatasResponse(peerId, nDownloadedNodes, remainingHashes, childrenHashes, accounts, storages, evmcodes))) =>
           log.debug(s"Got nodes $nDownloadedNodes from ${peer.id} in ${(System.nanoTime - start) / 1000000}ms")
 
-          self ! PeerWorkDone(peer, NodesWork(requestingHashes, remainingHashes ++ childrenHashes, Some(nDownloadedNodes), accounts.map(kv => (kv._1, kv._2.toArray)).toMap, storages.map(kv => (kv._1, kv._2.toArray)).toMap, evmcodes.toMap))
+          self ! PeerWorkDone(peer, NodesWork(requestingHashes, remainingHashes ++ childrenHashes, nDownloadedNodes, accounts.toMap, storages.toMap, evmcodes.toMap))
 
         case Success(None) =>
           log.debug(s"Got nodes empty response for known hashes. Mark ${peer.id} blockchain only")
           self ! MarkPeerBlockchainOnly(peer)
-          self ! PeerWorkDone(peer, NodesWork(requestingHashes, requestingHashes, None, Map(), Map(), Map()))
-
-        case Failure(e: AskTimeoutException) =>
-          log.debug(s"Got node $e when request nodes. Mark ${peer.id} blockchain only")
-          self ! MarkPeerBlockchainOnly(peer)
-          self ! PeerWorkDone(peer, NodesWork(requestingHashes, requestingHashes, None, Map(), Map(), Map()))
+          self ! PeerWorkDone(peer, NodesWork(requestingHashes, requestingHashes, 0, Map(), Map(), Map()))
 
         case Failure(e) =>
           log.debug(s"Got node $e when request nodes. Mark ${peer.id} blockchain only")
           self ! MarkPeerBlockchainOnly(peer)
-          self ! PeerWorkDone(peer, NodesWork(requestingHashes, requestingHashes, None, Map(), Map(), Map()))
+          self ! PeerWorkDone(peer, NodesWork(requestingHashes, requestingHashes, 0, Map(), Map(), Map()))
       }
     }
 
@@ -675,7 +675,7 @@ trait FastSyncService { _: SyncService =>
 
     private def toHeadersWork(headers: List[BlockHeader]): HeadersWork = {
       // calculate total difficulties
-      val (obtains, hds, tds, lastNumber) = headers.foldLeft((mutable.ListBuffer[Hash](), Map[Hash, BlockHeader](), Map[Hash, UInt256](), None: Option[Long])) {
+      val (obtains, hds, tds, lastNumber) = headers.foldLeft(mutable.ListBuffer[Hash](), Map[Hash, BlockHeader](), Map[Hash, UInt256](), None: Option[Long]) {
         case ((obtains, hds, tds, lastNumber), h) =>
           tds.get(h.parentHash) orElse blockchain.getTotalDifficultyByHash(h.parentHash) match {
             case Some(parentTotalDifficulty) =>
@@ -711,12 +711,6 @@ trait FastSyncService { _: SyncService =>
     }
 
     // --- saving methods
-    private val storages = blockchain.storages
-    private val accountNodeStorage = storages.accountNodeStorageFor(None)
-    private val storageNodeStorage = storages.storageNodeStorageFor(None)
-
-    private val accountNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()
-    private val storageNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()
 
     private def saveHeaders(kvs: Map[Hash, BlockHeader]) {
       val start = System.nanoTime
@@ -745,13 +739,13 @@ trait FastSyncService { _: SyncService =>
 
     private def saveAccountNodes(kvs: Map[Hash, Array[Byte]]) {
       val start = System.nanoTime
-      saveNodes(accountNodeStorage, kvs, accountNodeBuf)
+      saveNodes(accountNodeStorage, kvs)
       log.debug(s"SaveAccountNodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
     private def saveStorageNodes(kvs: Map[Hash, Array[Byte]]) {
       val start = System.nanoTime
-      saveNodes(storageNodeStorage, kvs, storageNodeBuf)
+      saveNodes(storageNodeStorage, kvs)
       log.debug(s"SaveStorageNodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
@@ -761,25 +755,31 @@ trait FastSyncService { _: SyncService =>
       log.debug(s"SaveEvmcodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
-    private def saveNodes(storage: NodeKeyValueStorage, kvs: Map[Hash, Array[Byte]], buf: mutable.HashMap[Hash, Array[Byte]]) {
-      var size = 0
-      kvs foreach {
-        case (k, v) =>
-          buf += ((k, v))
-          size += 1
-          if (size > 100) { // save per 100 to keep the batched size around 4096 (~ 32*100 bytes)
-            doSaveNodes(storage, buf)
-            buf.clear()
-            size = 0
-          }
-      }
-      doSaveNodes(storage, buf)
-      buf.clear()
+    private def saveNodes(storage: NodeKeyValueStorage, kvs: Map[Hash, Array[Byte]]) {
+      storage.update(Set(), kvs)
     }
 
-    private def doSaveNodes(storage: NodeKeyValueStorage, buf: mutable.HashMap[Hash, Array[Byte]]) {
-      storage.update(Set(), buf.toMap)
-    }
+    //    private val accountNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()
+    //    private val storageNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()
+    //    private def saveNodes(storage: NodeKeyValueStorage, kvs: Map[Hash, Array[Byte]], buf: mutable.HashMap[Hash, Array[Byte]]) {
+    //      var size = 0
+    //      kvs foreach {
+    //        case (k, v) =>
+    //          buf += (k -> v)
+    //          size += 1
+    //          if (size > 100) { // save per 100 to keep the batched size around 4096 (~ 32*100 bytes)
+    //            doSaveNodes(storage, buf)
+    //            buf.clear()
+    //            size = 0
+    //          }
+    //      }
+    //      doSaveNodes(storage, buf)
+    //      buf.clear()
+    //    }
+    //
+    //    private def doSaveNodes(storage: NodeKeyValueStorage, buf: mutable.HashMap[Hash, Array[Byte]]) {
+    //      storage.update(Set(), buf.toMap)
+    //    }
 
     private def reportStatus() {
       val duration = (System.nanoTime - prevReportTime) / 1000000000.0

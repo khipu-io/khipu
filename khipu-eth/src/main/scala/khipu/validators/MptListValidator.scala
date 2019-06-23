@@ -32,7 +32,7 @@ object MptListValidator {
       source = new ArchiveNodeStorage(new NodeStorage(EphemDataSource()))
     )(intByteArraySerializable, vSerializable)
 
-    val (_, updatedTrie) = toValidates.foldLeft((0, trie)) {
+    val (_, updatedTrie) = toValidates.foldLeft(0, trie) {
       case ((i, trie), k) =>
         (i + 1, trie.put(i, k))
     }

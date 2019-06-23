@@ -83,11 +83,13 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
   protected val peerConfiguration = serviceBoard.peerConfiguration
   private val miningConfig = serviceBoard.miningConfig
 
-  protected val fastSyncStateStorage = serviceBoard.storages.fastSyncStateStorage
-  protected val appStateStorage = serviceBoard.storages.appStateStorage
-  protected val blockchainStorages = blockchain.storages
-  protected val accountNodeStorage = blockchainStorages.accountNodeStorageFor(Some(0))
-  protected val storageNodeStorage = blockchainStorages.storageNodeStorageFor(Some(0))
+  protected val storages = serviceBoard.storages
+  protected val fastSyncStateStorage = storages.fastSyncStateStorage
+  protected val appStateStorage = storages.appStateStorage
+  protected val accountNodeStorage = storages.accountNodeStorageFor(None)
+  protected val storageNodeStorage = storages.storageNodeStorageFor(None)
+  protected val evmcodeStorage = storages.evmCodeStorage
+  protected val blockHeaderStorage = storages.blockHeaderStorage
 
   protected val mediator = DistributedPubSub(context.system).mediator
 
@@ -105,8 +107,6 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
     if (!appStateStorage.isFastSyncDone) {
       saveSyncState()
     }
-
-    serviceBoard.storages.closeAll()
 
     log.info("SyncService stopped")
   }

@@ -21,7 +21,7 @@ import khipu.store.trienode.PruningMode
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
 import khipu.util.BlockchainConfig
-import khipu.util.Config.DbConfig
+import khipu.util.Config
 import org.json4s.{ CustomSerializer, DefaultFormats, JString, JValue }
 import scala.io.Source
 import scala.util.{ Failure, Success, Try }
@@ -74,8 +74,7 @@ class GenesisDataLoader(
     dataSource:       DataSource,
     blockchain:       Blockchain,
     pruningMode:      PruningMode,
-    blockchainConfig: BlockchainConfig,
-    dbConfig:         DbConfig
+    blockchainConfig: BlockchainConfig
 )(implicit system: ActorSystem) {
   import GenesisDataLoader._
   private val log = Logging(system, this.getClass)
@@ -182,8 +181,10 @@ class GenesisDataLoader(
         Failure(new RuntimeException("Genesis data present in the database does not match genesis block from file." +
           " Use different directory for running private blockchains."))
       case None =>
-        val accountNodeStorage = blockchain.storages.accountNodeStorageFor(None)
-        accountNodeStorage.update(Set(), ephemDataSource.toMap)
+        if (!Config.Sync.doFastSync) {
+          val accountNodeStorage = blockchain.storages.accountNodeStorageFor(None)
+          accountNodeStorage.update(Set(), ephemDataSource.toMap)
+        }
         blockchain.saveBlock(Block(header, BlockBody(Nil, Nil)))
         blockchain.saveReceipts(header.hash, Nil)
         blockchain.saveTotalDifficulty(header.hash, header.difficulty)

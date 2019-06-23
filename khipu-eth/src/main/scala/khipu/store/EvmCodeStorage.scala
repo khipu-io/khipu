@@ -3,6 +3,7 @@ package khipu.store
 import akka.util.ByteString
 import khipu.Hash
 import khipu.store.datasource.DataSource
+import khipu.store.datasource.LmdbDataSource
 import khipu.util.SimpleMap
 
 /**
@@ -28,6 +29,8 @@ final class EvmCodeStorage(val source: DataSource) extends SimpleMap[Hash, ByteS
     source.update(namespace, remove, upsert)
     this
   }
+
+  def count = source.asInstanceOf[LmdbDataSource].count
 
   protected def apply(source: DataSource): EvmCodeStorage = new EvmCodeStorage(source)
 }
