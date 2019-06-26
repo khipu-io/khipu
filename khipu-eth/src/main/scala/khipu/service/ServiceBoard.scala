@@ -122,7 +122,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
           .setMapSize(dbConfig.LmdbConfig.mapSize)
           .setMaxDbs(dbConfig.LmdbConfig.maxDbs)
           .setMaxReaders(dbConfig.LmdbConfig.maxReaders)
-          .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD)
+          .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
 
         lazy val accountNodeDataSource = new LmdbNodeDataSource(dbConfig.account, env, cacheCfg.cacheSize)
         lazy val storageNodeDataSource = new LmdbNodeDataSource(dbConfig.storage, env, cacheCfg.cacheSize)
@@ -134,22 +134,26 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
         lazy val totalDifficultyDataSource = new LmdbBlockDataSource(dbConfig.td, env)
 
         def closeAll() {
-          log.info("db stopping ...")
+          log.info("db syncing...")
 
-          accountNodeDataSource.close()
-          storageNodeDataSource.close()
-          evmCodeDataSource.close()
-          blockHeaderDataSource.close()
-          blockBodyDataSource.close()
-          receiptsDataSource.close()
-          totalDifficultyDataSource.close()
+          // --- Don't close resouces here, since the futures during sync may not been finished yet
+          // --- and we don't care about the resources releasing, since when closeAll() is called,
+          // --- we are shutting down this application.
 
-          dataSource.close()
+          //accountNodeDataSource.close()
+          //storageNodeDataSource.close()
+          //evmCodeDataSource.close()
+          //blockHeaderDataSource.close()
+          //blockBodyDataSource.close()
+          //receiptsDataSource.close()
+          //totalDifficultyDataSource.close()
+
+          //dataSource.close()
 
           env.sync(true)
-          env.close()
+          //env.close()
 
-          log.info("db stopped")
+          log.info("db synced")
         }
       }
 
