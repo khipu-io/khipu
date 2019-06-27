@@ -97,7 +97,7 @@ object Dependencies {
     "com.lightbend.akka" %% "akka-management-cluster-http" % "0.6"
   )
 
-  val lmdb = Seq("org.lmdbjava" % "lmdbjava" % "0.6.1") // akka-distributed-data also includes this lib
+  val lmdb = Seq("org.lmdbjava" % "lmdbjava" % "0.7.0") // akka-distributed-data also includes this lib
 
   val rocksdb = Seq("org.rocksdb" % "rocksdbjni" % "6.0.1")
 

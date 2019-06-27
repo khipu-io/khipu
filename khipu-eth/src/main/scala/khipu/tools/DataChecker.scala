@@ -49,8 +49,8 @@ object DataChecker {
 
     private def processEntity(entity: V, blockNumber: Long) = {
       entityCount += 1
-      if (entityCount % 1000 == 0) {
-        log.info(s"[comp] got $topic entities $entityCount, at #$blockNumber")
+      if (entityCount % 10000 == 0) {
+        log.info(s"got $topic entities $entityCount, at #$blockNumber")
       }
 
       entityGot(entity, blockNumber)
@@ -88,7 +88,7 @@ object DataChecker {
             if (nodeCount % 10000 == 0) {
               val elapsed = (System.nanoTime - start) / 1000000000
               val speed = nodeCount / math.max(1, elapsed)
-              log.info(s"[comp] $topic nodes $nodeCount $speed/s")
+              log.info(s"$topic nodes $nodeCount $speed/s")
             }
 
             nodeGot(key, bytes)
@@ -108,18 +108,19 @@ object DataChecker {
   }
 
   def main(args: Array[String]) {
-    val lostKeys = Set(
-      "6def56fedd6eb859547b1b5759f62a94162541ea7aad120e6ecd1e76b0cd8af3",
-      "1c61d8677af71ddc0aaf835d26c257eccc68d44506f853eef1962b5fb8ec369a",
-      "a93fb7195e99fecd525faa33aae35903387d6038ec7afd7ec43d7a5cb9cf4686"
+    val lostKeys = Set( //"6def56fedd6eb859547b1b5759f62a94162541ea7aad120e6ecd1e76b0cd8af3",
+    //"1c61d8677af71ddc0aaf835d26c257eccc68d44506f853eef1962b5fb8ec369a",
+    //"a93fb7195e99fecd525faa33aae35903387d6038ec7afd7ec43d7a5cb9cf4686"
     ).map(khipu.hexDecode).map(Hash(_))
-    new DataChecker(storages, 7958037, lostKeys).loadSnaphot()
+
+    val stateNode = khipu.hexDecode("c51d801ae31c788f43ed3e09dca04876825c58daea01a531a8377c57748f012f")
+    new DataChecker(storages, 8005867, Some(stateNode), lostKeys).loadSnaphot()
   }
 
 }
-class DataChecker(storages: DefaultStorages, blockNumber: Long, checkList: Set[Hash]) {
+class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Option[Array[Byte]], checkList: Set[Hash]) {
   import DataChecker._
-  val log = Logging(system, this)
+  private val log = Logging(system, this)
 
   private val blockHeaderStorage = storages.blockHeaderStorage
   private val accountNodeStorage = storages.accountNodeStorageFor(None)
@@ -149,16 +150,12 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, checkList: Set[H
   }
 
   def loadSnaphot() {
-    log.info(s"[comp] loading nodes of #$blockNumber")
-    for {
-      hash <- blockHeaderStorage.getBlockHash(blockNumber)
-      header <- blockHeaderStorage.get(hash)
-    } {
-      log.info(s"stateRoot: ${header.stateRoot}")
-      val stateRoot = header.stateRoot.bytes
-      accountReader.getNode(stateRoot, blockNumber) map accountReader.processNode
+    log.info(s"loading nodes of #$blockNumber")
+    blockHeaderStorage.getBlockHash(blockNumber) flatMap blockHeaderStorage.get map (_.stateRoot.bytes) orElse stateRoot foreach { root =>
+      log.info(s"stateRoot: ${Hash(root)}")
+      accountReader.getNode(root, blockNumber) map accountReader.processNode
     }
     val totalNodeCount = accountReader.nodeCount + storageReader.nodeCount
-    log.info(s"[comp] all nodes loaded of #$blockNumber: total $totalNodeCount, account ${accountReader.nodeCount}, storage ${storageReader.nodeCount}")
+    log.info(s"all nodes loaded of #$blockNumber: total $totalNodeCount, account ${accountReader.nodeCount}, storage ${storageReader.nodeCount}")
   }
 }

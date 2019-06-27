@@ -56,7 +56,7 @@ class LMDBTool() {
     .setMapSize(mapSize)
     .setMaxDbs(6)
     .setMaxReaders(1024)
-    .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD)
+    .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
 
   def test1(tableName: String, num: Int) = {
     val table = if (DATA_SIZE > COMPILED_MAX_KEY_SIZE) {
@@ -73,9 +73,6 @@ class LMDBTool() {
   }
 
   def write1(table: Dbi[ByteBuffer], num: Int) = {
-    val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
-    val valBuf = ByteBuffer.allocateDirect(100 * 1024)
-
     val keys = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
@@ -85,6 +82,8 @@ class LMDBTool() {
     val nKeysToRead = 1000000
     val keyInterval = math.max(num / nKeysToRead, 1)
     while (i < num) {
+      val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
+      val valBuf = ByteBuffer.allocateDirect(100 * 1024)
 
       var j = 0
       val wtx = env.txnWrite()
@@ -156,13 +155,12 @@ class LMDBTool() {
   def read1(table: Dbi[ByteBuffer], keys: java.util.ArrayList[Array[Byte]]) {
     java.util.Collections.shuffle(keys)
 
-    val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
-
     val start0 = System.nanoTime
     var start = System.nanoTime
     val itr = keys.iterator
     var i = 0
     while (itr.hasNext) {
+      val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
       val k = itr.next
       val theKey = if (DATA_SIZE > COMPILED_MAX_KEY_SIZE) k else shortKey(k)
       keyBuf.put(theKey).flip()
@@ -253,11 +251,6 @@ class LMDBTool() {
   }
 
   def write2(table: Dbi[ByteBuffer], index: Dbi[ByteBuffer], startId: Long, num: Int) = {
-    val indexKey = ByteBuffer.allocateDirect(INDEX_KEY_SIZE)
-    val indexVal = ByteBuffer.allocateDirect(TABLE_KEY_SIZE).order(ByteOrder.nativeOrder)
-    val tableKey = ByteBuffer.allocateDirect(TABLE_KEY_SIZE).order(ByteOrder.nativeOrder)
-    val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
-
     val keys = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
@@ -267,6 +260,10 @@ class LMDBTool() {
     val nKeysToRead = 1000000
     val keyInterval = math.max(num / nKeysToRead, 1)
     while (i < num) {
+      val indexKey = ByteBuffer.allocateDirect(INDEX_KEY_SIZE)
+      val indexVal = ByteBuffer.allocateDirect(TABLE_KEY_SIZE).order(ByteOrder.nativeOrder)
+      val tableKey = ByteBuffer.allocateDirect(TABLE_KEY_SIZE).order(ByteOrder.nativeOrder)
+      val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
 
       var j = 0
       val wtx = env.txnWrite()
@@ -351,14 +348,14 @@ class LMDBTool() {
   def read2(table: Dbi[ByteBuffer], index: Dbi[ByteBuffer], keys: java.util.ArrayList[Array[Byte]]) {
     java.util.Collections.shuffle(keys)
 
-    val indexKey = ByteBuffer.allocateDirect(INDEX_KEY_SIZE)
-    val tableKey = ByteBuffer.allocateDirect(TABLE_KEY_SIZE)
-
     val start0 = System.nanoTime
     var start = System.nanoTime
     val itr = keys.iterator
     var i = 0
     while (itr.hasNext) {
+      val indexKey = ByteBuffer.allocateDirect(INDEX_KEY_SIZE)
+      val tableKey = ByteBuffer.allocateDirect(TABLE_KEY_SIZE)
+
       val k = itr.next
 
       val rtx = env.txnRead()
@@ -449,12 +446,12 @@ class LMDBTool() {
     txn.commit()
     txn.close()
 
-    val tableKey = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder)
-    val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
-
     var wtx = env.txnWrite()
     var i = 0
     while (i < 1010) {
+      val tableKey = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder)
+      val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
+
       val v = Array.ofDim[Byte](DATA_SIZE)
       Random.nextBytes(v)
       tableKey.putLong(i).flip()
@@ -473,6 +470,8 @@ class LMDBTool() {
     wtx = env.txnWrite()
     i = 1000
     while (i < 1010) {
+      val tableKey = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder)
+
       tableKey.putLong(i).flip()
       table.delete(wtx, tableKey)
       i += 1
@@ -484,6 +483,9 @@ class LMDBTool() {
     wtx = env.txnWrite()
     i = 1000
     while (i < 1010) {
+      val tableKey = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder)
+      val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
+
       tableKey.putLong(i).flip()
       tableVal.put(i.toString.getBytes).flip()
       table.put(wtx, tableKey, tableVal, PutFlags.MDB_APPEND)
@@ -496,6 +498,7 @@ class LMDBTool() {
     val rtx = env.txnRead()
     i = 1000
     while (i < 1010) {
+      val tableKey = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder)
       tableKey.putLong(i).flip()
       val tableVal = table.get(rtx, tableKey)
       if (tableVal ne null) {
