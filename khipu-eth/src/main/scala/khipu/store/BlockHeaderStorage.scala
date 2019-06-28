@@ -34,11 +34,12 @@ final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: Act
   private val table = lmdbSource.table
 
   {
+    log.info(s"loading blocknumber index ...")
     val start = System.nanoTime
 
     loadBlockNumberIndex(env, table)
 
-    log.info(s"loaded blocknumber index in ${(System.nanoTime - start) / 1000000000}s ")
+    log.info(s"loaded blocknumber index in ${(System.nanoTime - start) / 1000000000}s.")
   }
 
   private def loadBlockNumberIndex(env: Env[ByteBuffer], table: Dbi[ByteBuffer]) {

@@ -98,7 +98,6 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
 
   val forkResolverOpt = if (blockchainConfig.customGenesisFileOpt.isDefined) None else Some(new ForkResolver.DAOForkResolver(blockchainConfig))
 
-  log.info(s"db initializing...")
   val storages = dbConfig.dbEngine match {
     case dbConfig.LMDB =>
 
