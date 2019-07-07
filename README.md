@@ -6,9 +6,10 @@ It is built on earlier work on Mantis by [Grothendieck Team](https://iohk.io/pro
 The major researches of Khipu so far:
 
   - Try to execute transactions in a block as in parallel as possible. Average 80% transactions in one block could be executed in parallel currently
-  - A storage engine (Kesque) specially designed for blockchain, developed based on Kafka's log engine. Which perform only 1 disk I/O at most for 99.x% random read
+  - LMDB based storage engine carefully designed for blockchain.
+  - The fastest Ethereum implemention
 
-### Status - Alpha Release 0.1.0-alpha
+### Status - Alpha Release 0.2.0-beta
 
 This version of the code supports
 
@@ -19,12 +20,12 @@ This version of the code supports
 
 Features to be done
 
-  - Reduce disk usage
-  - Reduce memory usage
-  - CPU mining
-  - Execute transactions in parallel in mining
-  - Morden testnet and private network
-  - Unit tests
+  - [ ] Reduce disk usage
+  - [x] Reduce memory usage
+  - [ ] CPU mining
+  - [ ] Execute transactions in parallel in mining
+  - [ ] Morden testnet and private network
+  - [ ] Unit tests
 
 #### Notice
 
@@ -35,8 +36,8 @@ During fast sync, sometimes the syncing looks like stopped with no more state no
 
 ### Minimum requirements to run Khipu
 
-  - 16G RAM, 250G disk space (SSD is preferred, although HDD is okay)
-  - Under regular sync mode, if you restart Khipu, it may take 2 to 5 minutes (SSD), or 8 to 15 minutes (HDD) to load the storage indexes
+  - 16G RAM, 500G disk space (SSD is preferred, although HDD is okay)
+  - Under regular sync mode, if you restart Khipu, it may take 1 minutes (SSD), or 8 to 15 minutes (HDD) to load the storage indexes
 
 ### Installation and Running, Building
 
@@ -46,8 +47,8 @@ Running from command line:
 
 
 ```
-unzip khipu-eth-0.1.0.zip
-cd khipu-eth-0.1.0/bin
+unzip khipu-eth-0.2.0.zip
+cd khipu-eth-0.2.0/bin
 ./khipu-eth
 ```
 or
@@ -60,10 +61,10 @@ Khipu data directory is $HOME/.khipu.eth
 
 ```
 $ ls .khipu.eth
-kesque.logs  keystore  leveldb  nodeId.keys
+keystore lmdb nodeId.keys
 ```
 
-Remove leveldb and kesque.logs will level a installation with empty blockchain data, but the keystore and nodeId.keys will be kept.
+Remove lmdb will level a installation with empty blockchain data, but the keystore and nodeId.keys will be kept.
 
 
 #### Prerequisites to build
