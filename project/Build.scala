@@ -46,7 +46,7 @@ object Build extends sbt.Build {
 
   lazy val basicSettings = Defaults.coreDefaultSettings ++ Seq(
     organization := "khipu.io",
-    version := "0.2.0-alpha",
+    version := "0.2.0-beta",
     resolvers ++= Seq(
       "Local Maven" at Path.userHome.asURL + ".m2/repository",
       "Typesafe repo" at "http://repo.typesafe.com/typesafe/releases/",
