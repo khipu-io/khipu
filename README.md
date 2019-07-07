@@ -6,10 +6,10 @@ It is built on earlier work on Mantis by [Grothendieck Team](https://iohk.io/pro
 The major researches of Khipu so far:
 
   - Try to execute transactions in a block as in parallel as possible. Average 80% transactions in one block could be executed in parallel currently
-  - LMDB based storage engine carefully designed for blockchain.
+  - LMDB based storage engine carefully designed for blockchain
   - The fastest Ethereum implemention
 
-### Status - Alpha Release 0.2.0-beta
+### Status - Beta Release 0.2.0
 
 This version of the code supports
 
