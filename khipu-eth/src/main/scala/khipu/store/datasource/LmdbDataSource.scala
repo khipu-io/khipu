@@ -23,7 +23,7 @@ final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: 
 
   private val cache = new FIFOCache[Hash, Array[Byte]](cacheSize)
 
-  private var table = createTable()
+  var table = createTable()
 
   private def createTable(): Dbi[ByteBuffer] = env.openDbi(topic, DbiFlags.MDB_CREATE)
 
@@ -48,7 +48,8 @@ final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: 
         try {
           rtx = env.txnRead()
 
-          val tableKey = ByteBuffer.allocateDirect(combKey.length).put(combKey).flip().asInstanceOf[ByteBuffer]
+          val tableKey = ByteBuffer.allocateDirect(combKey.length)
+          tableKey.put(combKey).flip()
           val data = table.get(rtx, tableKey)
           ret = if (data ne null) {
             val value = Array.ofDim[Byte](data.remaining)
@@ -93,27 +94,43 @@ final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: 
 
       toRemove foreach { key =>
         val combKey = BytesUtil.concat(namespace, key)
-        val tableKey = ByteBuffer.allocateDirect(combKey.length).put(combKey).flip().asInstanceOf[ByteBuffer]
+
+        val tableKey = ByteBuffer.allocateDirect(combKey.length)
+        tableKey.put(combKey).flip()
         table.delete(wtx, tableKey)
       }
 
       toUpsert foreach {
         case (key, value) =>
           val combKey = BytesUtil.concat(namespace, key)
-          cache.put(Hash(combKey), value)
 
-          val tableKey = ByteBuffer.allocateDirect(combKey.length).put(combKey).flip().asInstanceOf[ByteBuffer]
-          val tableVal = ByteBuffer.allocateDirect(value.length).put(value).flip().asInstanceOf[ByteBuffer]
+          val tableKey = ByteBuffer.allocateDirect(combKey.length)
+          val tableVal = ByteBuffer.allocateDirect(value.length)
+
+          tableKey.put(combKey).flip()
+          tableVal.put(value).flip()
           table.put(wtx, tableKey, tableVal)
       }
 
       wtx.commit()
+
+      toRemove foreach {
+        key => cache.remove(Hash(BytesUtil.concat(namespace, key)))
+      }
+
+      toUpsert foreach {
+        case (key, value) => cache.put(Hash(BytesUtil.concat(namespace, key)), value)
+      }
     } catch {
       case ex: Throwable =>
-        if (wtx ne null) wtx.abort()
+        if (wtx ne null) {
+          wtx.abort()
+        }
         log.error(ex, ex.getMessage)
     } finally {
-      if (wtx ne null) wtx.close()
+      if (wtx ne null) {
+        wtx.close()
+      }
     }
 
     this

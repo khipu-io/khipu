@@ -12,7 +12,9 @@ object Storages {
 
     lazy val accountNodeStorageFor: (Option[Long]) => NodeTableStorage = bn => new NodeTableStorage(accountNodeDataSource)
     lazy val storageNodeStorageFor: (Option[Long]) => NodeTableStorage = bn => new NodeTableStorage(storageNodeDataSource)
-    lazy val evmCodeStorage = new EvmCodeStorage(evmCodeDataSource)
+    lazy val evmcodeStorage = new NodeTableStorage(evmcodeDataSource)
+
+    lazy val blockNumberMappingStorage = new BlockNumberMappingStorage(blockNumberMappingDataSource)
 
     lazy val blockHeaderStorage = new BlockHeaderStorage(blockHeaderDataSource)
     lazy val blockBodyStorage = new BlockBodyStorage(blockBodyDataSource)
@@ -24,8 +26,6 @@ object Storages {
     lazy val fastSyncStateStorage = new FastSyncStateStorage(fastSyncStateDataSource)
     lazy val appStateStorage = new AppStateStorage(appStateDataSource)
     lazy val knownNodesStorage = new KnownNodesStorage(knownNodesDataSource)
-
-    //lazy val blockNumberMappingStorage = new BlockNumberMappingStorage(blockHeightsHashesDataSource, blockNumberCache)
   }
 }
 

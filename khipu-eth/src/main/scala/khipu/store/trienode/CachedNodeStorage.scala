@@ -12,7 +12,10 @@ final class CachedNodeStorage(source: NodeStorage, cache: Cache[Hash, Array[Byte
 
   import system.dispatcher
 
-  override def get(key: Hash): Option[Array[Byte]] = {
+  def tableName = ""
+  def count = -1
+
+  def get(key: Hash): Option[Array[Byte]] = {
     cache.get(key) match {
       case None =>
         source.get(key) match {
@@ -28,7 +31,7 @@ final class CachedNodeStorage(source: NodeStorage, cache: Cache[Hash, Array[Byte
     }
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): CachedNodeStorage = {
+  def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): CachedNodeStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     source.update(Set(), toUpsert)
     //toUpsert foreach { case (key, value) => cache.put(key, () => Future(value)) }

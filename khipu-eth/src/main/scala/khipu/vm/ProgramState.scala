@@ -51,7 +51,7 @@ final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: Pr
   def config: EvmConfig = context.config
   def env: ExecEnv = context.env
   def program: Program = env.program
-  def inputData: ByteString = env.inputData
+  def input: ByteString = env.input
   def ownAddress: Address = env.ownerAddr
   def ownBalance: UInt256 = world.getBalance(ownAddress)
   def storage: S = world.getStorage(ownAddress)

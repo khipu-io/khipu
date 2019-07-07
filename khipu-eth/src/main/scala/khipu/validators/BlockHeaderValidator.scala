@@ -171,7 +171,7 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
   private def calculatePoWValue(blockHeader: BlockHeader): Array[Byte] = {
     val nonceReverted = blockHeader.nonce.reverse
     val hashBlockWithoutNonce = crypto.kec256(BlockHeader.getEncodedWithoutNonce(blockHeader))
-    val seedHash = crypto.kec512(hashBlockWithoutNonce ++ nonceReverted.toArray[Byte])
+    val seedHash = crypto.kec512(hashBlockWithoutNonce ++ nonceReverted)
 
     crypto.kec256(seedHash ++ blockHeader.mixHash.bytes)
   }

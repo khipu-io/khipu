@@ -269,7 +269,7 @@ trait FastSyncService { _: SyncService =>
     syncState foreach { syncState =>
       val start = System.nanoTime
       fastSyncStateStorage.putSyncState(syncState)
-      log.info(s"[fast] Saved sync state in ${(System.nanoTime - start) / 1000000}ms, header/enqueued number: ${syncState.bestBlockHeaderNumber}/${syncState.enqueuedBlockNumber}, bodies queue: ${syncState.pendingBlockBodies.size + syncState.workingBlockBodies.size}, receipts queue: ${syncState.pendingReceipts.size + syncState.workingReceipts.size}, nodes queue: ${syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size + syncState.workingMptNodes.size + syncState.workingNonMptNodes.size}, downloaded nodes: ${syncState.downloadedNodesCount} ")
+      log.info(s"[fast] Saved sync state in ${(System.nanoTime - start) / 1000000}ms, header/enqueued: ${syncState.bestBlockHeaderNumber}/${syncState.enqueuedBlockNumber}, bodies queue: ${syncState.pendingBlockBodies.size + syncState.workingBlockBodies.size}, receipts queue: ${syncState.pendingReceipts.size + syncState.workingReceipts.size}, nodes queue: ${syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size + syncState.workingMptNodes.size + syncState.workingNonMptNodes.size}, downloaded nodes: ${syncState.downloadedNodesCount} ")
     }
   }
 
@@ -751,12 +751,19 @@ trait FastSyncService { _: SyncService =>
 
     private def saveEvmcodes(kvs: Map[Hash, ByteString]) {
       val start = System.nanoTime
-      blockchain.saveEvmcode(kvs)
+      saveNodes(evmcodeStorage, kvs.map(x => x._1 -> x._2.toArray))
       log.debug(s"SaveEvmcodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
     private def saveNodes(storage: NodeKeyValueStorage, kvs: Map[Hash, Array[Byte]]) {
+      //val prev = storage.count
       storage.update(Set(), kvs)
+      //val post = storage.count
+      //if (post - prev == kvs.size) {
+      //  log.info(s"saving ${storage.tableName} ${kvs.size}, saved ${post - prev}")
+      //} else {
+      //  log.warning(s"saving ${storage.tableName} ${kvs.size}, but saved ${post - prev}")
+      //}
     }
 
     //    private val accountNodeBuf = new mutable.HashMap[Hash, Array[Byte]]()
@@ -794,7 +801,7 @@ trait FastSyncService { _: SyncService =>
       val nBlackPeers = handshakedPeers.size - goodPeers.size
       log.info(
         s"""|[fast] Block: ${currSyncedBlockNumber}/${syncState.targetBlockNumber}, $blockRate/s.
-            |State: ${syncState.downloadedNodesCount}/$nTotalNodes, $stateRate/s, $nWorkingNodes in working.
+            |State: ${syncState.downloadedNodesCount}/$nTotalNodes, $stateRate/s.
             |Peers: (in/out) (${incomingPeers.size}/${outgoingPeers.size}), (working/good/header/node/black) (${workingPeers.size}/${goodPeers.size}/${nHeaderPeers}/${nodeOkPeers.size}/${nBlackPeers})
             |""".stripMargin.replace("\n", " ")
       )

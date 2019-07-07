@@ -23,9 +23,9 @@ final case class ExecEnv(
   callerAddr:  Address,
   originAddr:  Address,
   gasPrice:    UInt256,
-  inputData:   ByteString,
   value:       UInt256,
   program:     Program,
+  input:       ByteString,
   blockHeader: BlockHeader,
   callDepth:   Int
 )

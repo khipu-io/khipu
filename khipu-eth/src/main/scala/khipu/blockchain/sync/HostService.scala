@@ -108,7 +108,7 @@ class HostService(blockchainReadOnly: Blockchain, peerConfiguration: PeerConfigu
 
             val nodeData: Seq[ByteString] = hashesRequested.flatMap { hash =>
               // fetch mpt node by hash, if no mpt node was found, fetch evm by hash
-              blockchainReadOnly.getMptNodeByHash(hash).map(x => ByteString(x.toBytes)) orElse blockchainReadOnly.getEvmCodeByHash(hash)
+              blockchainReadOnly.getMptNodeByHash(hash).map(x => ByteString(x.toBytes)) orElse blockchainReadOnly.getEvmcodeByHash(hash)
             }
 
             // force Message to MessageSerializable

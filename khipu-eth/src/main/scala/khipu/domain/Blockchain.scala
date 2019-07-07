@@ -10,7 +10,6 @@ import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.network.p2p.messages.PV63.MptNode
 import khipu.network.p2p.messages.PV63.MptNode._
 import khipu.store.BlockchainStorages
-import khipu.store.EvmCodeStorage
 import khipu.store.TransactionMappingStorage
 import khipu.store.TransactionMappingStorage.TransactionLocation
 import khipu.store.trienode.ReadOnlyNodeStorage
@@ -102,7 +101,7 @@ object Blockchain {
      * @param hash Code Hash
      * @return EVM code if found
      */
-    def getEvmCodeByHash(hash: Hash): Option[ByteString]
+    def getEvmcodeByHash(hash: Hash): Option[ByteString]
 
     /**
      * Returns MPT node searched by it's hash
@@ -161,8 +160,6 @@ object Blockchain {
 
     def getWorldState(blockNumber: Long, accountStartNonce: UInt256, stateRootHash: Option[Hash] = None): W
     def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: UInt256, stateRootHash: Option[Hash] = None): W
-
-    def evmCodeStorage: EvmCodeStorage
   }
 
   def apply(storages: BlockchainStorages): Blockchain =
@@ -170,16 +167,17 @@ object Blockchain {
 }
 final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[TrieStorage, BlockWorldState] {
 
+  private val accountNodeStorageFor = storages.accountNodeStorageFor
+  private val storageNodeStorageFor = storages.storageNodeStorageFor
+  private val evmcodeStorage = storages.evmcodeStorage
+
   private val blockHeaderStorage = storages.blockHeaderStorage
   private val blockBodyStorage = storages.blockBodyStorage
   private val receiptsStorage = storages.receiptsStorage
-  private val accountNodeStorageFor = storages.accountNodeStorageFor
-  private val storageNodeStorageFor = storages.storageNodeStorageFor
+
   private val totalDifficultyStorage = storages.totalDifficultyStorage
   private val transactionMappingStorage = storages.transactionMappingStorage
-  //private val blockNumberMappingStorage = storages.blockNumberMappingStorage
-
-  val evmCodeStorage = storages.evmCodeStorage
+  private val blockNumberMappingStorage = storages.blockNumberMappingStorage
 
   def getHashByBlockNumber(number: Long): Option[Hash] =
     blockHeaderStorage.getBlockHash(number)
@@ -196,29 +194,32 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getReceiptsByHash(blockhash: Hash): Option[Seq[Receipt]] =
     receiptsStorage.get(blockhash)
 
-  def getEvmCodeByHash(hash: Hash): Option[ByteString] =
-    evmCodeStorage.get(hash)
+  def getEvmcodeByHash(hash: Hash): Option[ByteString] =
+    evmcodeStorage.get(hash).map(ByteString(_))
 
   def getTotalDifficultyByHash(blockhash: Hash): Option[UInt256] =
     totalDifficultyStorage.get(blockhash)
 
   def saveBlockHeader(blockHeader: BlockHeader) {
     blockHeaderStorage.put(blockHeader.hash, blockHeader)
-    //saveBlockNumberMapping(blockHeader.number, hash)
+    blockNumberMappingStorage.put(blockHeader.hash, blockHeader.number)
   }
 
   def saveBlockHeader(blockHeaders: Seq[BlockHeader]) {
     val kvs = blockHeaders.map(x => x.hash -> x).toMap
     blockHeaderStorage.update(Set(), kvs)
+    val nums = kvs.map(kv => kv._1 -> kv._2.number)
+    blockNumberMappingStorage.update(Set(), nums)
   }
 
   def saveBlockHeader(hash: Hash, blockHeader: BlockHeader) {
     blockHeaderStorage.put(hash, blockHeader)
-    //saveBlockNumberMapping(blockHeader.number, hash)
+    blockNumberMappingStorage.put(hash, blockHeader.number)
   }
 
   def saveBlockHeader(kvs: Map[Hash, BlockHeader]) {
     blockHeaderStorage.update(Set(), kvs)
+    blockNumberMappingStorage.update(Set(), kvs.map(kv => kv._1 -> kv._2.number))
   }
 
   def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {
@@ -238,10 +239,10 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     receiptsStorage.update(Set(), kvs)
 
   def saveEvmcode(hash: Hash, evmCode: ByteString) =
-    evmCodeStorage.put(hash, evmCode)
+    evmcodeStorage.put(hash, evmCode.toArray)
 
   def saveEvmcode(kvs: Map[Hash, ByteString]) =
-    evmCodeStorage.update(Set(), kvs)
+    evmcodeStorage.update(Set(), kvs.map(x => x._1 -> x._2.toArray))
 
   def saveTotalDifficulty(blockhash: Hash, td: UInt256) =
     totalDifficultyStorage.put(blockhash, td)
@@ -254,6 +255,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
       this,
       accountNodeStorageFor(Some(blockNumber)),
       storageNodeStorageFor(Some(blockNumber)),
+      evmcodeStorage,
       accountStartNonce,
       stateRootHash
     )
@@ -264,6 +266,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
       this,
       ReadOnlyNodeStorage(accountNodeStorageFor(blockNumber)),
       ReadOnlyNodeStorage(storageNodeStorageFor(blockNumber)),
+      evmcodeStorage,
       accountStartNonce,
       stateRootHash
     )
@@ -306,8 +309,8 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getTransactionLocation(txHash: Hash): Option[TransactionLocation] =
     transactionMappingStorage.get(txHash)
 
-  //  private def saveBlockNumberMapping(number: Long, hash: Hash): Unit =
-  //    blockHeaderStorage.putBlockHash(number, hash)
+  private def saveBlockNumberMapping(hash: Hash, number: Long): Unit =
+    blockNumberMappingStorage.put(hash, number)
 
   private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody) {
     val kvs = blockBody.transactionList.zipWithIndex map {

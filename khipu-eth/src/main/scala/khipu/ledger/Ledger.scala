@@ -51,7 +51,7 @@ object Ledger {
   type PC = ProgramContext[BlockWorldState, TrieStorage]
   type PR = ProgramResult[BlockWorldState, TrieStorage]
 
-  final case class Stats(parallelCount: Int, dbReadTimePercent: Double, cacheHitRates: List[Double], cacheReadCount: Long)
+  final case class Stats(parallelCount: Int, dbReadTime: Long, cacheHitRates: List[Double], cacheReadCount: Long)
 
   final case class BlockResult(world: BlockWorldState, gasUsed: Long = 0, receipts: Seq[Receipt] = Nil, stats: Stats)
   final case class BlockPreparationResult(block: Block, blockResult: BlockResult, stateRootHash: Hash)
@@ -346,7 +346,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val start = System.nanoTime
     blockchain.storages.accountNodeDataSource.clock.start()
     blockchain.storages.storageNodeDataSource.clock.start()
-    blockchain.storages.evmCodeDataSource.clock.start()
+    blockchain.storages.evmcodeDataSource.clock.start()
     blockchain.storages.blockHeaderDataSource.clock.start()
     blockchain.storages.blockBodyDataSource.clock.start()
     blockchain.storages.accountNodeDataSource.resetCacheHitRate()
@@ -359,11 +359,11 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
     Future.sequence(fs) map { rs =>
       val dsGetElapsed1 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
-        blockchain.storages.evmCodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
+        blockchain.storages.evmcodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
 
       blockchain.storages.accountNodeDataSource.clock.start()
       blockchain.storages.storageNodeDataSource.clock.start()
-      blockchain.storages.evmCodeDataSource.clock.start()
+      blockchain.storages.evmcodeDataSource.clock.start()
       blockchain.storages.blockHeaderDataSource.clock.start()
       blockchain.storages.blockBodyDataSource.clock.start()
 
@@ -435,14 +435,15 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       }
 
       val dsGetElapsed2 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
-        blockchain.storages.evmCodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
+        blockchain.storages.evmcodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
+
+      val dbReadTime = dsGetElapsed1 + dsGetElapsed2
 
       val parallelRate = if (parallelCount > 0) {
         parallelCount * 100.0 / nTx
       } else {
         0.0
       }
-      val dbReadTimePerc = 100.0 * (dsGetElapsed1 + dsGetElapsed2) / (elapsed + reExecutedElapsed)
 
       val cacheHitRates = List(blockchain.storages.accountNodeDataSource.cacheHitRate, blockchain.storages.storageNodeDataSource.cacheHitRate).map(_ * 100.0)
       val cacheReadCount = blockchain.storages.accountNodeDataSource.cacheReadCount + blockchain.storages.storageNodeDataSource.cacheReadCount
@@ -452,7 +453,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
       txError match {
         case Some(error) => Left(error)
-        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbReadTimePerc, cacheHitRates, cacheReadCount))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
+        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbReadTime, cacheHitRates, cacheReadCount))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
       }
     } andThen {
       case Success(_) =>
@@ -555,7 +556,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val (checkpoint, context) = prepareProgramContext(stx, blockHeader, evmCfg)(world)
 
     if (blockchainConfig.isDebugTraceEnabled) {
-      println(s"\nTx 0x${stx.hash} ========>")
+      println(s"\nTx 0x${stx.hash} ========>\n${stx.tx}")
     }
     val result = runVM(stx, context, evmCfg)(checkpoint)
 
@@ -665,20 +666,22 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       (worldx.copy, worldx)
     }
 
-    val (worldBeforeTransfer, recipientAddress, program) = if (stx.tx.isContractCreation) {
-      val newContractAddress = worldAtCheckpoint.createAddress(senderAddress)
-      val world = if (evmCfg.eip161) {
-        worldAtCheckpoint.increaseNonce(newContractAddress)
+    // YP eq (91)
+    val (worldBeforeTransfer, recipientAddress, program, input) =
+      if (stx.tx.isContractCreation) {
+        val newContractAddress = worldAtCheckpoint.createAddress(senderAddress)
+        val world = if (evmCfg.eip161) {
+          worldAtCheckpoint.increaseNonce(newContractAddress)
+        } else {
+          worldAtCheckpoint
+        }
+        log.debug(s"newContractAddress: $newContractAddress")
+        (world, newContractAddress, Program(stx.tx.payload.toArray), ByteString())
       } else {
-        worldAtCheckpoint
+        val txReceivingAddress = stx.tx.receivingAddress.get
+        log.debug(s"txReceivingAddress: $txReceivingAddress")
+        (worldAtCheckpoint, txReceivingAddress, Program(world.getCode(txReceivingAddress).toArray), stx.tx.payload)
       }
-      log.debug(s"newContractAddress: $newContractAddress")
-      (world, newContractAddress, Program(stx.tx.payload.toArray))
-    } else {
-      val txReceivingAddress = stx.tx.receivingAddress.get
-      log.debug(s"txReceivingAddress: $txReceivingAddress")
-      (worldAtCheckpoint, txReceivingAddress, Program(world.getCode(txReceivingAddress).toArray))
-    }
 
     val worldAfterTransfer = worldBeforeTransfer.transfer(senderAddress, recipientAddress, stx.tx.value)
     val initialAddressesToDelete = Set[Address]()
@@ -688,6 +691,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       stx,
       recipientAddress,
       program,
+      input,
       blockHeader,
       worldAfterTransfer,
       evmCfg,

@@ -455,7 +455,7 @@ case object CALLVALUE extends ConstOp(0x34) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.value
 }
 case object CALLDATASIZE extends ConstOp(0x36) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.inputData.size)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.input.size)
 }
 case object GASPRICE extends ConstOp(0x3a) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.gasPrice
@@ -513,7 +513,7 @@ case object CALLDATALOAD extends OpCode[Int](0x35, 1, 1) with ConstGas[Int] {
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Int): ProgramState[W, S] = {
     val offset = params
-    val data = OpCode.sliceBytes(state.inputData, offset, 32)
+    val data = OpCode.sliceBytes(state.input, offset, 32)
     state.stack.push(UInt256(data))
     state.step()
   }
@@ -529,7 +529,7 @@ case object CALLDATACOPY extends OpCode[(UInt256, UInt256, UInt256)](0x37, 3, 0)
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): ProgramState[W, S] = {
     val (memOffset, dataOffset, size) = params
-    val data = OpCode.sliceBytes(state.inputData, dataOffset.intValueSafe, size.intValueSafe)
+    val data = OpCode.sliceBytes(state.input, dataOffset.intValueSafe, size.intValueSafe)
     state.memory.store(memOffset.intValueSafe, data)
     state.step()
   }
@@ -1061,11 +1061,11 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
             val worldAfterTransfer = worldBeforeTransfer.transfer(state.env.ownerAddr, newAddress, endowment)
 
             val env = state.env.copy(
-              inputData = ByteString(),
               callerAddr = state.env.ownerAddr,
               ownerAddr = newAddress,
               value = endowment,
               program = Program(initCode),
+              input = ByteString(),
               callDepth = state.env.callDepth + 1
             )
 
@@ -1277,7 +1277,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
         val (checkpoint, worldAtCheckpoint) = (state.world.copy, state.world)
 
         def prepareProgramContext(code: ByteString): ProgramContext[W, S] = {
-          val inputData = state.memory.load(inOffset.intValueSafe, inSize.intValueSafe)
+          val input = state.memory.load(inOffset.intValueSafe, inSize.intValueSafe)
 
           val (owner, caller, value) = this match {
             case CALL         => (codeAddress, state.ownAddress, callValue)
@@ -1287,11 +1287,11 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
           }
 
           val env = state.env.copy(
-            inputData = inputData,
             ownerAddr = owner,
             callerAddr = caller,
             value = value,
             program = Program(code.toArray),
+            input = input,
             callDepth = state.env.callDepth + 1
           )
 

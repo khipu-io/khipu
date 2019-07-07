@@ -141,7 +141,6 @@ final class LmdbNodeDataSource(
 
   def update(toRemove: Set[Hash], toUpsert: Map[Hash, TVal]): LmdbNodeDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
-    //table.remove(toRemove.map(_.bytes).toList)
 
     var byteBufs: List[ByteBuffer] = Nil
     var wtx: Txn[ByteBuffer] = null
@@ -153,12 +152,15 @@ final class LmdbNodeDataSource(
           log.debug(s"put $key -> ${shortKey(key.bytes).mkString(",")} -> $id -> ${Hash(crypto.kec256(data))}")
 
           val sKey = shortKey(key.bytes)
-          val indexKey = keyPool.acquire().put(sKey).flip().asInstanceOf[ByteBuffer]
-          val indexVal = keyPool.acquire().order(ByteOrder.nativeOrder).putLong(id).flip().asInstanceOf[ByteBuffer]
-          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder).putLong(id).flip().asInstanceOf[ByteBuffer]
-          val tableVal = ByteBuffer.allocateDirect(data.length).put(data).flip().asInstanceOf[ByteBuffer]
+          val indexKey = keyPool.acquire()
+          val indexVal = keyPool.acquire().order(ByteOrder.nativeOrder)
+          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder)
+          val tableVal = ByteBuffer.allocateDirect(data.length)
 
-          cache.put(key, tval)
+          indexKey.put(sKey).flip()
+          indexVal.putLong(id).flip()
+          tableKey.putLong(id).flip()
+          tableVal.put(data).flip()
 
           index.put(wtx, indexKey, indexVal)
           table.put(wtx, tableKey, tableVal, PutFlags.MDB_APPEND)
@@ -170,6 +172,10 @@ final class LmdbNodeDataSource(
       wtx.commit()
 
       nextId = newNextId
+
+      toUpsert foreach {
+        case (key, tval) => cache.put(key, tval)
+      }
     } catch {
       case ex: Throwable =>
         if (wtx ne null) wtx.abort()

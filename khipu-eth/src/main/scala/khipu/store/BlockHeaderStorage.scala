@@ -2,8 +2,6 @@ package khipu.store
 
 import akka.actor.ActorSystem
 import akka.event.Logging
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kesque.TVal
 import khipu.Hash
 import khipu.domain.BlockHeader
@@ -11,8 +9,6 @@ import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.store.datasource.BlockDataSource
 import khipu.store.datasource.LmdbBlockDataSource
 import khipu.util.SimpleMap
-import org.lmdbjava.Dbi
-import org.lmdbjava.Env
 import scala.collection.mutable
 
 /**
@@ -32,34 +28,6 @@ final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: Act
   private val lmdbSource = source.asInstanceOf[LmdbBlockDataSource]
   private val env = lmdbSource.env
   private val table = lmdbSource.table
-
-  {
-    log.info(s"loading blocknumber index ...")
-    val start = System.nanoTime
-
-    loadBlockNumberIndex(env, table)
-
-    log.info(s"loaded blocknumber index in ${(System.nanoTime - start) / 1000000000}s.")
-  }
-
-  private def loadBlockNumberIndex(env: Env[ByteBuffer], table: Dbi[ByteBuffer]) {
-    val start = System.nanoTime
-    val rtx = env.txnRead()
-    val itr = table.iterate(rtx)
-    while (itr.hasNext) {
-      val entry = itr.next()
-
-      val blockNumber = entry.key.order(ByteOrder.nativeOrder).getLong()
-
-      val data = new Array[Byte](entry.`val`.remaining)
-      entry.`val`.get(data)
-
-      LmdbBlockDataSource.putTimestampToKey(blockNumber, data.toBlockHeader.hash)
-    }
-    itr.close()
-    rtx.commit()
-    rtx.close()
-  }
 
   override def get(key: Hash): Option[BlockHeader] = {
     LmdbBlockDataSource.getTimestampByKey(key) flatMap {

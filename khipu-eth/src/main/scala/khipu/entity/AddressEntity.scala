@@ -153,7 +153,7 @@ final class AddressEntity(nodeStorage: NodeKeyValueStorage) extends Actor with T
       val commander = sender()
       lastActiveTime = LocalDateTime.now()
 
-      account.map(x => x.codeHash).flatMap(blockchain.getEvmCodeByHash).getOrElse(ByteString.empty)
+      account.map(x => x.codeHash).flatMap(blockchain.getEvmcodeByHash).getOrElse(ByteString.empty)
 
       promiseLoad() map { _ =>
         commander ! (code orElse persistedCode)

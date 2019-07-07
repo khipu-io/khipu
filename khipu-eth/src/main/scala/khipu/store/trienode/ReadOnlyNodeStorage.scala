@@ -13,6 +13,9 @@ object ReadOnlyNodeStorage {
 final class ReadOnlyNodeStorage private (source: NodeKeyValueStorage, cache: Map[Hash, Option[Array[Byte]]]) extends NodeKeyValueStorage {
   type This = ReadOnlyNodeStorage
 
+  def tableName = ""
+  def count = -1
+
   /**
    * Persists the changes into the underlying [[khipu.common.SimpleMap]]
    *

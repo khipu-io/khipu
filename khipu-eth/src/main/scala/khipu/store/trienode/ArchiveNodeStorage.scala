@@ -10,6 +10,9 @@ import khipu.Hash
 final class ArchiveNodeStorage(source: NodeStorage) extends NodeKeyValueStorage {
   type This = ArchiveNodeStorage
 
+  def tableName = ""
+  def count = -1
+
   override def get(key: Hash): Option[Array[Byte]] = source.get(key)
 
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): ArchiveNodeStorage = {

@@ -11,7 +11,6 @@ import khipu.domain.Account
 import khipu.domain.Address
 import khipu.domain.Blockchain
 import khipu.domain.SignedTransaction
-import khipu.store.EvmCodeStorage
 import khipu.store.trienode.NodeKeyValueStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
@@ -98,6 +97,7 @@ object BlockWorldState {
     blockchain:         Blockchain,
     accountNodeStorage: NodeKeyValueStorage,
     storageNodeStorage: NodeKeyValueStorage,
+    evmCodeStorage:     NodeKeyValueStorage,
     accountStartNonce:  UInt256,
     stateRootHash:      Option[Hash]        = None
   ): BlockWorldState = {
@@ -120,8 +120,8 @@ object BlockWorldState {
       blockchain,
       accountNodeStorage,
       storageNodeStorage,
+      evmCodeStorage,
       accountStartNonce,
-      blockchain.evmCodeStorage,
       TrieAccounts(underlyingAccountsTrie),
       Map(),
       Map(),
@@ -152,8 +152,8 @@ final class BlockWorldState private (
     blockchain:                   Blockchain,
     accountNodeStorage:           NodeKeyValueStorage,
     storageNodeStorage:           NodeKeyValueStorage,
+    evmCodeStorage:               NodeKeyValueStorage,
     accountStartNonce:            UInt256,
-    evmCodeStorage:               EvmCodeStorage,
     private var trieAccounts:     TrieAccounts,
     private var trieStorages:     Map[Address, TrieStorage],
     private var codes:            Map[Address, ByteString],
@@ -260,8 +260,8 @@ final class BlockWorldState private (
     }
   }
 
-  private def getCodeFromEvmCodeStorage(address: Address) = {
-    getAccount(address).map(_.codeHash).flatMap(evmCodeStorage.get).getOrElse(ByteString())
+  private def getCodeFromEvmCodeStorage(address: Address): ByteString = {
+    getAccount(address).map(_.codeHash).flatMap(x => evmCodeStorage.get(x).map(ByteString(_))).getOrElse(ByteString())
   }
 
   def saveCode(address: Address, code: ByteString): BlockWorldState = {
@@ -312,7 +312,7 @@ final class BlockWorldState private (
     this.codes.foldLeft(Map[Hash, ByteString]()) {
       case (acc, (address, code)) => acc + (Hash(crypto.kec256(code)) -> code)
     } foreach {
-      case (hash, code) => evmCodeStorage + (hash -> code)
+      case (hash, code) => evmCodeStorage.put(hash, code.toArray)
     }
 
     this.trieStorages.foreach {
@@ -395,8 +395,8 @@ final class BlockWorldState private (
     blockchain,
     accountNodeStorage,
     storageNodeStorage,
-    accountStartNonce,
     evmCodeStorage,
+    accountStartNonce,
     trieAccounts,
     trieStorages,
     codes,

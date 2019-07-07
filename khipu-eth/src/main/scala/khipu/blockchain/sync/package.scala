@@ -59,7 +59,7 @@ package object sync {
         None
       } else {
         nodeData.values find { value =>
-          Hash(crypto.kec256(value.toArray)) == requestHash
+          Hash(crypto.kec256(value)) == requestHash
         } map {
           NodeDataResponse(peerId, _)
         }

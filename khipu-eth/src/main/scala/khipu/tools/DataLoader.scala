@@ -40,7 +40,7 @@ final class DataLoader(blockchain: Blockchain)(implicit system: ActorSystem) {
   private val kafkaProps = KesqueDataSource.kafkaProps(system)
 
   private val nodeKeyValueStorage = blockchain.storages.accountNodeStorageFor(Some(0)) // TODO if want to load from leveldb, rewrite a storage
-  private val evmcodeStorage = blockchain.storages.evmCodeStorage
+  private val evmcodeStorage = blockchain.storages.evmcodeStorage
 
   private val accountTopic = "account"
   private val storageTopic = "storage"

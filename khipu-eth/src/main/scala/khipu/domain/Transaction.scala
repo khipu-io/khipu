@@ -11,7 +11,6 @@ object Transaction {
 
   def apply(nonce: UInt256, gasPrice: UInt256, gasLimit: Long, receivingAddress: Address, value: UInt256, payload: ByteString): Transaction =
     Transaction(nonce, gasPrice, gasLimit, Some(receivingAddress), value, payload)
-
 }
 
 final case class Transaction(
@@ -32,7 +31,7 @@ final case class Transaction(
          |gasLimit: $gasLimit
          |receivingAddress: ${if (receivingAddress.isDefined) khipu.toHexString(receivingAddress.get.bytes) else "[Contract creation]"}
          |value: $value wei
-         |payload: ${if (isContractCreation) "isContractCreation: " else "TransactionData: "}${khipu.toHexString(payload)}
+         |payload: ${if (isContractCreation) "Program: " else "Input: "}${khipu.toHexString(payload)}
          |}""".stripMargin
   }
 }

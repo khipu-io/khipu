@@ -139,6 +139,7 @@ object Config {
     val account = "account"
     val storage = "storage"
     val evmcode = "evmcode"
+    val blocknum = "blocknum"
     val header = "header"
     val body = "body"
     val td = "td" // total difficulty
@@ -241,6 +242,7 @@ object BlockchainConfig {
       val eip649BlockNumber = blockchainConfig.getLong("eip649-block-number")
       val byzantiumBlockNumber = blockchainConfig.getLong("byzantium-block-number")
       val constantinopleBlockNumber = blockchainConfig.getLong("constantinople-block-number")
+      val petersburgConfigBlockNumber = blockchainConfig.getLong("petersburg-block-number")
 
       val difficultyBombPauseBlockNumber = blockchainConfig.getLong("difficulty-bomb-pause-block-number")
       val difficultyBombContinueBlockNumber = blockchainConfig.getLong("difficulty-bomb-continue-block-number")
@@ -281,6 +283,7 @@ trait BlockchainConfig {
   def eip649BlockNumber: Long
   def byzantiumBlockNumber: Long
   def constantinopleBlockNumber: Long
+  def petersburgConfigBlockNumber: Long
 
   def difficultyBombPauseBlockNumber: Long
   def difficultyBombContinueBlockNumber: Long

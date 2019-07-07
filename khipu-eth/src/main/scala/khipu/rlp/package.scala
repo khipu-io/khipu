@@ -49,6 +49,8 @@ package object rlp {
     final def toBytes: Array[Byte] = encode(this.toRLPEncodable)
   }
 
+  def toRLPEncodable(value: Array[Byte]): RLPEncodeable = RLPValue(value)
+
   // --- utilities for UInt256
 
   def toRLPEncodable(value: UInt256): RLPEncodeable =

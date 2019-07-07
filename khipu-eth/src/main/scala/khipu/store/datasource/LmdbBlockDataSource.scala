@@ -16,7 +16,7 @@ import org.lmdbjava.Txn
 import scala.collection.mutable
 
 object LmdbBlockDataSource {
-  private var timestampToKey = Array.ofDim[Array[Byte]](200)
+  private val timestampToKey = new mutable.HashMap[Long, Hash]()
   private val keyToTimestamp = new mutable.HashMap[Hash, Long]()
 
   val KEY_SIZE = 8 // long - blocknumber
@@ -39,11 +39,7 @@ object LmdbBlockDataSource {
     try {
       readLock.lock()
 
-      if (timestamp >= 0 && timestamp < timestampToKey.length) {
-        Option(timestampToKey(timestamp.toInt)).map(Hash(_))
-      } else {
-        None
-      }
+      timestampToKey.get(timestamp)
     } finally {
       readLock.unlock()
     }
@@ -56,11 +52,12 @@ object LmdbBlockDataSource {
       val ret = new mutable.ListBuffer[Hash]()
       var lastNumber = from
       var i = from
-      while (i <= to && i < timestampToKey.length) {
-        val key = timestampToKey(i.toInt)
-        if (key ne null) {
-          ret += Hash(key)
-          lastNumber = i
+      while (i <= to) {
+        timestampToKey.get(i) match {
+          case Some(key) =>
+            ret += key
+            lastNumber = i
+          case None =>
         }
         i += 1
       }
@@ -75,12 +72,7 @@ object LmdbBlockDataSource {
     try {
       writeLock.lock()
 
-      if (timestamp > timestampToKey.length - 1) {
-        val newArr = Array.ofDim[Array[Byte]]((timestamp * 1.2).toInt)
-        System.arraycopy(timestampToKey, 0, newArr, 0, timestampToKey.length)
-        timestampToKey = newArr
-      }
-      timestampToKey(timestamp.toInt) = key.bytes
+      timestampToKey += (timestamp -> key)
       keyToTimestamp += (key -> timestamp)
     } finally {
       writeLock.unlock()
@@ -88,7 +80,7 @@ object LmdbBlockDataSource {
   }
 
   def removeTimestamp(key: Hash) {
-    keyToTimestamp.get(key) foreach { timestamp => timestampToKey(timestamp.toInt) = null }
+    keyToTimestamp.get(key) foreach { blockNumber => timestampToKey -= blockNumber }
     keyToTimestamp -= key
   }
 }
@@ -123,7 +115,8 @@ final class LmdbBlockDataSource(
         try {
           txn = env.txnRead()
 
-          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder).putLong(key).flip().asInstanceOf[ByteBuffer]
+          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder)
+          tableKey.putLong(key).flip()
           val tableVal = table.get(txn, tableKey)
           if (tableVal ne null) {
             val data = Array.ofDim[Byte](tableVal.remaining)
@@ -166,22 +159,31 @@ final class LmdbBlockDataSource(
 
       toUpsert foreach {
         case (key, tval @ TVal(data, _, _)) =>
-          cache.put(key, tval)
+          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder)
+          val tableVal = ByteBuffer.allocateDirect(data.length)
 
-          val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder).putLong(key).flip().asInstanceOf[ByteBuffer]
-          val tableVal = ByteBuffer.allocateDirect(data.length).put(data).flip().asInstanceOf[ByteBuffer]
+          tableKey.putLong(key).flip()
+          tableVal.put(data).flip()
           table.put(wxn, tableKey, tableVal)
 
           keyBufs ::= tableKey
       }
 
       wxn.commit()
+
+      toUpsert foreach {
+        case (key, tval) => cache.put(key, tval)
+      }
     } catch {
       case ex: Throwable =>
-        if (wxn ne null) wxn.abort()
+        if (wxn ne null) {
+          wxn.abort()
+        }
         log.error(ex, ex.getMessage)
     } finally {
-      if (wxn ne null) wxn.close()
+      if (wxn ne null) {
+        wxn.close()
+      }
       keyBufs foreach keyPool.release
     }
 

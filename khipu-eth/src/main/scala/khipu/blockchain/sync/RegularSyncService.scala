@@ -49,9 +49,10 @@ trait RegularSyncService { _: SyncService =>
   private def pf(n: Double) = "%1$6.2f".format(n) // percent
   private def pf2(n: Double) = "%1$5.2f".format(n) // percent less than 100%
   private def ef(n: Double) = "%1$6.3f".format(n) // elapse time
+  private def ef2(n: Double) = "%1$5.3f".format(n) // elapse time
   private def gf(n: Double) = "%1$7.2f".format(n) // gas
   private def f6(n: Int) = "%1$6d".format(n) // payload
-  private def f4(n: Int) = "%1$4d".format(n) // cache read count 
+  private def f5(n: Int) = "%1$5d".format(n) // cache read count 
 
   // Should keep newer block to be at the front
   private var workingHeaders = List[BlockHeader]()
@@ -411,12 +412,14 @@ trait RegularSyncService { _: SyncService =>
           val newTd = parentTd + block.header.difficulty
 
           val start1 = System.nanoTime
+          // TODO save in one transaction
           world.persist()
           blockchain.saveBlock(block)
           blockchain.saveReceipts(block.header.hash, receipts)
           blockchain.saveTotalDifficulty(block.header.hash, newTd)
           appStateStorage.putBestBlockNumber(block.header.number)
-          log.debug(s"${block.header.number} persisted in ${(System.nanoTime - start1) / 1000000}ms") // usually less than 20ms
+          val dbWriteTime = (System.nanoTime - start1) / 1000000000.0
+          log.debug(s"${block.header.number} persisted in ${(System.nanoTime - start1) / 1000000}ms")
 
           pendingTransactionsService ! PendingTransactionsService.RemoveTransactions(block.body.transactionList)
           ommersPool ! OmmersPool.RemoveOmmers((block.header +: block.body.uncleNodesList).toList)
@@ -426,10 +429,10 @@ trait RegularSyncService { _: SyncService =>
           val payloadSize = block.body.transactionList.map(_.tx.payload.size).foldLeft(0)(_ + _)
           val elapsed = (System.nanoTime - start) / 1000000000.0
           val parallel = 100.0 * stats.parallelCount / nTx
-          val dbTimePercent = stats.dbReadTimePercent
+          val dbReadTime = stats.dbReadTime / 1000000000.0
           val cacheHitRates = stats.cacheHitRates.map(x => s"${pf(x)}%").mkString(" ")
           val cacheReadCount = stats.cacheReadCount.toInt
-          log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${f6(payloadSize)}, parallel ${pf(parallel)}%, db ${pf(dbTimePercent)}%, cache(${f4(cacheReadCount)}) ${cacheHitRates}")
+          log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${f6(payloadSize)}, parallel ${pf(parallel)}%, r/w(s) ${ef2(dbReadTime)}/${ef2(dbWriteTime)}, cache(${f5(cacheReadCount)}) ${cacheHitRates}")
           Right(NewBlock(block, newTd, stats.parallelCount))
 
         case Left(err) =>

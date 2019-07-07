@@ -23,7 +23,7 @@ object LMDBTool {
   def main(args: Array[String]) {
     val dbTool = new LMDBTool()
 
-    dbTool.test2("table1", 50000000)
+    dbTool.test1("table1", 50000000)
 
     System.exit(0)
   }
@@ -59,11 +59,7 @@ class LMDBTool() {
     .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
 
   def test1(tableName: String, num: Int) = {
-    val table = if (DATA_SIZE > COMPILED_MAX_KEY_SIZE) {
-      env.openDbi(tableName, DbiFlags.MDB_CREATE)
-    } else {
-      env.openDbi(tableName, DbiFlags.MDB_CREATE, DbiFlags.MDB_DUPSORT)
-    }
+    val table = env.openDbi(tableName, DbiFlags.MDB_CREATE)
 
     val keys = write1(table, num)
     read1(table, keys)
@@ -94,7 +90,7 @@ class LMDBTool() {
 
         start = System.nanoTime
 
-        val theKey = if (DATA_SIZE > COMPILED_MAX_KEY_SIZE) k else shortKey(k)
+        val theKey = k
         try {
           keyBuf.put(theKey).flip()
           valBuf.put(v).flip()
@@ -162,7 +158,7 @@ class LMDBTool() {
     while (itr.hasNext) {
       val keyBuf = ByteBuffer.allocateDirect(env.getMaxKeySize)
       val k = itr.next
-      val theKey = if (DATA_SIZE > COMPILED_MAX_KEY_SIZE) k else shortKey(k)
+      val theKey = k
       keyBuf.put(theKey).flip()
 
       val rtx = env.txnRead()

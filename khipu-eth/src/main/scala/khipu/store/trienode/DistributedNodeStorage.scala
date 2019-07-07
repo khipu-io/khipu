@@ -17,6 +17,9 @@ final class DistributedNodeStorage(source: NodeStorage)(implicit system: ActorSy
 
   private def nodeSharding = ClusterSharding(system).shardRegion(NodeEntity.typeName)
 
+  def tableName = ""
+  def count = -1
+
   // TODO return Future
   override def get(key: Hash): Option[Array[Byte]] = {
     val f = (nodeSharding ? NodeEntity.GetNode(key.hexString)).mapTo[Option[Array[Byte]]]

@@ -113,8 +113,8 @@ object DataChecker {
     //"a93fb7195e99fecd525faa33aae35903387d6038ec7afd7ec43d7a5cb9cf4686"
     ).map(khipu.hexDecode).map(Hash(_))
 
-    val stateNode = khipu.hexDecode("c51d801ae31c788f43ed3e09dca04876825c58daea01a531a8377c57748f012f")
-    new DataChecker(storages, 8005867, Some(stateNode), lostKeys).loadSnaphot()
+    val stateNode = None // Some(khipu.hexDecode("c51d801ae31c788f43ed3e09dca04876825c58daea01a531a8377c57748f012f"))
+    new DataChecker(storages, 8044437, stateNode, lostKeys).loadSnaphot()
   }
 
 }
@@ -125,6 +125,7 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
   private val blockHeaderStorage = storages.blockHeaderStorage
   private val accountNodeStorage = storages.accountNodeStorageFor(None)
   private val storageNodeStorage = storages.storageNodeStorageFor(None)
+  private val evmcodeStorage = storages.evmcodeStorage
 
   private val storageReader = new NodeReader[UInt256](dbConfig.storage, storageNodeStorage)(trie.rlpUInt256Serializer) {
     override def nodeGot(k: Array[Byte], v: Array[Byte]) {
@@ -139,6 +140,12 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
       // try to extracted storage node hash
       if (account.stateRoot != Account.EMPTY_STATE_ROOT_HASH) {
         storageReader.getNode(account.stateRoot.bytes, blocknumber) map storageReader.processNode
+      }
+      if (account.codeHash != Account.EMPTY_CODE_HASH) {
+        evmcodeStorage.get(account.codeHash) match {
+          case None => log.error(s"evmcode not found ${account.codeHash}, trie is inconsistent")
+          case _    =>
+        }
       }
     }
 

@@ -10,6 +10,7 @@ object ProgramContext {
     stx:                      SignedTransaction,
     recipientAddress:         Address,
     program:                  Program,
+    input:                    ByteString,
     blockHeader:              BlockHeader,
     world:                    W,
     config:                   EvmConfig,
@@ -18,17 +19,14 @@ object ProgramContext {
     isStaticCall:             Boolean
   ): ProgramContext[W, S] = {
 
-    // YP eq (91)
-    val inputData = if (stx.tx.isContractCreation) ByteString() else stx.tx.payload
-
     val env = ExecEnv(
       recipientAddress,
       stx.sender,
       stx.sender,
       stx.tx.gasPrice,
-      inputData,
       stx.tx.value,
       program,
+      input,
       blockHeader,
       callDepth = 0
     )
