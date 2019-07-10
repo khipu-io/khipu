@@ -4,7 +4,7 @@ import sbt.Keys._
 object Build extends sbt.Build {
 
   lazy val root = Project("khipu", file("."))
-    .aggregate(khipu_base, khipu_eth, khipu_lmdb, kesque, khipu_bdb, khipu_rocksdb)
+    .aggregate(khipu_base, khipu_eth, khipu_lmdb, khipu_kesque, khipu_bdb, khipu_rocksdb)
     .settings(basicSettings: _*)
     .settings(Formatting.buildFileSettings: _*)
     .settings(noPublishing: _*)
@@ -22,7 +22,7 @@ object Build extends sbt.Build {
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
 
-  lazy val kesque = Project("kesque", file("kesque"))
+  lazy val khipu_kesque = Project("khipu-kesque", file("khipu-kesque"))
     .dependsOn(khipu_base)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
@@ -58,7 +58,7 @@ object Build extends sbt.Build {
   lazy val khipu_eth = Project("khipu-eth", file("khipu-eth"))
     .dependsOn(khipu_base)
     .dependsOn(khipu_lmdb)
-    .dependsOn(kesque)
+    .dependsOn(khipu_kesque)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
     .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.scrypto ++ Dependencies.snappy ++ Dependencies.caffeine)
