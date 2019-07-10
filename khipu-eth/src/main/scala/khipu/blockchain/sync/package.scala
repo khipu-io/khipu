@@ -14,6 +14,10 @@ import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.PV63
 
 package object sync {
+
+  val TxTopic = "khipu.tx"
+  val NewBlockTopic = "khipu.newblock"
+
   object NodeHash {
     val StateMptNode = 0.toByte
     val ContractStorageMptNode = 1.toByte

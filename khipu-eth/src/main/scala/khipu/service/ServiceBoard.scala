@@ -8,6 +8,7 @@ import akka.cluster.Cluster
 import akka.event.Logging
 import akka.stream.ActorMaterializer
 import java.io.File
+import java.io.PrintWriter
 import java.security.SecureRandom
 import kesque.Kesque
 import khipu.Hash
@@ -15,6 +16,7 @@ import khipu.Khipu
 import khipu.NodeStatus
 import khipu.ServerStatus
 import khipu.blockchain.sync.HostService
+import khipu.crypto
 import khipu.domain.Blockchain
 import khipu.ledger.Ledger
 import khipu.network.ForkResolver
@@ -45,10 +47,12 @@ import khipu.validators.Validators
 import org.apache.kafka.common.record.CompressionType
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
+import org.spongycastle.crypto.AsymmetricCipherKeyPair
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.io.Source
 
 /**
  * Per host singleton instance with ActorSystem context
@@ -59,6 +63,7 @@ import scala.concurrent.duration._
 object ServiceBoard extends ExtensionId[ServiceBoardExtension] with ExtensionIdProvider {
   override def lookup = ServiceBoard
   override def createExtension(system: ExtendedActorSystem) = new ServiceBoardExtension(system)
+
 }
 
 class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
@@ -85,7 +90,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
   val secureRandomAlgo = if (config.hasPath("secure-random-algo")) Some(config.getString("secure-random-algo")) else None
   val secureRandom = secureRandomAlgo.map(SecureRandom.getInstance(_)).getOrElse(new SecureRandom())
   val nodeKeyFile = util.Config.nodeKeyFile
-  val nodeKey = khipu.loadAsymmetricCipherKeyPair(nodeKeyFile, secureRandom)
+  val nodeKey = loadAsymmetricCipherKeyPair(nodeKeyFile, secureRandom)
   log.info(s"nodeKey at $nodeKeyFile: $nodeKey")
 
   val nodeId = khipu.toHexString(nodeKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ.getEncoded(false).drop(1))
@@ -248,5 +253,33 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
   val hostService = new HostService(blockchain, peerConfiguration)
 
   log.info(s"serviceBoard is ready")
+
+  def loadAsymmetricCipherKeyPair(filePath: String, secureRandom: SecureRandom): AsymmetricCipherKeyPair = {
+    val file = new File(filePath)
+    if (!file.exists) {
+      val keysValuePair = crypto.generateKeyPair(secureRandom)
+
+      // write keys to file
+      val (priv, _) = crypto.keyPairToByteArrays(keysValuePair)
+      require(file.getParentFile.exists || file.getParentFile.mkdirs(), "Key's file parent directory creation failed")
+      val writer = new PrintWriter(filePath)
+      try {
+        writer.write(khipu.toHexString(priv))
+      } finally {
+        writer.close()
+      }
+
+      keysValuePair
+    } else {
+      val reader = Source.fromFile(filePath)
+      try {
+        val privHex = reader.mkString
+        crypto.keyPairFromPrvKey(khipu.hexDecode(privHex))
+      } finally {
+        reader.close()
+      }
+    }
+  }
+
 }
 

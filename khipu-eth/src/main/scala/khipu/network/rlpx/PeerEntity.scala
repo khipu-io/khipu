@@ -14,6 +14,7 @@ import khipu.BroadcastTransactions
 import khipu.ProcessedTransactions
 import khipu.Command
 import khipu.Hash
+import khipu.blockchain.sync
 import khipu.blockchain.sync.BlockHeadersRequest
 import khipu.blockchain.sync.BlockBodiesRequest
 import khipu.blockchain.sync.NodeDataRequest
@@ -92,8 +93,8 @@ class PeerEntity(peer: Peer) extends Actor with Timers with ActorLogging {
   private val knownTransactions = mutable.HashSet[Hash]()
 
   val mediator = DistributedPubSub(context.system).mediator
-  mediator ! Subscribe(khipu.TxTopic, self)
-  mediator ! Subscribe(khipu.NewBlockTopic, self)
+  mediator ! Subscribe(sync.TxTopic, self)
+  mediator ! Subscribe(sync.NewBlockTopic, self)
 
   val serviceBoard = ServiceBoard(context.system)
   def peerManager = serviceBoard.peerManage

@@ -494,6 +494,6 @@ trait RegularSyncService { _: SyncService =>
    */
   //FIXME: Decide block propagation algorithm (for now we send block to every peer) [EC-87]
   def broadcastNewBlocks(newBlocks: Seq[NewBlock]) {
-    mediator ! Publish(khipu.NewBlockTopic, BroadcastNewBlocks(newBlocks))
+    mediator ! Publish(sync.NewBlockTopic, BroadcastNewBlocks(newBlocks))
   }
 }

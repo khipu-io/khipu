@@ -12,6 +12,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import khipu.BroadcastTransactions
 import khipu.ProcessedTransactions
+import khipu.blockchain.sync
 import khipu.domain.SignedTransaction
 import khipu.network.p2p.messages.CommonMessages.SignedTransactions
 import khipu.network.rlpx.PeerEntity
@@ -90,7 +91,7 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
     case RemoveTransactions(signedTransactions) =>
       val stxHashs = signedTransactions.map(_.hash).toSet
       pendingTransactions = pendingTransactions.filterNot(ptx => stxHashs.contains(ptx.stx.hash))
-      mediator ! Publish(khipu.TxTopic, ProcessedTransactions(signedTransactions))
+      mediator ! Publish(sync.TxTopic, ProcessedTransactions(signedTransactions))
 
     case PeerEntity.MessageFromPeer(peerId, SignedTransactions(signedTransactions)) =>
       addTransactions(signedTransactions.toList)
@@ -121,7 +122,7 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
     val ptxHashs = pendingTransactions.map(_.stx.hash).toSet
     val txsToNotify = signedTransactions.filter(tx => ptxHashs.contains(tx.hash)) // signed transactions that are still pending
     if (txsToNotify.nonEmpty) {
-      mediator ! Publish(khipu.TxTopic, BroadcastTransactions(txsToNotify))
+      mediator ! Publish(sync.TxTopic, BroadcastTransactions(txsToNotify))
     }
   }
 }

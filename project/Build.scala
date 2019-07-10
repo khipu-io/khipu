@@ -4,7 +4,7 @@ import sbt.Keys._
 object Build extends sbt.Build {
 
   lazy val root = Project("khipu", file("."))
-    .aggregate(kesque, khipu_base, khipu_eth)
+    .aggregate(khipu_base, khipu_eth, khipu_lmdb, kesque, khipu_bdb, khipu_rocksdb)
     .settings(basicSettings: _*)
     .settings(Formatting.buildFileSettings: _*)
     .settings(noPublishing: _*)
@@ -18,31 +18,56 @@ object Build extends sbt.Build {
   lazy val khipu_base = Project("khipu-base", file("khipu-base"))
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.spongycastle ++ Dependencies.scrypto)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
-
-  lazy val khipu_eth = Project("khipu-eth", file("khipu-eth"))
-    .dependsOn(khipu_base)
-    .dependsOn(kesque)
-    .settings(basicSettings: _*)
-    .settings(noPublishing: _*)
-    .settings(unmanagedJars in Compile ++= Seq(baseDirectory.value / "lib" / "db-5.3.28.jar").classpath)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.lmdb ++ Dependencies.rocksdb ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.snappy ++ Dependencies.caffeine)
-    .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
-    .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
-    .settings(Packaging.settings)
-    .settings(
-      //mainClass in Compile := Some("khipu.store.KesqueCompactor")
-      mainClass in Compile := Some("khipu.Khipu")
-    )
 
   lazy val kesque = Project("kesque", file("kesque"))
+    .dependsOn(khipu_base)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
     .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.kafka ++ Dependencies.spongycastle ++ Dependencies.caffeine ++ Dependencies.lmdb)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+
+  lazy val khipu_bdb = Project("khipu-bdb", file("khipu-bdb"))
+    .dependsOn(khipu_base)
+    .settings(basicSettings: _*)
+    .settings(noPublishing: _*)
+    .settings(unmanagedJars in Compile ++= Seq(baseDirectory.value / "lib" / "db-5.3.28.jar").classpath)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka)
+    .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
+    .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+
+  lazy val khipu_rocksdb = Project("khipu-rocksdb", file("khipu-rocksdb"))
+    .dependsOn(khipu_base)
+    .settings(basicSettings: _*)
+    .settings(noPublishing: _*)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.rocksdb)
+    .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
+    .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+
+  lazy val khipu_lmdb = Project("khipu-lmdb", file("khipu-lmdb"))
+    .dependsOn(khipu_base)
+    .settings(basicSettings: _*)
+    .settings(noPublishing: _*)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.lmdb)
+    .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
+    .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+
+  lazy val khipu_eth = Project("khipu-eth", file("khipu-eth"))
+    .dependsOn(khipu_base)
+    .dependsOn(khipu_lmdb)
+    .dependsOn(kesque)
+    .settings(basicSettings: _*)
+    .settings(noPublishing: _*)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.akka_http ++ Dependencies.others ++ Dependencies.spongycastle ++ Dependencies.scrypto ++ Dependencies.snappy ++ Dependencies.caffeine)
+    .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
+    .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+    .settings(Packaging.settings)
+    .settings(
+      mainClass in Compile := Some("khipu.Khipu")
+    )
 
   lazy val basicSettings = Defaults.coreDefaultSettings ++ Seq(
     organization := "khipu.io",
@@ -115,6 +140,8 @@ object Dependencies {
 
   val spongycastle = Seq("com.madgag.spongycastle" % "core" % "1.58.0.0")
 
+  val scrypto = Seq("org.consensusresearch" %% "scrypto" % "1.2.0-RC3")
+
   val snappy = Seq("org.xerial.snappy" % "snappy-java" % "1.1.7")
 
   val caffeine = Seq("com.github.ben-manes.caffeine" % "caffeine" % "2.6.2")
@@ -123,11 +150,11 @@ object Dependencies {
     "ch.megard" %% "akka-http-cors" % "0.2.1",
     "org.json4s" %% "json4s-native" % "3.5.1",
     "de.heikoseeberger" %% "akka-http-json4s" % "1.11.0",
-    "org.consensusresearch" %% "scrypto" % "1.2.0-RC3",
     "org.jline" % "jline" % "3.1.2",
     "commons-io" % "commons-io" % "2.5",
     "com.google.code.findbugs" % "jsr305" % "3.0.2" % Provided
   )
+
 
   val log = Seq(
     "org.slf4j" % "slf4j-api" % SLF4J_VERSION,

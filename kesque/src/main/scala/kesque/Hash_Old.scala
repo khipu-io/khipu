@@ -3,9 +3,9 @@ package kesque
 import java.util.Arrays
 import org.spongycastle.util.encoders.Hex
 
-object Hash {
-  val empty = Hash(Array[Byte]())
-  def apply(): Hash = empty
+object Hash_Old {
+  val empty = Hash_Old(Array[Byte]())
+  def apply(): Hash_Old = empty
 
   def intHash(bytes: Array[Byte]): Int = {
     val n = math.min(bytes.length, 4)
@@ -31,7 +31,7 @@ object Hash {
     h
   }
 }
-final case class Hash(bytes: Array[Byte]) {
+final case class Hash_Old(bytes: Array[Byte]) {
   def value = new java.math.BigInteger(1, bytes)
 
   def length = bytes.length
@@ -40,12 +40,12 @@ final case class Hash(bytes: Array[Byte]) {
 
   def hexString: String = Hex.toHexString(bytes)
 
-  override def hashCode: Int = Hash.intHash(bytes)
+  override def hashCode: Int = Hash_Old.intHash(bytes)
 
   override def equals(any: Any) = {
     any match {
-      case that: Hash => (this eq that) || Arrays.equals(this.bytes, that.bytes)
-      case _          => false
+      case that: Hash_Old => (this eq that) || Arrays.equals(this.bytes, that.bytes)
+      case _              => false
     }
   }
 
