@@ -1,6 +1,6 @@
 ## Khipu: Enterprise Blockchain Platform
 
-Khipu is an enterprise blockchain platform which will be compatible with Ethereum protocol.
+Khipu is an enterprise blockchain platform based on Ethereum.
 It is built on earlier work on Mantis by [Grothendieck Team](https://iohk.io/projects/ethereum-classic/), but supports ETH.
 
 The major researches of Khipu so far:
@@ -29,7 +29,7 @@ Features to be done
 
 #### Notice
 
-This version's data storage format may be changed during productional release.
+This version's data storage format may be changed before productional release.
 
 During fast sync, sometimes the syncing looks like stopped with no more state nodes or blocks being downloaded. A possible reason that may be the current left handshaked peers could not respond to state nodes or blocks request any more. In case of this, try to stop khipu and restart it again.
 
