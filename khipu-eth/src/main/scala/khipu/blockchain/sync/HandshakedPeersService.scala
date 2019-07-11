@@ -26,6 +26,7 @@ object HandshakedPeersService {
 trait HandshakedPeersService { _: SyncService =>
   import context.dispatcher
   import HandshakedPeersService._
+  import util.Config.Sync._
 
   protected def appStateStorage: AppStateStorage
 
@@ -161,5 +162,10 @@ trait HandshakedPeersService { _: SyncService =>
       case Failure(e) =>
         Success(false)
     }
+  }
+
+  protected def setCurrBlockHeaderForChecking() {
+    val bestBlockNumber = appStateStorage.getBestBlockNumber
+    blockHeaderForChecking = blockchain.getBlockHeaderByNumber(bestBlockNumber - blockResolveDepth)
   }
 }

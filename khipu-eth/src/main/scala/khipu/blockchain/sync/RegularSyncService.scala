@@ -60,6 +60,7 @@ trait RegularSyncService { _: SyncService =>
   def startRegularSync() {
     log.info("Starting regular block synchronization")
     appStateStorage.fastSyncDone()
+    setCurrBlockHeaderForChecking()
     context become (handleRegularSync orElse peerUpdateBehavior orElse ommersBehavior orElse stopBehavior)
     resumeRegularSync()
   }
@@ -293,6 +294,8 @@ trait RegularSyncService { _: SyncService =>
                 val gasUsed = _gasUsed / 1048576.0
                 val parallel = (100.0 * nTxInParallel / nTx)
                 log.debug(s"[sync] Executed ${newBlocks.size} blocks up to #${newBlocks.last.block.header.number} in ${ef(elapsed)}s, block time ${ef(elapsed / newBlocks.size)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} Mgas/s, parallel: ${pf(parallel)}%")
+
+                setCurrBlockHeaderForChecking()
 
                 broadcastNewBlocks(newBlocks)
               }
