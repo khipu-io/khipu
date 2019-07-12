@@ -51,7 +51,7 @@ object Ledger {
   type PC = ProgramContext[BlockWorldState, TrieStorage]
   type PR = ProgramResult[BlockWorldState, TrieStorage]
 
-  final case class Stats(parallelCount: Int, dbReadTime: Long, cacheHitRates: List[Double], cacheReadCount: Long)
+  final case class Stats(parallelCount: Int, dbReadTimePerc: Double, cacheHitRates: List[Double], cacheReadCount: Long)
 
   final case class BlockResult(world: BlockWorldState, gasUsed: Long = 0, receipts: Seq[Receipt] = Nil, stats: Stats)
   final case class BlockPreparationResult(block: Block, blockResult: BlockResult, stateRootHash: Hash)
@@ -437,7 +437,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       val dsGetElapsed2 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
         blockchain.storages.evmcodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
 
-      val dbReadTime = dsGetElapsed1 + dsGetElapsed2
+      val dbReadTimePerc = (dsGetElapsed1 + dsGetElapsed2).toDouble / (elapsed + reExecutedElapsed)
 
       val parallelRate = if (parallelCount > 0) {
         parallelCount * 100.0 / nTx
@@ -453,7 +453,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
       txError match {
         case Some(error) => Left(error)
-        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbReadTime, cacheHitRates, cacheReadCount))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
+        case None        => postExecuteTransactions(blockHeader, evmCfg, txResults, Stats(parallelCount, dbReadTimePerc, cacheHitRates, cacheReadCount))(currWorld.map(_.withTx(None)).getOrElse(initialWorldFun))
       }
     } andThen {
       case Success(_) =>

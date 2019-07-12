@@ -286,12 +286,11 @@ trait RegularSyncService { _: SyncService =>
               val elapsed = (System.nanoTime - start) / 1000000000.0
 
               if (newBlocks.nonEmpty) {
-                val (nTx, _gasUsed, nTxInParallel) = newBlocks.foldLeft(0, 0L, 0) {
+                val (nTx, gasUsed, nTxInParallel) = newBlocks.foldLeft(0, 0L, 0) {
                   case ((accTx, accGasUsed, accParallel), b) =>
                     val nTx = b.block.body.transactionList.size
                     (accTx + nTx, accGasUsed + b.block.header.gasUsed, accParallel + b.txInParallel)
                 }
-                val gasUsed = _gasUsed / 1048576.0
                 val parallel = (100.0 * nTxInParallel / nTx)
                 log.debug(s"[sync] Executed ${newBlocks.size} blocks up to #${newBlocks.last.block.header.number} in ${ef(elapsed)}s, block time ${ef(elapsed / newBlocks.size)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} Mgas/s, parallel: ${pf(parallel)}%")
 
@@ -412,6 +411,8 @@ trait RegularSyncService { _: SyncService =>
       val start = System.nanoTime
       ledger.executeBlock(block, validators) map {
         case Right(BlockResult(world, _, receipts, stats)) =>
+          val dbReadTime = (stats.dbReadTimePerc * (System.nanoTime - start)) / 1000000000.0
+
           val newTd = parentTd + block.header.difficulty
 
           val start1 = System.nanoTime
@@ -432,7 +433,6 @@ trait RegularSyncService { _: SyncService =>
           val payloadSize = block.body.transactionList.map(_.tx.payload.size).foldLeft(0)(_ + _)
           val elapsed = (System.nanoTime - start) / 1000000000.0
           val parallel = 100.0 * stats.parallelCount / nTx
-          val dbReadTime = stats.dbReadTime / 1000000000.0
           val cacheHitRates = stats.cacheHitRates.map(x => s"${pf(x)}%").mkString(" ")
           val cacheReadCount = stats.cacheReadCount.toInt
           log.info(s"[sync]${if (isBatch) "+" else " "}Executed #${block.header.number} (${tf(nTx)} tx) in ${ef(elapsed)}s, ${xf(nTx / elapsed)} tx/s, ${gf(gasUsed / elapsed)} mgas/s, payload ${f6(payloadSize)}, parallel ${pf(parallel)}%, r/w(s) ${ef2(dbReadTime)}/${ef2(dbWriteTime)}, cache(${f5(cacheReadCount)}) ${cacheHitRates}")
