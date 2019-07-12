@@ -158,7 +158,7 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
 
   def loadSnaphot() {
     log.info(s"loading nodes of #$blockNumber")
-    blockHeaderStorage.getBlockHash(blockNumber) flatMap blockHeaderStorage.get map (_.stateRoot.bytes) orElse stateRoot foreach { root =>
+    storages.getHashByBlockNumber(blockNumber) flatMap blockHeaderStorage.get map (_.stateRoot.bytes) orElse stateRoot foreach { root =>
       log.info(s"stateRoot: ${Hash(root)}")
       accountReader.getNode(root, blockNumber) map accountReader.processNode
     }

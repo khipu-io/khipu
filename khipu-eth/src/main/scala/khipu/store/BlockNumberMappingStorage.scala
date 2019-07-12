@@ -5,38 +5,37 @@ import akka.event.Logging
 import java.nio.ByteBuffer
 import khipu.Hash
 import khipu.store.datasource.DataSource
-import khipu.store.datasource.LmdbBlockDataSource
 import khipu.store.datasource.LmdbDataSource
 import khipu.util.SimpleMap
 import org.lmdbjava.Dbi
 import org.lmdbjava.Env
+import scala.collection.mutable
 
+object BlockNumberMappingStorage {
+  val namespace: Array[Byte] = Array[Byte]()
+}
 /**
  * This class is used to store the blockhash -> blocknumber
  */
-final class BlockNumberMappingStorage(val source: DataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, Long] {
+final class BlockNumberMappingStorage(storags: Storages, val source: DataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, Long] {
   type This = BlockNumberMappingStorage
+
+  import BlockNumberMappingStorage.namespace
 
   private val log = Logging(system, this.getClass)
   private val lmdbSource = source.asInstanceOf[LmdbDataSource]
   private val env = lmdbSource.env
   private val table = lmdbSource.table
 
-  val namespace: Array[Byte] = Array[Byte]()
   def keySerializer: Hash => Array[Byte] = _.bytes
   def valueSerializer: Long => Array[Byte] = ByteBuffer.allocate(8).putLong(_).array
   def valueDeserializer: Array[Byte] => Long = ByteBuffer.wrap(_).getLong
 
-  {
-    log.info(s"Loading block number index ...")
-    val start = System.nanoTime
-
-    loadBlockNumberIndex(env, table)
-
-    log.info(s"Loaded block number index in ${(System.nanoTime - start) / 1000000000}s.")
-  }
-
+  // batch load clock number - woo, this takes lots time
+  //loadBlockNumberIndex(env, table)
   private def loadBlockNumberIndex(env: Env[ByteBuffer], table: Dbi[ByteBuffer]) {
+    log.info(s"Loading block number index ...")
+
     val start = System.nanoTime
     val rtx = env.txnRead()
     val itr = table.iterate(rtx)
@@ -49,11 +48,13 @@ final class BlockNumberMappingStorage(val source: DataSource)(implicit system: A
       val blockNumber = entry.`val`.getLong()
       log.debug(s"blockNumber: $blockNumber, hash: ${Hash(hash)}")
 
-      LmdbBlockDataSource.putTimestampToKey(blockNumber, Hash(hash))
+      storags.putBlockNumber(blockNumber, Hash(hash))
     }
     itr.close()
     rtx.commit()
     rtx.close()
+
+    log.info(s"Loaded block number index in ${(System.nanoTime - start) / 1000000000}s.")
   }
 
   override def get(key: Hash): Option[Long] = {
@@ -69,6 +70,6 @@ final class BlockNumberMappingStorage(val source: DataSource)(implicit system: A
 
   def count = source.asInstanceOf[LmdbDataSource].count
 
-  protected def apply(source: DataSource): BlockNumberMappingStorage = new BlockNumberMappingStorage(source)
+  protected def apply(storags: Storages, source: DataSource): BlockNumberMappingStorage = new BlockNumberMappingStorage(storags, source)
 }
 

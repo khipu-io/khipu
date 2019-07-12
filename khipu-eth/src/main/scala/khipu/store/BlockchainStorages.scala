@@ -1,5 +1,6 @@
 package khipu.store
 
+import khipu.Hash
 import khipu.store.datasource.BlockDataSource
 import khipu.store.datasource.DataSource
 import khipu.store.datasource.NodeDataSource
@@ -30,4 +31,13 @@ trait BlockchainStorages {
   def blockHeaderStorage: BlockHeaderStorage
   def blockBodyStorage: BlockBodyStorage
   def receiptsStorage: ReceiptsStorage
+
+  // ---
+  def blockNumberMapping: BlockNumberMapping
+
+  def getBlockNumberByHash(hash: Hash) = blockNumberMapping.getBlockNumberByHash(hash)
+  def getHashByBlockNumber(blockNumber: Long) = blockNumberMapping.getHashByBlockNumber(blockNumber)
+  def getHashsByBlockNumberRange(from: Long, to: Long) = blockNumberMapping.getHashsByBlockNumberRange(from, to)
+  def putBlockNumber(blockNumber: Long, hash: Hash) = blockNumberMapping.putBlockNumber(blockNumber, hash)
+  def removeBlockNumber(key: Hash) = blockNumberMapping.removeBlockNumber(key)
 }

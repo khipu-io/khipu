@@ -58,7 +58,7 @@ object ReceiptsStorage {
  *   Key: hash of the block to which the list of receipts belong
  *   Value: the list of receipts
  */
-final class ReceiptsStorage(val source: BlockDataSource) extends SimpleMap[Hash, Seq[Receipt]] {
+final class ReceiptsStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, Seq[Receipt]] {
   type This = ReceiptsStorage
 
   import ReceiptsStorage.ReceiptsSerializer._
@@ -68,7 +68,7 @@ final class ReceiptsStorage(val source: BlockDataSource) extends SimpleMap[Hash,
   def valueDeserializer: Array[Byte] => Seq[Receipt] = toReceipts
 
   override def get(key: Hash): Option[Seq[Receipt]] = {
-    LmdbBlockDataSource.getTimestampByKey(key) flatMap {
+    storages.getBlockNumberByHash(key) flatMap {
       blockNum => source.get(blockNum).map(x => toReceipts(x.value))
     }
   }
@@ -76,17 +76,17 @@ final class ReceiptsStorage(val source: BlockDataSource) extends SimpleMap[Hash,
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Seq[Receipt]]): ReceiptsStorage = {
     val upsert = toUpsert flatMap {
       case (key, value) =>
-        LmdbBlockDataSource.getTimestampByKey(key) map {
+        storages.getBlockNumberByHash(key) map {
           blockNum => (blockNum -> TVal(toBytes(value), -1, blockNum))
         }
     }
     val remove = toRemove flatMap {
-      key => LmdbBlockDataSource.getTimestampByKey(key)
+      key => storages.getBlockNumberByHash(key)
     }
     source.update(remove, upsert)
     this
   }
 
-  protected def apply(source: BlockDataSource): ReceiptsStorage = new ReceiptsStorage(source)
+  protected def apply(storages: Storages, source: BlockDataSource): ReceiptsStorage = new ReceiptsStorage(storages, source)
 }
 

@@ -194,7 +194,7 @@ object KesqueCompactor {
     val storageTable = storages.storageNodeDataSource.asInstanceOf[KesqueDataSource].table
     val blockHeaderStorage = storages.blockHeaderStorage
 
-    val compactor = new KesqueCompactor(kesque, accountTable, storageTable, blockHeaderStorage, 7225555, 0, 1)
+    val compactor = new KesqueCompactor(kesque, accountTable, storageTable, storages, blockHeaderStorage, 7225555, 0, 1)
     compactor.start()
   }
 }
@@ -202,6 +202,7 @@ final class KesqueCompactor(
     kesque:             Kesque,
     accountTable:       HashKeyValueTable,
     storageTable:       HashKeyValueTable,
+    storages:           Storages,
     blockHeaderStorage: BlockHeaderStorage,
     blockNumber:        Long,
     fromFileNo:         Int,
@@ -251,7 +252,7 @@ final class KesqueCompactor(
   private def loadSnaphot() {
     log.info(s"[comp] loading nodes of #$blockNumber")
     for {
-      hash <- blockHeaderStorage.getBlockHash(blockNumber)
+      hash <- storages.getHashByBlockNumber(blockNumber)
       header <- blockHeaderStorage.get(hash)
     } {
       val stateRoot = header.stateRoot.bytes

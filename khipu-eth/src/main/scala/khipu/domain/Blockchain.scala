@@ -180,10 +180,10 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   private val blockNumberMappingStorage = storages.blockNumberMappingStorage
 
   def getHashByBlockNumber(number: Long): Option[Hash] =
-    blockHeaderStorage.getBlockHash(number)
+    storages.getHashByBlockNumber(number)
 
   def getNumberByBlockHash(hash: Hash): Option[Long] =
-    blockHeaderStorage.getBlockNumber(hash)
+    storages.getBlockNumberByHash(hash)
 
   def getBlockHeaderByHash(hash: Hash): Option[BlockHeader] =
     blockHeaderStorage.get(hash)

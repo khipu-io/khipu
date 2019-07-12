@@ -16,7 +16,7 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockHeader belong
  *   Value: the block header
  */
-final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, BlockHeader] {
+final class BlockHeaderStorage(storages: Storages, val source: BlockDataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, BlockHeader] {
   type This = BlockHeaderStorage
 
   def keySerializer: Hash => Array[Byte] = _.bytes
@@ -29,8 +29,11 @@ final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: Act
   private val env = lmdbSource.env
   private val table = lmdbSource.table
 
+  def getByBlockNumber(blockNumber: Long) = {
+    source.get(blockNumber).map(_.value.toBlockHeader.hash)
+  }
   override def get(key: Hash): Option[BlockHeader] = {
-    LmdbBlockDataSource.getTimestampByKey(key) flatMap {
+    storages.getBlockNumberByHash(key) flatMap {
       blockNum => source.get(blockNum).map(_.value.toBlockHeader)
     }
   }
@@ -38,23 +41,19 @@ final class BlockHeaderStorage(val source: BlockDataSource)(implicit system: Act
   override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockHeader]): BlockHeaderStorage = {
     val upsert = toUpsert map {
       case (key, value) =>
-        LmdbBlockDataSource.putTimestampToKey(value.number, key)
+        storages.putBlockNumber(value.number, key)
         (value.number -> TVal(value.toBytes, -1, value.number))
     }
     val remove = toRemove flatMap {
       key =>
-        val blockNum = LmdbBlockDataSource.getTimestampByKey(key)
-        LmdbBlockDataSource.removeTimestamp(key)
+        val blockNum = storages.getBlockNumberByHash(key)
+        //storages.removeBlockNumber(key)
         blockNum
     }
     source.update(remove, upsert)
     this
   }
 
-  def getBlockNumber(hash: Hash) = LmdbBlockDataSource.getTimestampByKey(hash)
-  def getBlockHash(blockNumber: Long) = LmdbBlockDataSource.getKeyByTimestamp(blockNumber)
-  def getBlockHashs(from: Long, to: Long) = LmdbBlockDataSource.getKeysByTimestamp(from, to)
-
-  protected def apply(source: BlockDataSource): BlockHeaderStorage = new BlockHeaderStorage(source)
+  protected def apply(storages: Storages, source: BlockDataSource): BlockHeaderStorage = new BlockHeaderStorage(storages, source)
 }
 

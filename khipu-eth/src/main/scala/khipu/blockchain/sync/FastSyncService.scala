@@ -449,7 +449,7 @@ trait FastSyncService { _: SyncService =>
         if (syncState.pendingBlockBodies.size + syncState.pendingReceipts.size < 10000) {
           val from = syncState.enqueuedBlockNumber + 1
           val to = math.min(syncState.enqueuedBlockNumber + 200, syncState.bestBlockHeaderNumber)
-          val (lastNumber, enqueueHashs) = blockHeaderStorage.getBlockHashs(from, to)
+          val (lastNumber, enqueueHashs) = storages.getHashsByBlockNumberRange(from, to)
           if (enqueueHashs.nonEmpty) {
             syncState.enqueuedBlockNumber = lastNumber
 

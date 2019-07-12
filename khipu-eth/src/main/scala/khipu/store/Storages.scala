@@ -1,6 +1,7 @@
 package khipu.store
 
 import akka.actor.ActorSystem
+import khipu.Hash
 import khipu.store.datasource.DataSources
 import khipu.store.trienode.NodeTableStorage
 import khipu.store.trienode.PruningMode
@@ -14,18 +15,20 @@ object Storages {
     lazy val storageNodeStorageFor: (Option[Long]) => NodeTableStorage = bn => new NodeTableStorage(storageNodeDataSource)
     lazy val evmcodeStorage = new NodeTableStorage(evmcodeDataSource)
 
-    lazy val blockNumberMappingStorage = new BlockNumberMappingStorage(blockNumberMappingDataSource)
+    lazy val blockNumberMappingStorage = new BlockNumberMappingStorage(this, blockNumberMappingDataSource)
 
-    lazy val blockHeaderStorage = new BlockHeaderStorage(blockHeaderDataSource)
-    lazy val blockBodyStorage = new BlockBodyStorage(blockBodyDataSource)
-    lazy val receiptsStorage = new ReceiptsStorage(receiptsDataSource)
-    lazy val totalDifficultyStorage = new TotalDifficultyStorage(totalDifficultyDataSource)
+    lazy val blockHeaderStorage = new BlockHeaderStorage(this, blockHeaderDataSource)
+    lazy val blockBodyStorage = new BlockBodyStorage(this, blockBodyDataSource)
+    lazy val receiptsStorage = new ReceiptsStorage(this, receiptsDataSource)
+    lazy val totalDifficultyStorage = new TotalDifficultyStorage(this, totalDifficultyDataSource)
 
     lazy val transactionMappingStorage = new TransactionMappingStorage(transactionMappingDataSource)
 
     lazy val fastSyncStateStorage = new FastSyncStateStorage(fastSyncStateDataSource)
     lazy val appStateStorage = new AppStateStorage(appStateDataSource)
     lazy val knownNodesStorage = new KnownNodesStorage(knownNodesDataSource)
+
+    lazy val blockNumberMapping = new BlockNumberMapping(blockNumberMappingDataSource, blockHeaderDataSource)
   }
 }
 

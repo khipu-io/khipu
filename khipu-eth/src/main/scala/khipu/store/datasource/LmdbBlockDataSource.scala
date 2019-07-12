@@ -4,10 +4,8 @@ import akka.actor.ActorSystem
 import akka.event.Logging
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.concurrent.locks.ReentrantReadWriteLock
 import kesque.FIFOCache
 import kesque.TVal
-import khipu.Hash
 import khipu.crypto
 import khipu.util.Clock
 import org.lmdbjava.DbiFlags
@@ -15,75 +13,6 @@ import org.lmdbjava.Env
 import org.lmdbjava.Txn
 import scala.collection.mutable
 
-object LmdbBlockDataSource {
-  private val timestampToKey = new mutable.HashMap[Long, Hash]()
-  private val keyToTimestamp = new mutable.HashMap[Hash, Long]()
-
-  val KEY_SIZE = 8 // long - blocknumber
-
-  private val lock = new ReentrantReadWriteLock()
-  private val readLock = lock.readLock
-  private val writeLock = lock.writeLock
-
-  def getTimestampByKey(key: Hash): Option[Long] = {
-    try {
-      readLock.lock()
-
-      keyToTimestamp.get(key)
-    } finally {
-      readLock.unlock()
-    }
-  }
-
-  def getKeyByTimestamp(timestamp: Long): Option[Hash] = {
-    try {
-      readLock.lock()
-
-      timestampToKey.get(timestamp)
-    } finally {
-      readLock.unlock()
-    }
-  }
-
-  def getKeysByTimestamp(from: Long, to: Long): (Long, List[Hash]) = {
-    try {
-      readLock.lock()
-
-      val ret = new mutable.ListBuffer[Hash]()
-      var lastNumber = from
-      var i = from
-      while (i <= to) {
-        timestampToKey.get(i) match {
-          case Some(key) =>
-            ret += key
-            lastNumber = i
-          case None =>
-        }
-        i += 1
-      }
-
-      (lastNumber, ret.toList)
-    } finally {
-      readLock.unlock()
-    }
-  }
-
-  def putTimestampToKey(timestamp: Long, key: Hash) {
-    try {
-      writeLock.lock()
-
-      timestampToKey += (timestamp -> key)
-      keyToTimestamp += (key -> timestamp)
-    } finally {
-      writeLock.unlock()
-    }
-  }
-
-  def removeTimestamp(key: Hash) {
-    keyToTimestamp.get(key) foreach { blockNumber => timestampToKey -= blockNumber }
-    keyToTimestamp -= key
-  }
-}
 final class LmdbBlockDataSource(
     val topic: String,
     val env:   Env[ByteBuffer],
