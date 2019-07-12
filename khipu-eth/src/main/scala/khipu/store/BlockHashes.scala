@@ -7,7 +7,7 @@ import khipu.store.datasource.BlockDataSource
 import khipu.store.datasource.DataSource
 import scala.collection.mutable
 
-final class BlockNumberMapping(blockNumberMappingSource: DataSource, blockHeaderSource: BlockDataSource) {
+final class BlockHashes(blockHashSource: DataSource, blockHeaderSource: BlockDataSource) {
   private val blockNumberToHash = new mutable.HashMap[Long, Hash]()
   private val hashToBlockNumber = new mutable.HashMap[Hash, Long]()
 
@@ -21,7 +21,7 @@ final class BlockNumberMapping(blockNumberMappingSource: DataSource, blockHeader
 
       hashToBlockNumber.get(hash) match {
         case None =>
-          blockNumberMappingSource.get(BlockNumberMappingStorage.namespace, hash.bytes).map(x => ByteBuffer.wrap(x).getLong) map { blockNumber =>
+          blockHashSource.get(BlockHashStorage.namespace, hash.bytes).map(x => ByteBuffer.wrap(x).getLong) map { blockNumber =>
             blockNumberToHash += (blockNumber -> hash)
             hashToBlockNumber += (hash -> blockNumber)
             blockNumber

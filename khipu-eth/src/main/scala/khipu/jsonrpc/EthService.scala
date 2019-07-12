@@ -30,7 +30,7 @@ import khipu.ledger.Ledger
 import khipu.mining.BlockGenerator
 import khipu.util
 import khipu.store.AppStateStorage
-import khipu.store.TransactionMappingStorage.TransactionLocation
+import khipu.store.TransactionStorage.TransactionLocation
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
 import khipu.rlp

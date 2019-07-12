@@ -10,9 +10,6 @@ import akka.stream.ActorMaterializer
 import java.io.File
 import java.io.PrintWriter
 import java.security.SecureRandom
-import kesque.Kesque
-import khipu.Hash
-import khipu.Khipu
 import khipu.NodeStatus
 import khipu.ServerStatus
 import khipu.blockchain.sync.HostService
@@ -22,16 +19,13 @@ import khipu.ledger.Ledger
 import khipu.network.ForkResolver
 import khipu.network.p2p.MessageDecoder
 import khipu.network.p2p.messages.Versions
-import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.network.rlpx.KnownNodesService.KnownNodesServiceConfig
 import khipu.network.rlpx.PeerManager
 import khipu.network.rlpx.discovery.DiscoveryConfig
 import khipu.store.Storages
-import khipu.store.datasource.KesqueDataSource
 import khipu.store.datasource.LmdbBlockDataSource
 import khipu.store.datasource.LmdbDataSource
 import khipu.store.datasource.LmdbNodeDataSource
-import khipu.store.datasource.SharedLeveldbDataSources
 import khipu.store.datasource.SharedLmdbDataSources
 import khipu.util
 import khipu.util.BlockchainConfig
@@ -44,13 +38,10 @@ import khipu.validators.BlockValidator
 import khipu.validators.OmmersValidator
 import khipu.validators.SignedTransactionValidator
 import khipu.validators.Validators
-import org.apache.kafka.common.record.CompressionType
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
 import org.spongycastle.crypto.AsymmetricCipherKeyPair
 import org.spongycastle.crypto.params.ECPublicKeyParameters
-import scala.concurrent.Await
-import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.io.Source
 
@@ -132,7 +123,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
         lazy val storageNodeDataSource = new LmdbNodeDataSource(dbConfig.storage, env, cacheCfg.cacheSize)
         lazy val evmcodeDataSource = new LmdbNodeDataSource(dbConfig.evmcode, env)
 
-        lazy val blockNumberMappingDataSource = new LmdbDataSource(dbConfig.blocknum, env)
+        lazy val blockHashDataSource = new LmdbDataSource(dbConfig.blocknum, env)
 
         lazy val blockHeaderDataSource = new LmdbBlockDataSource(dbConfig.header, env)
         lazy val blockBodyDataSource = new LmdbBlockDataSource(dbConfig.body, env)
@@ -164,7 +155,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
         }
       }
 
-    case dbConfig.KESQUE => null // Temporary disabled KESQUE
+    case dbConfig.KESQUE => null // disabled KESQUE
 
     //      new Storages.DefaultStorages with SharedLeveldbDataSources {
     //        implicit protected val system = ServiceBoardExtension.this.system

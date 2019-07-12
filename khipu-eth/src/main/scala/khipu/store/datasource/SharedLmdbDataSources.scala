@@ -11,7 +11,7 @@ trait SharedLmdbDataSources extends DataSources {
 
   lazy val dataSource = LmdbDataSource("shared", env)
 
-  lazy val transactionMappingDataSource = dataSource
+  lazy val transactionDataSource = dataSource
 
   lazy val fastSyncStateDataSource = dataSource
   lazy val appStateDataSource = dataSource

@@ -9,7 +9,7 @@ object Namespaces {
   val KnownNodes = Array[Byte]('k'.toByte)
   val Heights = Array[Byte]('i'.toByte)
   val FastSyncState = Array[Byte]('h'.toByte)
-  val TransactionMapping = Array[Byte]('l'.toByte)
+  val Transaction = Array[Byte]('l'.toByte)
 }
 
 trait KeyValueStorage[K, V] extends SimpleMap[K, V] {

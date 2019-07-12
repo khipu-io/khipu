@@ -12,7 +12,7 @@ trait BlockchainStorages {
   def storageNodeDataSource: NodeDataSource
   def evmcodeDataSource: NodeDataSource
 
-  def blockNumberMappingDataSource: DataSource
+  def blockHashDataSource: DataSource
 
   def blockHeaderDataSource: BlockDataSource
   def blockBodyDataSource: BlockDataSource
@@ -20,24 +20,24 @@ trait BlockchainStorages {
   def totalDifficultyDataSource: BlockDataSource
 
   // -- storage
-  def transactionMappingStorage: TransactionMappingStorage
+  def transactionStorage: TransactionStorage
   def totalDifficultyStorage: TotalDifficultyStorage
 
   def accountNodeStorageFor: (Option[Long]) => NodeKeyValueStorage
   def storageNodeStorageFor: (Option[Long]) => NodeKeyValueStorage
   def evmcodeStorage: NodeKeyValueStorage
 
-  def blockNumberMappingStorage: BlockNumberMappingStorage
+  def blockHashStorage: BlockHashStorage
   def blockHeaderStorage: BlockHeaderStorage
   def blockBodyStorage: BlockBodyStorage
   def receiptsStorage: ReceiptsStorage
 
   // ---
-  def blockNumberMapping: BlockNumberMapping
+  def blockHashes: BlockHashes
 
-  def getBlockNumberByHash(hash: Hash) = blockNumberMapping.getBlockNumberByHash(hash)
-  def getHashByBlockNumber(blockNumber: Long) = blockNumberMapping.getHashByBlockNumber(blockNumber)
-  def getHashsByBlockNumberRange(from: Long, to: Long) = blockNumberMapping.getHashsByBlockNumberRange(from, to)
-  def putBlockNumber(blockNumber: Long, hash: Hash) = blockNumberMapping.putBlockNumber(blockNumber, hash)
-  def removeBlockNumber(key: Hash) = blockNumberMapping.removeBlockNumber(key)
+  def getBlockNumberByHash(hash: Hash) = blockHashes.getBlockNumberByHash(hash)
+  def getHashByBlockNumber(blockNumber: Long) = blockHashes.getHashByBlockNumber(blockNumber)
+  def getHashsByBlockNumberRange(from: Long, to: Long) = blockHashes.getHashsByBlockNumberRange(from, to)
+  def putBlockNumber(blockNumber: Long, hash: Hash) = blockHashes.putBlockNumber(blockNumber, hash)
+  def removeBlockNumber(key: Hash) = blockHashes.removeBlockNumber(key)
 }

@@ -5,16 +5,16 @@ import java.nio.ByteOrder
 import khipu.Hash
 import khipu.store.datasource.DataSource
 
-object TransactionMappingStorage {
+object TransactionStorage {
   final case class TransactionLocation(blockHash: Hash, txIndex: Int)
 }
-import TransactionMappingStorage._
-final class TransactionMappingStorage(val source: DataSource) extends KeyValueStorage[Hash, TransactionLocation] {
-  type This = TransactionMappingStorage
+import TransactionStorage._
+final class TransactionStorage(val source: DataSource) extends KeyValueStorage[Hash, TransactionLocation] {
+  type This = TransactionStorage
 
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
-  val namespace: Array[Byte] = Namespaces.TransactionMapping
+  val namespace: Array[Byte] = Namespaces.Transaction
   def keySerializer: Hash => Array[Byte] = _.bytes
 
   override def valueSerializer: TransactionLocation => Array[Byte] = tl => {
@@ -38,6 +38,6 @@ final class TransactionMappingStorage(val source: DataSource) extends KeyValueSt
     TransactionLocation(blockHash, txIndex)
   }
 
-  protected def apply(dataSource: DataSource): TransactionMappingStorage = new TransactionMappingStorage(dataSource)
+  protected def apply(dataSource: DataSource): TransactionStorage = new TransactionStorage(dataSource)
 }
 

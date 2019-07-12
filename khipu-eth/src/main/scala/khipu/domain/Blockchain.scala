@@ -10,8 +10,8 @@ import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.network.p2p.messages.PV63.MptNode
 import khipu.network.p2p.messages.PV63.MptNode._
 import khipu.store.BlockchainStorages
-import khipu.store.TransactionMappingStorage
-import khipu.store.TransactionMappingStorage.TransactionLocation
+import khipu.store.TransactionStorage
+import khipu.store.TransactionStorage.TransactionLocation
 import khipu.store.trienode.ReadOnlyNodeStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
@@ -176,8 +176,8 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   private val receiptsStorage = storages.receiptsStorage
 
   private val totalDifficultyStorage = storages.totalDifficultyStorage
-  private val transactionMappingStorage = storages.transactionMappingStorage
-  private val blockNumberMappingStorage = storages.blockNumberMappingStorage
+  private val transactionStorage = storages.transactionStorage
+  private val blockHashStorage = storages.blockHashStorage
 
   def getHashByBlockNumber(number: Long): Option[Hash] =
     storages.getHashByBlockNumber(number)
@@ -202,24 +202,24 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
 
   def saveBlockHeader(blockHeader: BlockHeader) {
     blockHeaderStorage.put(blockHeader.hash, blockHeader)
-    blockNumberMappingStorage.put(blockHeader.hash, blockHeader.number)
+    blockHashStorage.put(blockHeader.hash, blockHeader.number)
   }
 
   def saveBlockHeader(blockHeaders: Seq[BlockHeader]) {
     val kvs = blockHeaders.map(x => x.hash -> x).toMap
     blockHeaderStorage.update(Set(), kvs)
     val nums = kvs.map(kv => kv._1 -> kv._2.number)
-    blockNumberMappingStorage.update(Set(), nums)
+    blockHashStorage.update(Set(), nums)
   }
 
   def saveBlockHeader(hash: Hash, blockHeader: BlockHeader) {
     blockHeaderStorage.put(hash, blockHeader)
-    blockNumberMappingStorage.put(hash, blockHeader.number)
+    blockHashStorage.put(hash, blockHeader.number)
   }
 
   def saveBlockHeader(kvs: Map[Hash, BlockHeader]) {
     blockHeaderStorage.update(Set(), kvs)
-    blockNumberMappingStorage.update(Set(), kvs.map(kv => kv._1 -> kv._2.number))
+    blockHashStorage.update(Set(), kvs.map(kv => kv._1 -> kv._2.number))
   }
 
   def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {
@@ -307,20 +307,20 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     (accountNodeStorageFor(None).get(hash) orElse storageNodeStorageFor(None).get(hash)).map(_.toMptNode)
 
   def getTransactionLocation(txHash: Hash): Option[TransactionLocation] =
-    transactionMappingStorage.get(txHash)
+    transactionStorage.get(txHash)
 
   private def saveBlockNumberMapping(hash: Hash, number: Long): Unit =
-    blockNumberMappingStorage.put(hash, number)
+    blockHashStorage.put(hash, number)
 
   private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody) {
     val kvs = blockBody.transactionList.zipWithIndex map {
       case (tx, index) => (tx.hash, TransactionLocation(blockHash, index))
     }
-    transactionMappingStorage.update(Set(), kvs.toMap)
+    transactionStorage.update(Set(), kvs.toMap)
   }
 
   private def removeTxsLocations(stxs: Seq[SignedTransaction]) {
-    stxs.map(_.hash).foreach(transactionMappingStorage.remove)
+    stxs.map(_.hash).foreach(transactionStorage.remove)
   }
 }
 

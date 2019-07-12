@@ -11,16 +11,16 @@ import org.lmdbjava.Dbi
 import org.lmdbjava.Env
 import scala.collection.mutable
 
-object BlockNumberMappingStorage {
+object BlockHashStorage {
   val namespace: Array[Byte] = Array[Byte]()
 }
 /**
  * This class is used to store the blockhash -> blocknumber
  */
-final class BlockNumberMappingStorage(storags: Storages, val source: DataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, Long] {
-  type This = BlockNumberMappingStorage
+final class BlockHashStorage(storags: Storages, val source: DataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, Long] {
+  type This = BlockHashStorage
 
-  import BlockNumberMappingStorage.namespace
+  import BlockHashStorage.namespace
 
   private val log = Logging(system, this.getClass)
   private val lmdbSource = source.asInstanceOf[LmdbDataSource]
@@ -61,7 +61,7 @@ final class BlockNumberMappingStorage(storags: Storages, val source: DataSource)
     source.get(namespace, key.bytes).map(x => ByteBuffer.wrap(x).getLong)
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Long]): BlockNumberMappingStorage = {
+  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Long]): BlockHashStorage = {
     val remove = toRemove map { key => key.bytes }
     val upsert = toUpsert map { case (key, value) => (key.bytes -> ByteBuffer.allocate(8).putLong(value).array) }
     source.update(namespace, remove, upsert)
@@ -70,6 +70,6 @@ final class BlockNumberMappingStorage(storags: Storages, val source: DataSource)
 
   def count = source.asInstanceOf[LmdbDataSource].count
 
-  protected def apply(storags: Storages, source: DataSource): BlockNumberMappingStorage = new BlockNumberMappingStorage(storags, source)
+  protected def apply(storags: Storages, source: DataSource): BlockHashStorage = new BlockHashStorage(storags, source)
 }
 
