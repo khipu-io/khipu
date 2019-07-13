@@ -1,8 +1,8 @@
 package khipu.store.trienode
 
 import akka.actor.ActorSystem
-import kesque.TVal
 import khipu.Hash
+import khipu.TVal
 import khipu.store.datasource.NodeDataSource
 
 final class NodeTableStorage(source: NodeDataSource)(implicit system: ActorSystem) extends NodeKeyValueStorage {

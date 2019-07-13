@@ -2,8 +2,8 @@ package khipu.store
 
 import akka.actor.ActorSystem
 import akka.event.Logging
-import kesque.TVal
 import khipu.Hash
+import khipu.TVal
 import khipu.domain.BlockHeader
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.store.datasource.BlockDataSource

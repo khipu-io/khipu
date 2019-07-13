@@ -3,9 +3,9 @@ package khipu.store.datasource
 import akka.actor.ActorSystem
 import akka.event.Logging
 import java.nio.ByteBuffer
-import kesque.FIFOCache
 import khipu.Hash
 import khipu.util.BytesUtil
+import khipu.util.FIFOCache
 import org.lmdbjava.Env
 import org.lmdbjava.Dbi
 import org.lmdbjava.DbiFlags

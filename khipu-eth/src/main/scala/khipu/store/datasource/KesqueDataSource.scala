@@ -8,9 +8,9 @@ import java.util.Properties
 import kesque.HashKeyValueTable
 import kesque.HashOffsets
 import kesque.Kesque
-import kesque.TKeyVal
-import kesque.TVal
 import khipu.Hash
+import khipu.TKeyVal
+import khipu.TVal
 import khipu.util.Clock
 import org.apache.kafka.common.record.CompressionType
 import scala.collection.JavaConverters._

@@ -3,8 +3,8 @@ package khipu.tools
 import java.io.File
 import kesque.Kesque
 import kesque.KesqueTable
-import kesque.TKeyVal
 import khipu.Hash
+import khipu.TKeyVal
 import khipu.crypto
 import scala.util.Random
 import org.lmdbjava.Env

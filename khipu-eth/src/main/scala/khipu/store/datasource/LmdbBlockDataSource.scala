@@ -4,10 +4,10 @@ import akka.actor.ActorSystem
 import akka.event.Logging
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kesque.FIFOCache
-import kesque.TVal
+import khipu.TVal
 import khipu.crypto
 import khipu.util.Clock
+import khipu.util.FIFOCache
 import org.lmdbjava.DbiFlags
 import org.lmdbjava.Env
 import org.lmdbjava.Txn

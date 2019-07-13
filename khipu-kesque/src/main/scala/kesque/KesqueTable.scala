@@ -5,6 +5,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
 import khipu.Hash
+import khipu.TKeyVal
+import khipu.TVal
+import khipu.util.FIFOCache
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.SimpleRecord
 import org.lmdbjava.Env

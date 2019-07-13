@@ -1,7 +1,7 @@
 package khipu.store
 
-import kesque.TVal
 import khipu.Hash
+import khipu.TVal
 import khipu.domain.Receipt
 import khipu.ledger.BloomFilter
 import khipu.rlp
@@ -10,7 +10,6 @@ import khipu.rlp.RLPImplicitConversions._
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
 import khipu.store.datasource.BlockDataSource
-import khipu.store.datasource.LmdbBlockDataSource
 import khipu.util.SimpleMap
 
 object ReceiptsStorage {

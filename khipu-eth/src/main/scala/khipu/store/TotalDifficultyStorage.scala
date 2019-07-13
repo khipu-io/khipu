@@ -1,7 +1,7 @@
 package khipu.store
 
-import kesque.TVal
 import khipu.Hash
+import khipu.TVal
 import khipu.UInt256
 import khipu.store.datasource.BlockDataSource
 import khipu.util.SimpleMap

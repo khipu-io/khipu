@@ -1,4 +1,4 @@
-package kesque
+package khipu.util
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import scala.collection.mutable

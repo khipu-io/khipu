@@ -1,7 +1,7 @@
 package khipu.store
 
-import kesque.TVal
 import khipu.Hash
+import khipu.TVal
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.store.datasource.BlockDataSource
 import khipu.util.SimpleMap

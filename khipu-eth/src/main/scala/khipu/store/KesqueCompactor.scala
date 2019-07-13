@@ -6,8 +6,8 @@ import akka.event.Logging
 import java.io.File
 import kesque.HashKeyValueTable
 import kesque.Kesque
-import kesque.TKeyVal
-import kesque.TVal
+import khipu.TKeyVal
+import khipu.TVal
 import khipu.UInt256
 import khipu.domain.Account
 import khipu.rlp

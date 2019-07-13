@@ -1,7 +1,7 @@
 package khipu.store.datasource
 
-import kesque.TVal
 import khipu.Hash
+import khipu.TVal
 import khipu.util.Clock
 import khipu.util.SimpleMap
 

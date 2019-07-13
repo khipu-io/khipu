@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.Properties
 import kafka.server.QuotaFactory.UnboundedQuota
+import khipu.TKeyVal
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.SimpleRecord
@@ -205,6 +206,3 @@ final class Kesque(props: Properties) {
   }
 }
 
-// -1 value of offset/timestamp means unset
-final case class TKeyVal(key: Array[Byte], value: Array[Byte], offset: Int, timestamp: Long)
-final case class TVal(value: Array[Byte], offset: Int, timestamp: Long)
