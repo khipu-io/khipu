@@ -437,12 +437,17 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       val dsGetElapsed2 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
         blockchain.storages.evmcodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
 
-      val dbReadTimePerc = (dsGetElapsed1 + dsGetElapsed2).toDouble / (elapsed + reExecutedElapsed)
-
-      val parallelRate = if (parallelCount > 0) {
-        parallelCount * 100.0 / nTx
+      val totalElasped = elapsed + reExecutedElapsed
+      val dbReadTimePerc = if (totalElasped != 0) {
+        (dsGetElapsed1 + dsGetElapsed2).toDouble / totalElasped
       } else {
         0.0
+      }
+
+      val parallelRate = if (nTx > 0) {
+        100.0 * parallelCount / nTx
+      } else {
+        100.0
       }
 
       val cacheHitRates = List(blockchain.storages.accountNodeDataSource.cacheHitRate, blockchain.storages.storageNodeDataSource.cacheHitRate).map(_ * 100.0)
