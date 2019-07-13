@@ -10,4 +10,10 @@ package object khipu {
   // -1 value of offset/timestamp means unset
   final case class TVal(value: Array[Byte], offset: Int, timestamp: Long)
   final case class TKeyVal(key: Array[Byte], value: Array[Byte], offset: Int, timestamp: Long)
+
+  sealed trait Log[+T] { def value: T }
+  sealed trait Changed[+T] extends Log[T]
+  final case class Deleted[T](value: T) extends Changed[T]
+  final case class Updated[T](value: T) extends Changed[T]
+  final case class Original[T](value: T) extends Log[T]
 }

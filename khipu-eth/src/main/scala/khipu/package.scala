@@ -31,10 +31,4 @@ case object ActiveCheckTick
 case object Loaded
 case object Unlock
 
-sealed trait Log[+T] { def value: T }
-sealed trait Changed[+T] extends Log[T]
-final case class Deleted[T](value: T) extends Changed[T]
-final case class Updated[T](value: T) extends Changed[T]
-final case class Original[T](value: T) extends Log[T]
-
 case object Stop
