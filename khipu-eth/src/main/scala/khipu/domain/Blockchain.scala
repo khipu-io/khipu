@@ -177,7 +177,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
 
   private val totalDifficultyStorage = storages.totalDifficultyStorage
   private val transactionStorage = storages.transactionStorage
-  private val blockHashStorage = storages.blockHashStorage
+  private val blockNumberStorage = storages.blockNumberStorage
 
   def getHashByBlockNumber(number: Long): Option[Hash] =
     storages.getHashByBlockNumber(number)
@@ -202,24 +202,24 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
 
   def saveBlockHeader(blockHeader: BlockHeader) {
     blockHeaderStorage.put(blockHeader.hash, blockHeader)
-    blockHashStorage.put(blockHeader.hash, blockHeader.number)
+    blockNumberStorage.put(blockHeader.hash, blockHeader.number)
   }
 
   def saveBlockHeader(blockHeaders: Seq[BlockHeader]) {
     val kvs = blockHeaders.map(x => x.hash -> x).toMap
     blockHeaderStorage.update(Set(), kvs)
     val nums = kvs.map(kv => kv._1 -> kv._2.number)
-    blockHashStorage.update(Set(), nums)
+    blockNumberStorage.update(Set(), nums)
   }
 
   def saveBlockHeader(hash: Hash, blockHeader: BlockHeader) {
     blockHeaderStorage.put(hash, blockHeader)
-    blockHashStorage.put(hash, blockHeader.number)
+    blockNumberStorage.put(hash, blockHeader.number)
   }
 
   def saveBlockHeader(kvs: Map[Hash, BlockHeader]) {
     blockHeaderStorage.update(Set(), kvs)
-    blockHashStorage.update(Set(), kvs.map(kv => kv._1 -> kv._2.number))
+    blockNumberStorage.update(Set(), kvs.map(kv => kv._1 -> kv._2.number))
   }
 
   def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {
@@ -310,7 +310,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     transactionStorage.get(txHash)
 
   private def saveBlockNumberMapping(hash: Hash, number: Long): Unit =
-    blockHashStorage.put(hash, number)
+    blockNumberStorage.put(hash, number)
 
   private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody) {
     val kvs = blockBody.transactionList.zipWithIndex map {

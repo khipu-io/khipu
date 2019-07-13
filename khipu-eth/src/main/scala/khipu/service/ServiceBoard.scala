@@ -123,7 +123,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
         lazy val storageNodeDataSource = new LmdbNodeDataSource(dbConfig.storage, env, cacheCfg.cacheSize)
         lazy val evmcodeDataSource = new LmdbNodeDataSource(dbConfig.evmcode, env)
 
-        lazy val blockHashDataSource = new LmdbDataSource(dbConfig.blocknum, env)
+        lazy val blockNumberDataSource = new LmdbDataSource(dbConfig.blocknum, env)
 
         lazy val blockHeaderDataSource = new LmdbBlockDataSource(dbConfig.header, env)
         lazy val blockBodyDataSource = new LmdbBlockDataSource(dbConfig.body, env)
