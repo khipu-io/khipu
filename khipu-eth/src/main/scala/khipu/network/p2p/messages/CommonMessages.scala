@@ -155,7 +155,7 @@ object CommonMessages {
       }
     }
   }
-  final case class NewBlock(block: Block, totalDifficulty: UInt256, txInParallel: Int = 0) extends Message {
+  final case class NewBlock(block: Block, totalDifficulty: UInt256) extends Message {
     override def code: Int = NewBlock.code
     override def toString: String = {
       s"""NewBlock {

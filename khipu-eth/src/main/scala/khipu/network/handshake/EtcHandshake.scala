@@ -109,7 +109,7 @@ object EtcHandshake {
      * @return new peer info with the total difficulty updated
      */
     def maybeUpdateTotalDifficulty(message: Message): Option[PeerInfo] = message match {
-      case NewBlock(_, totalDifficulty, _) if totalDifficulty.compareTo(this.totalDifficulty) != 0 => Some(withTotalDifficulty(totalDifficulty))
+      case NewBlock(_, totalDifficulty) if totalDifficulty.compareTo(this.totalDifficulty) != 0 => Some(withTotalDifficulty(totalDifficulty))
       case _ => None
     }
 
