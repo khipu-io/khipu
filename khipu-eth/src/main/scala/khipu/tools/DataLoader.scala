@@ -2,7 +2,7 @@ package khipu.tools
 
 import akka.actor.ActorSystem
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.domain.Account
 import khipu.domain.Blockchain
 import khipu.rlp
@@ -49,7 +49,7 @@ final class DataLoader(blockchain: Blockchain)(implicit system: ActorSystem) {
   private val producer = new KafkaProducer[Array[Byte], Array[Byte]](kafkaProps)
 
   private val accountReader = new NodeReader[Account](Account.accountSerializer, accountTopic, isExport = false)
-  private val storageReader = new NodeReader[UInt256](trie.rlpUInt256Serializer, storageTopic, isExport = false)
+  private val storageReader = new NodeReader[EvmWord](trie.rlpEvmWordSerializer, storageTopic, isExport = false)
   private val isExportEvmCode = false
 
   private val loadedEvmcodeKeys = mutable.HashSet[Hash]()
@@ -145,7 +145,7 @@ final class DataLoader(blockchain: Blockchain)(implicit system: ActorSystem) {
             }
           }
 
-        case _: UInt256 =>
+        case _: EvmWord =>
           storageCount += 1
           println(s"got storage $storageCount")
 

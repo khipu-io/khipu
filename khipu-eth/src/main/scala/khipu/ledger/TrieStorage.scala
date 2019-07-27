@@ -4,7 +4,7 @@ import khipu.Deleted
 import khipu.Log
 import khipu.Original
 import khipu.Updated
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.vm.Storage
 import khipu.trie.MerklePatriciaTrie
 
@@ -14,23 +14,23 @@ import khipu.trie.MerklePatriciaTrie
 object TrieStorage {
   val DeletedValue = Deleted(null)
 
-  def apply(underlyingTrie: MerklePatriciaTrie[UInt256, UInt256]) =
+  def apply(underlyingTrie: MerklePatriciaTrie[EvmWord, EvmWord]) =
     new TrieStorage(underlyingTrie, Map())
 }
 final class TrieStorage private (
-    underlyingTrie:           MerklePatriciaTrie[UInt256, UInt256],
-    private[ledger] var logs: Map[UInt256, Log[UInt256]]
+    underlyingTrie:           MerklePatriciaTrie[EvmWord, EvmWord],
+    private[ledger] var logs: Map[EvmWord, Log[EvmWord]]
 ) extends Storage[TrieStorage] {
   import TrieStorage._
 
   def underlying = underlyingTrie
 
-  private var originalValues = Map[UInt256, UInt256]()
+  private var originalValues = Map[EvmWord, EvmWord]()
 
-  def getOriginalValue(address: UInt256): Option[UInt256] =
+  def getOriginalValue(address: EvmWord): Option[EvmWord] =
     originalValues.get(address) orElse underlyingTrie.get(address)
 
-  def load(address: UInt256): UInt256 = {
+  def load(address: EvmWord): EvmWord = {
     logs.get(address) match {
       case None =>
         underlyingTrie.get(address) match {
@@ -40,15 +40,15 @@ final class TrieStorage private (
             }
             logs += (address -> Original(value))
             value
-          case None => UInt256.Zero
+          case None => EvmWord.Zero
         }
       case Some(Original(value)) => value
       case Some(Updated(value))  => value
-      case Some(Deleted(_))      => UInt256.Zero
+      case Some(Deleted(_))      => EvmWord.Zero
     }
   }
 
-  def store(address: UInt256, value: UInt256): TrieStorage = {
+  def store(address: EvmWord, value: EvmWord): TrieStorage = {
     val updatedLogs = if (value.isZero) {
       logs + (address -> DeletedValue)
     } else {

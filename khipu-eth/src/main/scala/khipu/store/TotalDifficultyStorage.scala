@@ -2,7 +2,7 @@ package khipu.store
 
 import khipu.Hash
 import khipu.TVal
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.store.datasource.BlockDataSource
 import khipu.util.SimpleMap
 
@@ -11,20 +11,20 @@ import khipu.util.SimpleMap
  *   Key: hash of the block
  *   Value: the total difficulty
  */
-final class TotalDifficultyStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, UInt256] {
+final class TotalDifficultyStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, EvmWord] {
   type This = TotalDifficultyStorage
 
   def keySerializer: Hash => Array[Byte] = _.bytes
-  def valueSerializer: UInt256 => Array[Byte] = _.bigEndianMag
-  def valueDeserializer: Array[Byte] => UInt256 = UInt256.safe
+  def valueSerializer: EvmWord => Array[Byte] = _.bigEndianMag
+  def valueDeserializer: Array[Byte] => EvmWord = EvmWord.safe
 
-  override def get(key: Hash): Option[UInt256] = {
+  override def get(key: Hash): Option[EvmWord] = {
     storages.getBlockNumberByHash(key) flatMap {
-      blockNum => source.get(blockNum).map(x => UInt256.safe(x.value))
+      blockNum => source.get(blockNum).map(x => EvmWord.safe(x.value))
     }
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, UInt256]): TotalDifficultyStorage = {
+  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, EvmWord]): TotalDifficultyStorage = {
     val upsert = toUpsert flatMap {
       case (key, value) =>
         storages.getBlockNumberByHash(key) map {

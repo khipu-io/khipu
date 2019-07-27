@@ -5,7 +5,7 @@ import khipu.Deleted
 import khipu.Hash
 import khipu.Original
 import khipu.Updated
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto
 import khipu.domain.Account
 import khipu.domain.Address
@@ -56,12 +56,12 @@ object BlockWorldState {
   case object OnCode extends RaceCondition
 
   object AccountDelta {
-    def unapply(x: AccountDelta): Option[(UInt256, UInt256, Hash, Hash)] =
+    def unapply(x: AccountDelta): Option[(EvmWord, EvmWord, Hash, Hash)] =
       Some(x.nonce, x.balance, x.stateRoot, x.codeHash)
   }
   final class AccountDelta {
-    private var _nonce = UInt256.Zero
-    private var _balance = UInt256.Zero
+    private var _nonce = EvmWord.Zero
+    private var _balance = EvmWord.Zero
     private var _stateRoot = Account.EMPTY_STATE_ROOT_HASH
     private var _codeHash = Account.EMPTY_CODE_HASH
 
@@ -70,12 +70,12 @@ object BlockWorldState {
     def stateRoot = _stateRoot
     def codeHash = _codeHash
 
-    def increaseNonce(nonce: UInt256) = {
+    def increaseNonce(nonce: EvmWord) = {
       this._nonce += nonce
       this
     }
 
-    def increaseBalance(balance: UInt256) = {
+    def increaseBalance(balance: EvmWord) = {
       this._balance += balance
       this
     }
@@ -98,7 +98,7 @@ object BlockWorldState {
     accountNodeStorage: NodeKeyValueStorage,
     storageNodeStorage: NodeKeyValueStorage,
     evmCodeStorage:     NodeKeyValueStorage,
-    accountStartNonce:  UInt256,
+    accountStartNonce:  EvmWord,
     stateRootHash:      Option[Hash]        = None
   ): BlockWorldState = {
 
@@ -153,7 +153,7 @@ final class BlockWorldState private (
     accountNodeStorage:           NodeKeyValueStorage,
     storageNodeStorage:           NodeKeyValueStorage,
     evmCodeStorage:               NodeKeyValueStorage,
-    accountStartNonce:            UInt256,
+    accountStartNonce:            EvmWord,
     private var trieAccounts:     TrieAccounts,
     private var trieStorages:     Map[Address, TrieStorage],
     private var codes:            Map[Address, ByteString],
@@ -169,7 +169,7 @@ final class BlockWorldState private (
    */
   def rootHash: Hash = Hash(trieAccounts.rootHash)
 
-  def getBlockHash(number: Long): Option[UInt256] = blockchain.getHashByBlockNumber(number).map(UInt256(_))
+  def getBlockHash(number: Long): Option[EvmWord] = blockchain.getHashByBlockNumber(number).map(EvmWord(_))
 
   def emptyAccount: Account = Account.empty(accountStartNonce)
 
@@ -230,7 +230,7 @@ final class BlockWorldState private (
     val underlyingTrie = MerklePatriciaTrie(
       getStateRoot(address).bytes,
       storageNodeStorage
-    )(trie.hashUInt256Serializable, trie.rlpUInt256Serializer)
+    )(trie.hashEvmWordSerializable, trie.rlpEvmWordSerializer)
 
     TrieStorage(underlyingTrie)
   }
@@ -274,8 +274,8 @@ final class BlockWorldState private (
     this
   }
 
-  def getCodeHash(address: Address): Option[UInt256] = {
-    getAccount(address).map(_.codeHash).map(UInt256(_))
+  def getCodeHash(address: Address): Option[EvmWord] = {
+    getAccount(address).map(_.codeHash).map(EvmWord(_))
   }
 
   private def addRaceCondition(modified: RaceCondition, address: Address) {

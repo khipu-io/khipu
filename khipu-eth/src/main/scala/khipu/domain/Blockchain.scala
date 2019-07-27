@@ -2,7 +2,7 @@ package khipu.domain
 
 import akka.util.ByteString
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto
 import khipu.ledger.TrieStorage
 import khipu.ledger.BlockWorldState
@@ -87,7 +87,7 @@ object Blockchain {
      * @param rootHash storage root hash
      * @param position storage position
      */
-    def getAccountStorageAt(rootHash: Hash, position: UInt256): ByteString
+    def getAccountStorageAt(rootHash: Hash, position: EvmWord): ByteString
 
     /**
      * Returns the receipts based on a block hash
@@ -115,7 +115,7 @@ object Blockchain {
      * @param blockhash
      * @return total difficulty if found
      */
-    def getTotalDifficultyByHash(blockhash: Hash): Option[UInt256]
+    def getTotalDifficultyByHash(blockhash: Hash): Option[EvmWord]
 
     def getTransactionLocation(txHash: Hash): Option[TransactionLocation]
 
@@ -146,8 +146,8 @@ object Blockchain {
     def saveReceipts(kvs: Map[Hash, Seq[Receipt]]): Unit
     def saveEvmcode(hash: Hash, evmCode: ByteString): Unit
     def saveEvmcode(kvs: Map[Hash, ByteString]): Unit
-    def saveTotalDifficulty(blockhash: Hash, totalDifficulty: UInt256): Unit
-    def saveTotalDifficulty(kvs: Map[Hash, UInt256]): Unit
+    def saveTotalDifficulty(blockhash: Hash, totalDifficulty: EvmWord): Unit
+    def saveTotalDifficulty(kvs: Map[Hash, EvmWord]): Unit
 
     /**
      * Returns a block hash given a block number
@@ -158,8 +158,8 @@ object Blockchain {
     def getHashByBlockNumber(number: Long): Option[Hash]
     def getNumberByBlockHash(hash: Hash): Option[Long]
 
-    def getWorldState(blockNumber: Long, accountStartNonce: UInt256, stateRootHash: Option[Hash] = None): W
-    def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: UInt256, stateRootHash: Option[Hash] = None): W
+    def getWorldState(blockNumber: Long, accountStartNonce: EvmWord, stateRootHash: Option[Hash] = None): W
+    def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: EvmWord, stateRootHash: Option[Hash] = None): W
   }
 
   def apply(storages: BlockchainStorages): Blockchain =
@@ -197,7 +197,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getEvmcodeByHash(hash: Hash): Option[ByteString] =
     evmcodeStorage.get(hash).map(ByteString(_))
 
-  def getTotalDifficultyByHash(blockhash: Hash): Option[UInt256] =
+  def getTotalDifficultyByHash(blockhash: Hash): Option[EvmWord] =
     totalDifficultyStorage.get(blockhash)
 
   def saveBlockHeader(blockHeader: BlockHeader) {
@@ -244,13 +244,13 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def saveEvmcode(kvs: Map[Hash, ByteString]) =
     evmcodeStorage.update(Set(), kvs.map(x => x._1 -> x._2.toArray))
 
-  def saveTotalDifficulty(blockhash: Hash, td: UInt256) =
+  def saveTotalDifficulty(blockhash: Hash, td: EvmWord) =
     totalDifficultyStorage.put(blockhash, td)
 
-  def saveTotalDifficulty(kvs: Map[Hash, UInt256]) =
+  def saveTotalDifficulty(kvs: Map[Hash, EvmWord]) =
     totalDifficultyStorage.update(Set(), kvs)
 
-  def getWorldState(blockNumber: Long, accountStartNonce: UInt256, stateRootHash: Option[Hash]): BlockWorldState =
+  def getWorldState(blockNumber: Long, accountStartNonce: EvmWord, stateRootHash: Option[Hash]): BlockWorldState =
     BlockWorldState(
       this,
       accountNodeStorageFor(Some(blockNumber)),
@@ -261,7 +261,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     )
 
   //FIXME Maybe we can use this one in regular execution too and persist underlying storage when block execution is successful
-  def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: UInt256, stateRootHash: Option[Hash]): BlockWorldState =
+  def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: EvmWord, stateRootHash: Option[Hash]): BlockWorldState =
     BlockWorldState(
       this,
       ReadOnlyNodeStorage(accountNodeStorageFor(blockNumber)),
@@ -294,11 +294,11 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   /**
    * API for outside query. Account storage can only be quered via MPT trie
    */
-  def getAccountStorageAt(accountStateRootHash: Hash, position: UInt256): ByteString = {
+  def getAccountStorageAt(accountStateRootHash: Hash, position: EvmWord): ByteString = {
     val storage = MerklePatriciaTrie(
       accountStateRootHash.bytes,
       storageNodeStorageFor(None)
-    )(trie.hashUInt256Serializable, trie.rlpUInt256Serializer).get(position).getOrElse(UInt256.Zero).bytes
+    )(trie.hashEvmWordSerializable, trie.rlpEvmWordSerializer).get(position).getOrElse(EvmWord.Zero).bytes
 
     ByteString(storage)
   }

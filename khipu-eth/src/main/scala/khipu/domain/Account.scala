@@ -2,7 +2,7 @@ package khipu.domain
 
 import akka.util.ByteString
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto.kec256
 import khipu.network.p2p.messages.PV63.AccountImplicits
 import khipu.rlp
@@ -16,7 +16,7 @@ object Account {
   // c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
   val EMPTY_CODE_HASH = Hash(kec256(ByteString()))
 
-  def empty(startNonce: UInt256) = Account(nonce = startNonce)
+  def empty(startNonce: EvmWord) = Account(nonce = startNonce)
 
   val accountSerializer = new ByteArraySerializable[Account] {
     import AccountImplicits._
@@ -53,16 +53,16 @@ object Account {
  *
  */
 final case class Account(
-    nonce:     UInt256,
-    balance:   UInt256 = UInt256.Zero,
+    nonce:     EvmWord,
+    balance:   EvmWord = EvmWord.Zero,
     stateRoot: Hash    = Account.EMPTY_STATE_ROOT_HASH,
     codeHash:  Hash    = Account.EMPTY_CODE_HASH
 ) {
 
-  def increaseNonce(value: UInt256 = UInt256.One): Account =
+  def increaseNonce(value: EvmWord = EvmWord.One): Account =
     copy(nonce = nonce + value)
 
-  def increaseBalance(value: UInt256): Account =
+  def increaseBalance(value: EvmWord): Account =
     copy(balance = balance + value)
 
   def withCodeHash(codeHash: Hash): Account =

@@ -3,7 +3,7 @@ package khipu.jsonrpc
 import akka.util.ByteString
 import java.math.BigInteger
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.jsonrpc.EthService.BestBlockNumberRequest
 import khipu.jsonrpc.EthService.BestBlockNumberResponse
 import khipu.jsonrpc.EthService.BlockByBlockHashRequest
@@ -623,7 +623,7 @@ object EthJsonMethodsImplicits extends JsonMethodsImplicits {
     def toEitherOpt[A, B](opt: Option[Either[A, B]]): Either[A, Option[B]] =
       opt.map(_.right.map(Some.apply)).getOrElse(Right(None))
 
-    def optionalQuantity(input: JValue): Either[JsonRpcError, Option[UInt256]] =
+    def optionalQuantity(input: JValue): Either[JsonRpcError, Option[EvmWord]] =
       input match {
         case JNothing => Right(None)
         case o        => extractQuantity(o).map(Some(_))
@@ -640,8 +640,8 @@ object EthJsonMethodsImplicits extends JsonMethodsImplicits {
       from = from,
       to = to,
       gas = gas.map(_.longValue),
-      gasPrice = gasPrice.getOrElse(UInt256.Zero),
-      value = value.getOrElse(UInt256.Zero),
+      gasPrice = gasPrice.getOrElse(EvmWord.Zero),
+      value = value.getOrElse(EvmWord.Zero),
       data = data.getOrElse(ByteString(""))
     )
   }

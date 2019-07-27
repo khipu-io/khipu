@@ -1,13 +1,13 @@
 package khipu.domain
 
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.util.BlockchainConfig
 
 object DifficultyCalculator {
   private val FrontierTimestampDiffLimit = -99
   private val ExpDifficultyPeriod = 100000
   private val DifficultyBoundDivision = 2048
-  private val MinimumDifficulty = UInt256(131072)
+  private val MinimumDifficulty = EvmWord(131072)
 }
 final class DifficultyCalculator(blockchainConfig: BlockchainConfig) {
   import DifficultyCalculator._
@@ -17,9 +17,9 @@ final class DifficultyCalculator(blockchainConfig: BlockchainConfig) {
     case _     => false
   }
 
-  def calculateDifficulty(currHeader: BlockHeader, parentHeader: BlockHeader): UInt256 =
+  def calculateDifficulty(currHeader: BlockHeader, parentHeader: BlockHeader): EvmWord =
     calculateDifficulty(currHeader.number, currHeader.unixTimestamp, parentHeader)
-  def calculateDifficulty(blockNumber: Long, blockTimestamp: Long, parentHeader: BlockHeader): UInt256 = {
+  def calculateDifficulty(blockNumber: Long, blockTimestamp: Long, parentHeader: BlockHeader): EvmWord = {
     val quotient = parentHeader.difficulty / DifficultyBoundDivision
     val multiplier = getCalcDifficultyMultiplier(blockNumber, blockTimestamp, parentHeader)
 
@@ -28,9 +28,9 @@ final class DifficultyCalculator(blockchainConfig: BlockchainConfig) {
 
     val difficultyBombExponent = if (isEth) getBombExponent_eth(blockNumber) else getBombExponent_etc(blockNumber)
     val difficultyBomb = if (difficultyBombExponent >= 0) {
-      UInt256.Two.pow(difficultyBombExponent.toInt)
+      EvmWord.Two.pow(difficultyBombExponent.toInt)
     } else {
-      UInt256.Zero
+      EvmWord.Zero
     }
 
     difficulty + difficultyBomb

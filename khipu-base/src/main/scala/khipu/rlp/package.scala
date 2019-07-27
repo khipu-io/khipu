@@ -51,16 +51,16 @@ package object rlp {
 
   def toRLPEncodable(value: Array[Byte]): RLPEncodeable = RLPValue(value)
 
-  // --- utilities for UInt256
+  // --- utilities for EvmWord
 
-  def toRLPEncodable(value: UInt256): RLPEncodeable =
+  def toRLPEncodable(value: EvmWord): RLPEncodeable =
     RLPValue(if (value.isZero) ZeroByteRLP else value.nonZeroLeadingBytes)
 
-  def toUInt256(bytes: ByteString): UInt256 = toUInt256(bytes.toArray)
-  def toUInt256(bytes: Array[Byte]): UInt256 = toUInt256(rawDecode(bytes))
-  def toUInt256(rLPEncodeable: RLPEncodeable): UInt256 = {
+  def toEvmWord(bytes: ByteString): EvmWord = toEvmWord(bytes.toArray)
+  def toEvmWord(bytes: Array[Byte]): EvmWord = toEvmWord(rawDecode(bytes))
+  def toEvmWord(rLPEncodeable: RLPEncodeable): EvmWord = {
     rLPEncodeable match {
-      case RLPValue(bytes) => if (bytes.length == 0) UInt256.Zero else UInt256(bytes)
+      case RLPValue(bytes) => if (bytes.length == 0) EvmWord.Zero else EvmWord(bytes)
       case _               => throw RLPException("src is not an RLPValue")
     }
   }

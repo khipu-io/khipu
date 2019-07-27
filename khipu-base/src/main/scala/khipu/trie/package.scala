@@ -25,14 +25,14 @@ package object trie {
     override def fromBytes(bytes: Array[Byte]): Array[Byte] = bytes
   }
 
-  object rlpUInt256Serializer extends ByteArraySerializable[UInt256] {
-    // NOTE should rlp decode first before deser to UInt256, see rlp.toUInt256
-    override def fromBytes(bytes: Array[Byte]): UInt256 = rlp.toUInt256(bytes)
-    override def toBytes(input: UInt256): Array[Byte] = rlp.encode(rlp.toRLPEncodable(input))
+  object rlpEvmWordSerializer extends ByteArraySerializable[EvmWord] {
+    // NOTE should rlp decode first before deser to EvmWord, see rlp.toEvmWord
+    override def fromBytes(bytes: Array[Byte]): EvmWord = rlp.toEvmWord(bytes)
+    override def toBytes(input: EvmWord): Array[Byte] = rlp.encode(rlp.toRLPEncodable(input))
   }
 
-  object hashUInt256Serializable extends ByteArrayEncoder[UInt256] {
-    override def toBytes(input: UInt256): Array[Byte] = crypto.kec256(input.bytes)
+  object hashEvmWordSerializable extends ByteArrayEncoder[EvmWord] {
+    override def toBytes(input: EvmWord): Array[Byte] = crypto.kec256(input.bytes)
   }
 
   def toHash(bytes: Array[Byte]): Array[Byte] = crypto.kec256(bytes)

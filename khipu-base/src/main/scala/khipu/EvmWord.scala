@@ -4,7 +4,7 @@ import akka.util.ByteString
 import khipu.util.BytesUtil
 import java.math.BigInteger
 
-object UInt256 {
+object EvmWord {
 
   val SIZE = 32 // size in bytes
   val SIZE_IN_BITS = 256 // 32 * 8
@@ -25,40 +25,40 @@ object UInt256 {
   private val MAX_VALUE = TWO.pow(SIZE_IN_BITS) subtract BigInteger.ONE
   private val MAX_SIGNED_VALUE = TWO.pow(SIZE_IN_BITS - 1) subtract BigInteger.ONE
 
-  // UInt256 value should be put behind MODULUS (will be used in UInt256 constructor) etc
+  // EvmWord value should be put behind MODULUS (will be used in EvmWord constructor) etc
 
   val Modulus = safe(TWO.pow(SIZE_IN_BITS))
 
-  val Zero: UInt256 = safe(ZERO)
-  val One: UInt256 = safe(ONE)
-  val Two: UInt256 = safe(TWO)
-  val Ten: UInt256 = safe(TEN)
-  val MaxInt: UInt256 = safe(MAX_INT)
-  val MaxLong: UInt256 = safe(MAX_LONG)
-  val ThirtyTwo: UInt256 = safe(THIRTY_TWO)
+  val Zero: EvmWord = safe(ZERO)
+  val One: EvmWord = safe(ONE)
+  val Two: EvmWord = safe(TWO)
+  val Ten: EvmWord = safe(TEN)
+  val MaxInt: EvmWord = safe(MAX_INT)
+  val MaxLong: EvmWord = safe(MAX_LONG)
+  val ThirtyTwo: EvmWord = safe(THIRTY_TWO)
   val TwoFiveSix = safe(TWO_FIVE_SIX)
 
-  def apply(n: Int): UInt256 = safe(n)
-  def apply(n: Long): UInt256 = safe(n)
-  def apply(b: Boolean): UInt256 = if (b) One else Zero
-  def apply(bytes: ByteString): UInt256 = apply(bytes.toArray)
-  def apply(bytes: Hash): UInt256 = apply(bytes.bytes)
+  def apply(n: Int): EvmWord = safe(n)
+  def apply(n: Long): EvmWord = safe(n)
+  def apply(b: Boolean): EvmWord = if (b) One else Zero
+  def apply(bytes: ByteString): EvmWord = apply(bytes.toArray)
+  def apply(bytes: Hash): EvmWord = apply(bytes.bytes)
 
   // with bound limited
-  def apply(n: BigInteger): UInt256 = new UInt256(boundBigInt(n))
-  def apply(bigEndianBytes: Array[Byte]): UInt256 = {
+  def apply(n: BigInteger): EvmWord = new EvmWord(boundBigInt(n))
+  def apply(bigEndianBytes: Array[Byte]): EvmWord = {
     require(bigEndianBytes.length <= SIZE, s"Input byte array cannot be longer than $SIZE: ${bigEndianBytes.length}")
     if (bigEndianBytes.length == 0) {
-      UInt256.Zero
+      EvmWord.Zero
     } else {
       safe(bigEndianBytes)
     }
   }
 
-  def safe(n: Int): UInt256 = new UInt256(BigInteger.valueOf(n))
-  def safe(n: Long): UInt256 = new UInt256(BigInteger.valueOf(n))
-  def safe(n: BigInteger): UInt256 = new UInt256(n)
-  def safe(bigEndianMag: Array[Byte]): UInt256 = new UInt256(new BigInteger(1, bigEndianMag))
+  def safe(n: Int): EvmWord = new EvmWord(BigInteger.valueOf(n))
+  def safe(n: Long): EvmWord = new EvmWord(BigInteger.valueOf(n))
+  def safe(n: BigInteger): EvmWord = new EvmWord(n)
+  def safe(bigEndianMag: Array[Byte]): EvmWord = new EvmWord(new BigInteger(1, bigEndianMag))
 
   private def boundBigInt(n: BigInteger): BigInteger = {
     if (n.signum > 0) {
@@ -80,80 +80,80 @@ object UInt256 {
   }
 
   /**
-   * Number of 32-byte UInt256s required to hold n bytes (~= math.ceil(n / 32))
+   * Number of 32-byte EvmWords required to hold n bytes (~= math.ceil(n / 32))
    * We assume n is not neseccary to exceed Long.MaxValue, and use Long here
    */
   def wordsForBytes(n: Long): Long = if (n == 0) 0 else (n - 1) / SIZE + 1
 
   // --- simple test
   def main(args: Array[String]) {
-    var a1 = UInt256(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
-    var a2 = UInt256(hexDecode("01"))
+    var a1 = EvmWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    var a2 = EvmWord(hexDecode("01"))
     var r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xc000000000000000000000000000000000000000000000000000000000000000
 
-    a1 = UInt256(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = UInt256(hexDecode("ff"))
+    a1 = EvmWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = EvmWord(hexDecode("ff"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = UInt256(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = UInt256(hexDecode("0100"))
+    a1 = EvmWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = EvmWord(hexDecode("0100"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = UInt256(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = UInt256(hexDecode("0101"))
+    a1 = EvmWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = EvmWord(hexDecode("0101"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = UInt256(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = UInt256(hexDecode("00"))
+    a1 = EvmWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = EvmWord(hexDecode("00"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = UInt256(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = UInt256(hexDecode("01"))
+    a1 = EvmWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = EvmWord(hexDecode("01"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = UInt256(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = UInt256(hexDecode("ff"))
+    a1 = EvmWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = EvmWord(hexDecode("ff"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = UInt256(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = UInt256(hexDecode("0100"))
+    a1 = EvmWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = EvmWord(hexDecode("0100"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = UInt256(hexDecode("0000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = UInt256(hexDecode("01"))
+    a1 = EvmWord(hexDecode("0000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = EvmWord(hexDecode("01"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
 
-    a1 = UInt256(hexDecode("4000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = UInt256(hexDecode("fe"))
+    a1 = EvmWord(hexDecode("4000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = EvmWord(hexDecode("fe"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000001
 
-    a1 = UInt256(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = UInt256(hexDecode("f8"))
+    a1 = EvmWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = EvmWord(hexDecode("f8"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x000000000000000000000000000000000000000000000000000000000000007f
 
-    a1 = UInt256(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = UInt256(hexDecode("fe"))
+    a1 = EvmWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = EvmWord(hexDecode("fe"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000001
 
-    a1 = UInt256(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = UInt256(hexDecode("ff"))
+    a1 = EvmWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = EvmWord(hexDecode("ff"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
 
-    a1 = UInt256(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = UInt256(hexDecode("0100"))
+    a1 = EvmWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = EvmWord(hexDecode("0100"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
   }
@@ -161,10 +161,10 @@ object UInt256 {
 }
 /**
  * Represents 256 bit unsigned integers with standard arithmetic, byte-wise operation and EVM-specific extensions
- * require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid UInt256 value: $n") --- already checked in apply(n: BigInteger)
+ * require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid EvmWord value: $n") --- already checked in apply(n: BigInteger)
  */
-final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
-  import UInt256._
+final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
+  import EvmWord._
 
   // EVM-specific arithmetic
   private lazy val signed = if (n.compareTo(MAX_SIGNED_VALUE) > 0) (n subtract MODULUS) else n
@@ -187,8 +187,8 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
   }
 
   /**
-   * Converts an UInt256 to an Array[Byte].
-   * Output Array[Byte] is padded with zeros from the left side up to UInt256.Size bytes.
+   * Converts an EvmWord to an Array[Byte].
+   * Output Array[Byte] is padded with zeros from the left side up to EvmWord.Size bytes.
    */
   lazy val bytes: Array[Byte] = {
     val src = bigEndianMag
@@ -218,54 +218,54 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
     }
   }
 
-  def getByte(that: UInt256): UInt256 = {
+  def getByte(that: EvmWord): EvmWord = {
     if (that.n.compareTo(THIRTY_ONE) > 0) {
       Zero
     } else {
-      UInt256.safe(bytes(that.n.intValue).toInt & 0xff)
+      EvmWord.safe(bytes(that.n.intValue).toInt & 0xff)
     }
   }
 
   // standard arithmetic (note the use of new instead of apply where result is guaranteed to be within bounds)
-  def &(that: UInt256): UInt256 = UInt256.safe(n and that.n)
-  def |(that: UInt256): UInt256 = UInt256.safe(n or that.n)
-  def ^(that: UInt256): UInt256 = UInt256.safe(n xor that.n)
-  def unary_- : UInt256 = UInt256(n.negate)
-  def unary_~ : UInt256 = UInt256(n.not)
-  def +(that: UInt256): UInt256 = UInt256(n add that.n)
-  def -(that: UInt256): UInt256 = UInt256(n subtract that.n)
-  def *(that: UInt256): UInt256 = UInt256(n multiply that.n)
-  def /(that: UInt256): UInt256 = UInt256.safe(n divide that.n)
-  def **(that: UInt256): UInt256 = UInt256.safe(n.modPow(that.n, MODULUS))
+  def &(that: EvmWord): EvmWord = EvmWord.safe(n and that.n)
+  def |(that: EvmWord): EvmWord = EvmWord.safe(n or that.n)
+  def ^(that: EvmWord): EvmWord = EvmWord.safe(n xor that.n)
+  def unary_- : EvmWord = EvmWord(n.negate)
+  def unary_~ : EvmWord = EvmWord(n.not)
+  def +(that: EvmWord): EvmWord = EvmWord(n add that.n)
+  def -(that: EvmWord): EvmWord = EvmWord(n subtract that.n)
+  def *(that: EvmWord): EvmWord = EvmWord(n multiply that.n)
+  def /(that: EvmWord): EvmWord = EvmWord.safe(n divide that.n)
+  def **(that: EvmWord): EvmWord = EvmWord.safe(n.modPow(that.n, MODULUS))
 
-  def +(that: Int): UInt256 = UInt256(n add BigInteger.valueOf(that))
-  def -(that: Int): UInt256 = UInt256(n subtract BigInteger.valueOf(that))
-  def *(that: Int): UInt256 = UInt256(n multiply BigInteger.valueOf(that))
-  def /(that: Int): UInt256 = UInt256.safe(n divide BigInteger.valueOf(that))
+  def +(that: Int): EvmWord = EvmWord(n add BigInteger.valueOf(that))
+  def -(that: Int): EvmWord = EvmWord(n subtract BigInteger.valueOf(that))
+  def *(that: Int): EvmWord = EvmWord(n multiply BigInteger.valueOf(that))
+  def /(that: Int): EvmWord = EvmWord.safe(n divide BigInteger.valueOf(that))
 
-  def +(that: Long): UInt256 = UInt256(n add BigInteger.valueOf(that))
-  def -(that: Long): UInt256 = UInt256(n subtract BigInteger.valueOf(that))
-  def *(that: Long): UInt256 = UInt256(n multiply BigInteger.valueOf(that))
-  def /(that: Long): UInt256 = UInt256.safe(n divide BigInteger.valueOf(that))
+  def +(that: Long): EvmWord = EvmWord(n add BigInteger.valueOf(that))
+  def -(that: Long): EvmWord = EvmWord(n subtract BigInteger.valueOf(that))
+  def *(that: Long): EvmWord = EvmWord(n multiply BigInteger.valueOf(that))
+  def /(that: Long): EvmWord = EvmWord.safe(n divide BigInteger.valueOf(that))
 
-  def pow(that: Int): UInt256 = UInt256(n pow that)
+  def pow(that: Int): EvmWord = EvmWord(n pow that)
 
-  def min(that: UInt256): UInt256 = if (n.compareTo(that.n) < 0) this else that
-  def max(that: UInt256): UInt256 = if (n.compareTo(that.n) > 0) this else that
+  def min(that: EvmWord): EvmWord = if (n.compareTo(that.n) < 0) this else that
+  def max(that: EvmWord): EvmWord = if (n.compareTo(that.n) > 0) this else that
   def isZero: Boolean = n.signum == 0
   def nonZero: Boolean = n.signum != 0
 
-  def div(that: UInt256): UInt256 = if (that.n.signum == 0) Zero else UInt256.safe(n divide that.n)
-  def sdiv(that: UInt256): UInt256 = if (that.n.signum == 0) Zero else UInt256(signed divide that.signed)
-  def mod(that: UInt256): UInt256 = if (that.n.signum == 0) Zero else UInt256(n mod that.n)
-  def smod(that: UInt256): UInt256 = if (that.n.signum == 0) Zero else UInt256(signed remainder that.signed.abs)
-  def addmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.signum == 0) Zero else UInt256.safe((n add that.n) remainder modulus.n)
-  def mulmod(that: UInt256, modulus: UInt256): UInt256 = if (modulus.n.signum == 0) Zero else UInt256.safe((n multiply that.n) mod modulus.n)
+  def div(that: EvmWord): EvmWord = if (that.n.signum == 0) Zero else EvmWord.safe(n divide that.n)
+  def sdiv(that: EvmWord): EvmWord = if (that.n.signum == 0) Zero else EvmWord(signed divide that.signed)
+  def mod(that: EvmWord): EvmWord = if (that.n.signum == 0) Zero else EvmWord(n mod that.n)
+  def smod(that: EvmWord): EvmWord = if (that.n.signum == 0) Zero else EvmWord(signed remainder that.signed.abs)
+  def addmod(that: EvmWord, modulus: EvmWord): EvmWord = if (modulus.n.signum == 0) Zero else EvmWord.safe((n add that.n) remainder modulus.n)
+  def mulmod(that: EvmWord, modulus: EvmWord): EvmWord = if (modulus.n.signum == 0) Zero else EvmWord.safe((n multiply that.n) mod modulus.n)
 
-  def slt(that: UInt256): Boolean = signed.compareTo(that.signed) < 0
-  def sgt(that: UInt256): Boolean = signed.compareTo(that.signed) > 0
+  def slt(that: EvmWord): Boolean = signed.compareTo(that.signed) < 0
+  def sgt(that: EvmWord): Boolean = signed.compareTo(that.signed) > 0
 
-  def signExtend(that: UInt256): UInt256 = {
+  def signExtend(that: EvmWord): EvmWord = {
     if (that.n.signum < 0 || that.n.compareTo(THIRTY_ONE) > 0) {
       this
     } else {
@@ -277,7 +277,7 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
       } else {
         n and mask
       }
-      UInt256.safe(newN)
+      EvmWord.safe(newN)
     }
   }
 
@@ -286,11 +286,11 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
    * @param arg
    * @return this << arg
    */
-  def shiftLeft(arg: UInt256): UInt256 = {
+  def shiftLeft(arg: EvmWord): EvmWord = {
     if (arg.n.compareTo(MAX_POW) >= 0) {
       Zero
     } else {
-      UInt256(n.shiftLeft(arg.intValueSafe))
+      EvmWord(n.shiftLeft(arg.intValueSafe))
     }
   }
 
@@ -299,11 +299,11 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
    * @param arg
    * @return this >> arg
    */
-  def shiftRight(arg: UInt256): UInt256 = {
+  def shiftRight(arg: EvmWord): EvmWord = {
     if (arg.n.compareTo(MAX_POW) >= 0) {
       Zero
     } else {
-      UInt256(n.shiftRight(arg.intValueSafe))
+      EvmWord(n.shiftRight(arg.intValueSafe))
     }
   }
 
@@ -312,16 +312,16 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
    * @param arg
    * @return this >> arg
    */
-  def shiftRightSigned(arg: UInt256): UInt256 = {
+  def shiftRightSigned(arg: EvmWord): EvmWord = {
     if (arg.n.compareTo(MAX_POW) >= 0) {
       if (isNegative) {
-        UInt256(BigInteger.ONE.negate)
+        EvmWord(BigInteger.ONE.negate)
       } else {
         Zero
       }
     } else {
 
-      UInt256(signed.shiftRight(arg.intValueSafe))
+      EvmWord(signed.shiftRight(arg.intValueSafe))
     }
   }
 
@@ -333,11 +333,11 @@ final class UInt256 private (val n: BigInteger) extends Ordered[UInt256] {
     signed.signum < 0
   }
 
-  def compare(that: UInt256): Int = n.compareTo(that.n)
+  def compare(that: EvmWord): Int = n.compareTo(that.n)
 
   override def equals(any: Any): Boolean = {
     any match {
-      case that: UInt256    => (this eq that) || n == that.n
+      case that: EvmWord    => (this eq that) || n == that.n
       case that: BigInteger => n == that
       case that: Byte       => n == BigInteger.valueOf(that)
       case that: Short      => n == BigInteger.valueOf(that)

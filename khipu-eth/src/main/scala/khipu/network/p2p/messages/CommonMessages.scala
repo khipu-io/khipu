@@ -1,7 +1,7 @@
 package khipu.network.p2p.messages
 
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.domain.Address
@@ -33,12 +33,12 @@ object CommonMessages {
     implicit final class StatusDec(val bytes: Array[Byte]) {
       def toStatus: Status = rlp.rawDecode(bytes) match {
         case RLPList(protocolVersion, networkId, totalDifficulty, bestHash, genesisHash) =>
-          Status(protocolVersion, networkId, rlp.toUInt256(totalDifficulty), bestHash, genesisHash)
+          Status(protocolVersion, networkId, rlp.toEvmWord(totalDifficulty), bestHash, genesisHash)
         case _ => throw new RuntimeException("Cannot decode Status")
       }
     }
   }
-  final case class Status(protocolVersion: Int, networkId: Int, totalDifficulty: UInt256, bestHash: Hash, genesisHash: Hash) extends Message {
+  final case class Status(protocolVersion: Int, networkId: Int, totalDifficulty: EvmWord, bestHash: Hash, genesisHash: Hash) extends Message {
     override def code: Int = Status.code
     override def toString: String = {
       s"""Status {
@@ -86,7 +86,7 @@ object CommonMessages {
         val chainId = ECDSASignature.extractChainIdFromV(v)
 
         SignedTransaction(
-          Transaction(rlp.toUInt256(nonce), rlp.toUInt256(gasPrice), gasLimit, receivingAddressOpt, rlp.toUInt256(value), payload),
+          Transaction(rlp.toEvmWord(nonce), rlp.toEvmWord(gasPrice), gasLimit, receivingAddressOpt, rlp.toEvmWord(value), payload),
           r,
           s,
           realV,
@@ -149,13 +149,13 @@ object CommonMessages {
                 uncleNodesList.items.map(_.toBlockHeader)
               )
             ),
-            rlp.toUInt256(totalDifficulty)
+            rlp.toEvmWord(totalDifficulty)
           )
         case _ => throw new RuntimeException("Cannot decode NewBlock")
       }
     }
   }
-  final case class NewBlock(block: Block, totalDifficulty: UInt256) extends Message {
+  final case class NewBlock(block: Block, totalDifficulty: EvmWord) extends Message {
     override def code: Int = NewBlock.code
     override def toString: String = {
       s"""NewBlock {

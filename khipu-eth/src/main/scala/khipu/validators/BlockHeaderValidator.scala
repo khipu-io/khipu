@@ -2,7 +2,7 @@ package khipu.validators
 
 import java.math.BigInteger
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto
 import khipu.domain.Block
 import khipu.domain.BlockHeader
@@ -159,8 +159,8 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    */
   //FIXME: Simple PoW validation without using DAG [EC-88]
   private def validatePoW(blockHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
-    val powBoundary = UInt256.Modulus / blockHeader.difficulty
-    val powValue = UInt256(new BigInteger(1, calculatePoWValue(blockHeader).toArray))
+    val powBoundary = EvmWord.Modulus / blockHeader.difficulty
+    val powValue = EvmWord(new BigInteger(1, calculatePoWValue(blockHeader).toArray))
     if (powValue.compareTo(powBoundary) <= 0) {
       Right(blockHeader)
     } else {
@@ -196,7 +196,7 @@ object BlockHeaderError {
   case object HeaderParentNotFoundError extends BlockHeaderError
   case object HeaderExtraDataError extends BlockHeaderError
   case object HeaderTimestampError extends BlockHeaderError
-  final case class HeaderDifficultyError(header: UInt256, calculated: UInt256) extends BlockHeaderError
+  final case class HeaderDifficultyError(header: EvmWord, calculated: EvmWord) extends BlockHeaderError
   case object HeaderGasUsedError extends BlockHeaderError
   case object HeaderGasLimitError extends BlockHeaderError
   case object HeaderNumberError extends BlockHeaderError

@@ -3,7 +3,7 @@ package khipu.network.handshake
 import akka.util.ByteString
 import khipu.NodeStatus
 import khipu.ServerStatus
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.domain.Blockchain
 import khipu.network.ForkResolver
 import khipu.network.p2p.Message
@@ -93,11 +93,11 @@ object EtcHandshake {
 
   final case class PeerInfo(
       remoteStatus:    Status,
-      totalDifficulty: UInt256,
+      totalDifficulty: EvmWord,
       forkAccepted:    Boolean,
       maxBlockNumber:  Long
   ) {
-    def withTotalDifficulty(totalDifficulty: UInt256): PeerInfo = copy(totalDifficulty = totalDifficulty)
+    def withTotalDifficulty(totalDifficulty: EvmWord): PeerInfo = copy(totalDifficulty = totalDifficulty)
     def withForkAccepted(forkAccepted: Boolean): PeerInfo = copy(forkAccepted = forkAccepted)
     def withMaxBlockNumber(maxBlockNumber: Long): PeerInfo = copy(maxBlockNumber = maxBlockNumber)
 

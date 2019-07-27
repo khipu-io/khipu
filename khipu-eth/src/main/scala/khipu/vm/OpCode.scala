@@ -1,7 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto
 import khipu.domain.Address
 import khipu.domain.TxLogEntry
@@ -245,188 +245,188 @@ case object STOP extends OpCode[Unit](0x00, 0, 0) with ConstGas[Unit] {
     state.halt
 }
 
-sealed abstract class BinaryOp(code: Int) extends OpCode[(UInt256, UInt256)](code, 2, 1) {
+sealed abstract class BinaryOp(code: Int) extends OpCode[(EvmWord, EvmWord)](code, 2, 1) {
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(a, b) = state.stack.pop(2)
     (a, b)
   }
 
-  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
+  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): ProgramState[W, S] = {
     val (a, b) = params
     val res = f(a, b)
     state.stack.push(res)
     state.step()
   }
 
-  protected def f(x: UInt256, y: UInt256): UInt256
+  protected def f(x: EvmWord, y: EvmWord): EvmWord
 }
-case object ADD extends BinaryOp(0x01) with ConstGas[(UInt256, UInt256)] {
+case object ADD extends BinaryOp(0x01) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x + y
+  protected def f(x: EvmWord, y: EvmWord) = x + y
 }
-case object MUL extends BinaryOp(0x02) with ConstGas[(UInt256, UInt256)] {
+case object MUL extends BinaryOp(0x02) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_low
-  protected def f(x: UInt256, y: UInt256) = x * y
+  protected def f(x: EvmWord, y: EvmWord) = x * y
 }
-case object SUB extends BinaryOp(0x03) with ConstGas[(UInt256, UInt256)] {
+case object SUB extends BinaryOp(0x03) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x - y
+  protected def f(x: EvmWord, y: EvmWord) = x - y
 }
-case object DIV extends BinaryOp(0x04) with ConstGas[(UInt256, UInt256)] {
+case object DIV extends BinaryOp(0x04) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_low
-  protected def f(x: UInt256, y: UInt256) = x div y
+  protected def f(x: EvmWord, y: EvmWord) = x div y
 }
-case object SDIV extends BinaryOp(0x05) with ConstGas[(UInt256, UInt256)] {
+case object SDIV extends BinaryOp(0x05) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_low
-  protected def f(x: UInt256, y: UInt256) = x sdiv y
+  protected def f(x: EvmWord, y: EvmWord) = x sdiv y
 }
-case object MOD extends BinaryOp(0x06) with ConstGas[(UInt256, UInt256)] {
+case object MOD extends BinaryOp(0x06) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_low
-  protected def f(x: UInt256, y: UInt256) = x mod y
+  protected def f(x: EvmWord, y: EvmWord) = x mod y
 }
-case object SMOD extends BinaryOp(0x07) with ConstGas[(UInt256, UInt256)] {
+case object SMOD extends BinaryOp(0x07) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_low
-  protected def f(x: UInt256, y: UInt256) = x smod y
+  protected def f(x: EvmWord, y: EvmWord) = x smod y
 }
 case object EXP extends BinaryOp(0x0a) {
   protected def constGasFn(s: FeeSchedule) = s.G_exp
-  protected def f(x: UInt256, y: UInt256) = x ** y
+  protected def f(x: EvmWord, y: EvmWord) = x ** y
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): Long = {
     val (_, m) = params
     state.config.feeSchedule.G_expbyte * m.byteSize
   }
 }
-case object SIGNEXTEND extends BinaryOp(0x0b) with ConstGas[(UInt256, UInt256)] {
+case object SIGNEXTEND extends BinaryOp(0x0b) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_low
-  protected def f(x: UInt256, y: UInt256) = y signExtend x
+  protected def f(x: EvmWord, y: EvmWord) = y signExtend x
 }
-case object LT extends BinaryOp(0x10) with ConstGas[(UInt256, UInt256)] {
+case object LT extends BinaryOp(0x10) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = UInt256(x < y)
+  protected def f(x: EvmWord, y: EvmWord) = EvmWord(x < y)
 }
-case object GT extends BinaryOp(0x11) with ConstGas[(UInt256, UInt256)] {
+case object GT extends BinaryOp(0x11) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = UInt256(x > y)
+  protected def f(x: EvmWord, y: EvmWord) = EvmWord(x > y)
 }
-case object SLT extends BinaryOp(0x12) with ConstGas[(UInt256, UInt256)] {
+case object SLT extends BinaryOp(0x12) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = UInt256(x slt y)
+  protected def f(x: EvmWord, y: EvmWord) = EvmWord(x slt y)
 }
-case object SGT extends BinaryOp(0x13) with ConstGas[(UInt256, UInt256)] {
+case object SGT extends BinaryOp(0x13) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = UInt256(x sgt y)
+  protected def f(x: EvmWord, y: EvmWord) = EvmWord(x sgt y)
 }
-case object EQ extends BinaryOp(0x14) with ConstGas[(UInt256, UInt256)] {
+case object EQ extends BinaryOp(0x14) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = UInt256(x.n.compareTo(y.n) == 0)
+  protected def f(x: EvmWord, y: EvmWord) = EvmWord(x.n.compareTo(y.n) == 0)
 }
-case object AND extends BinaryOp(0x16) with ConstGas[(UInt256, UInt256)] {
+case object AND extends BinaryOp(0x16) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x & y
+  protected def f(x: EvmWord, y: EvmWord) = x & y
 }
-case object OR extends BinaryOp(0x17) with ConstGas[(UInt256, UInt256)] {
+case object OR extends BinaryOp(0x17) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x | y
+  protected def f(x: EvmWord, y: EvmWord) = x | y
 }
-case object XOR extends BinaryOp(0x18) with ConstGas[(UInt256, UInt256)] {
+case object XOR extends BinaryOp(0x18) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = x ^ y
+  protected def f(x: EvmWord, y: EvmWord) = x ^ y
 }
-case object BYTE extends BinaryOp(0x1a) with ConstGas[(UInt256, UInt256)] {
+case object BYTE extends BinaryOp(0x1a) with ConstGas[(EvmWord, EvmWord)] {
   override protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(a, b) = state.stack.pop(2)
-    if (a.compareTo(UInt256.MaxInt) > 0) {
+    if (a.compareTo(EvmWord.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (a, b)
   }
 
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = y getByte x
+  protected def f(x: EvmWord, y: EvmWord) = y getByte x
 }
-case object SHL extends BinaryOp(0x1b) with ConstGas[(UInt256, UInt256)] {
+case object SHL extends BinaryOp(0x1b) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = y shiftLeft x
+  protected def f(x: EvmWord, y: EvmWord) = y shiftLeft x
 }
-case object SHR extends BinaryOp(0x1c) with ConstGas[(UInt256, UInt256)] {
+case object SHR extends BinaryOp(0x1c) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = y shiftRight x
+  protected def f(x: EvmWord, y: EvmWord) = y shiftRight x
 }
-case object SAR extends BinaryOp(0x1d) with ConstGas[(UInt256, UInt256)] {
+case object SAR extends BinaryOp(0x1d) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256, y: UInt256) = y shiftRightSigned x
+  protected def f(x: EvmWord, y: EvmWord) = y shiftRightSigned x
 }
 
-sealed abstract class UnaryOp(code: Int) extends OpCode[UInt256](code, 1, 1) with ConstGas[UInt256] {
+sealed abstract class UnaryOp(code: Int) extends OpCode[EvmWord](code, 1, 1) with ConstGas[EvmWord] {
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(a) = state.stack.pop()
     a
   }
 
-  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): ProgramState[W, S] = {
     val a = params
     val res = f(a)
     state.stack.push(res)
     state.step()
   }
 
-  protected def f(x: UInt256): UInt256
+  protected def f(x: EvmWord): EvmWord
 }
 case object ISZERO extends UnaryOp(0x15) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256) = UInt256(x.isZero)
+  protected def f(x: EvmWord) = EvmWord(x.isZero)
 }
 case object NOT extends UnaryOp(0x19) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
-  protected def f(x: UInt256) = ~x
+  protected def f(x: EvmWord) = ~x
 }
 
-sealed abstract class TernaryOp(code: Int) extends OpCode[(UInt256, UInt256, UInt256)](code, 3, 1) {
+sealed abstract class TernaryOp(code: Int) extends OpCode[(EvmWord, EvmWord, EvmWord)](code, 3, 1) {
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(a, b, c) = state.stack.pop(3)
     (a, b, c)
   }
 
-  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): ProgramState[W, S] = {
     val (a, b, c) = params
     val res = f(a, b, c)
     state.stack.push(res)
     state.step()
   }
 
-  protected def f(x: UInt256, y: UInt256, z: UInt256): UInt256
+  protected def f(x: EvmWord, y: EvmWord, z: EvmWord): EvmWord
 }
-case object ADDMOD extends TernaryOp(0x08) with ConstGas[(UInt256, UInt256, UInt256)] {
+case object ADDMOD extends TernaryOp(0x08) with ConstGas[(EvmWord, EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_mid
-  protected def f(x: UInt256, y: UInt256, z: UInt256) = x.addmod(y, z)
+  protected def f(x: EvmWord, y: EvmWord, z: EvmWord) = x.addmod(y, z)
 }
-case object MULMOD extends TernaryOp(0x09) with ConstGas[(UInt256, UInt256, UInt256)] {
+case object MULMOD extends TernaryOp(0x09) with ConstGas[(EvmWord, EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_mid
-  protected def f(x: UInt256, y: UInt256, z: UInt256) = x.mulmod(y, z)
+  protected def f(x: EvmWord, y: EvmWord, z: EvmWord) = x.mulmod(y, z)
 }
 
-case object SHA3 extends OpCode[(UInt256, UInt256)](0x20, 2, 1) {
+case object SHA3 extends OpCode[(EvmWord, EvmWord)](0x20, 2, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_sha3
 
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bounds, just use safe int value
     val List(offset, size) = state.stack.pop(2)
-    (UInt256.safe(offset.intValueSafe), UInt256.safe(size.intValueSafe))
+    (EvmWord.safe(offset.intValueSafe), EvmWord.safe(size.intValueSafe))
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): ProgramState[W, S] = {
     val (offset, size) = params
     val input = state.memory.load(offset.intValueSafe, size.intValueSafe)
     val hash = crypto.kec256(input.toArray)
-    state.stack.push(UInt256(hash))
+    state.stack.push(EvmWord(hash))
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): Long = {
     val (offset, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
-    val shaCost = state.config.feeSchedule.G_sha3word * UInt256.wordsForBytes(size.longValueSafe)
+    val shaCost = state.config.feeSchedule.G_sha3word * EvmWord.wordsForBytes(size.longValueSafe)
     memCost + shaCost
   }
 }
@@ -440,62 +440,62 @@ sealed abstract class ConstOp(code: Int) extends OpCode[Unit](code, 0, 1) with C
     state.step()
   }
 
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]): UInt256
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]): EvmWord
 }
 case object ADDRESS extends ConstOp(0x30) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.ownerAddr.toUInt256
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.ownerAddr.toEvmWord
 }
 case object ORIGIN extends ConstOp(0x32) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.originAddr.toUInt256
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.originAddr.toEvmWord
 }
 case object CALLER extends ConstOp(0x33) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.callerAddr.toUInt256
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.callerAddr.toEvmWord
 }
 case object CALLVALUE extends ConstOp(0x34) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.value
 }
 case object CALLDATASIZE extends ConstOp(0x36) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.input.size)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord.safe(s.input.size)
 }
 case object GASPRICE extends ConstOp(0x3a) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.gasPrice
 }
 case object CODESIZE extends ConstOp(0x38) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.env.program.length)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord.safe(s.env.program.length)
 }
 case object COINBASE extends ConstOp(0x41) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.beneficiary)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord(s.env.blockHeader.beneficiary)
 }
 case object TIMESTAMP extends ConstOp(0x42) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.unixTimestamp)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord(s.env.blockHeader.unixTimestamp)
 }
 case object NUMBER extends ConstOp(0x43) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.number)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord(s.env.blockHeader.number)
 }
 case object DIFFICULTY extends ConstOp(0x44) {
   protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = s.env.blockHeader.difficulty
 }
 case object GASLIMIT extends ConstOp(0x45) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.env.blockHeader.gasLimit)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord(s.env.blockHeader.gasLimit)
 }
 case object PC extends ConstOp(0x58) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256.safe(s.pc)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord.safe(s.pc)
 }
 case object MSIZE extends ConstOp(0x59) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(UInt256.SIZE * UInt256.wordsForBytes(s.memory.size))
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord(EvmWord.SIZE * EvmWord.wordsForBytes(s.memory.size))
 }
 case object GAS extends ConstOp(0x5a) {
-  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = UInt256(s.gas - s.config.feeSchedule.G_base)
+  protected def f(s: ProgramState[_ <: WorldState[_, _ <: Storage[_]], _ <: Storage[_]]) = EvmWord(s.gas - s.config.feeSchedule.G_base)
 }
 
-case object BALANCE extends OpCode[UInt256](0x31, 1, 1) with ConstGas[UInt256] {
+case object BALANCE extends OpCode[EvmWord](0x31, 1, 1) with ConstGas[EvmWord] {
   protected def constGasFn(s: FeeSchedule) = s.G_balance
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(accountAddress) = state.stack.pop()
     accountAddress
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): ProgramState[W, S] = {
     val accountAddress = params
     val accountBalance = state.world.getBalance(Address(accountAddress))
     state.stack.push(accountBalance)
@@ -514,12 +514,12 @@ case object CALLDATALOAD extends OpCode[Int](0x35, 1, 1) with ConstGas[Int] {
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Int): ProgramState[W, S] = {
     val offset = params
     val data = OpCode.sliceBytes(state.input, offset, 32)
-    state.stack.push(UInt256(data))
+    state.stack.push(EvmWord(data))
     state.step()
   }
 }
 
-case object CALLDATACOPY extends OpCode[(UInt256, UInt256, UInt256)](0x37, 3, 0) {
+case object CALLDATACOPY extends OpCode[(EvmWord, EvmWord, EvmWord)](0x37, 3, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use save int value
@@ -527,22 +527,22 @@ case object CALLDATACOPY extends OpCode[(UInt256, UInt256, UInt256)](0x37, 3, 0)
     (memOffset, dataOffset, size)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): ProgramState[W, S] = {
     val (memOffset, dataOffset, size) = params
     val data = OpCode.sliceBytes(state.input, dataOffset.intValueSafe, size.intValueSafe)
     state.memory.store(memOffset.intValueSafe, data)
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): Long = {
     val (memOffset, _, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
-    val copyCost = state.config.feeSchedule.G_copy * UInt256.wordsForBytes(size.longValueSafe)
+    val copyCost = state.config.feeSchedule.G_copy * EvmWord.wordsForBytes(size.longValueSafe)
     memCost + copyCost
   }
 }
 
-case object CODECOPY extends OpCode[(UInt256, UInt256, UInt256)](0x39, 3, 0) {
+case object CODECOPY extends OpCode[(EvmWord, EvmWord, EvmWord)](0x39, 3, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
@@ -550,69 +550,69 @@ case object CODECOPY extends OpCode[(UInt256, UInt256, UInt256)](0x39, 3, 0) {
     (memOffset, codeOffset, size)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): ProgramState[W, S] = {
     val (memOffset, codeOffset, size) = params
     val bytes = OpCode.sliceBytes(state.program.code, codeOffset.intValueSafe, size.intValueSafe)
     state.memory.store(memOffset.intValueSafe, bytes)
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): Long = {
     val (memOffset, _, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
-    val copyCost = state.config.feeSchedule.G_copy * UInt256.wordsForBytes(size.longValueSafe)
+    val copyCost = state.config.feeSchedule.G_copy * EvmWord.wordsForBytes(size.longValueSafe)
     memCost + copyCost
   }
 }
 
-case object EXTCODESIZE extends OpCode[UInt256](0x3b, 1, 1) with ConstGas[UInt256] {
+case object EXTCODESIZE extends OpCode[EvmWord](0x3b, 1, 1) with ConstGas[EvmWord] {
   protected def constGasFn(s: FeeSchedule) = s.G_extcodesize
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(addr) = state.stack.pop()
     addr
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): ProgramState[W, S] = {
     val addr = params
     val codeSize = state.world.getCode(Address(addr)).size
-    state.stack.push(UInt256(codeSize))
+    state.stack.push(EvmWord(codeSize))
     state.step()
   }
 }
 
-case object EXTCODECOPY extends OpCode[(UInt256, UInt256, UInt256, UInt256)](0x3c, 4, 0) {
+case object EXTCODECOPY extends OpCode[(EvmWord, EvmWord, EvmWord, EvmWord)](0x3c, 4, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_extcodecopy
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
     val List(address, memOffset, codeOffset, size) = state.stack.pop(4)
-    (address, UInt256.safe(memOffset.intValueSafe), UInt256.safe(codeOffset.intValueSafe), UInt256.safe(size.intValueSafe))
+    (address, EvmWord.safe(memOffset.intValueSafe), EvmWord.safe(codeOffset.intValueSafe), EvmWord.safe(size.intValueSafe))
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord, EvmWord)): ProgramState[W, S] = {
     val (address, memOffset, codeOffset, size) = params
     val codeCopy = OpCode.sliceBytes(state.world.getCode(Address(address)), codeOffset.intValueSafe, size.intValueSafe)
     state.memory.store(memOffset.intValueSafe, codeCopy)
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord, EvmWord)): Long = {
     val (_, memOffset, _, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
-    val copyCost = state.config.feeSchedule.G_copy * UInt256.wordsForBytes(size.longValueSafe)
+    val copyCost = state.config.feeSchedule.G_copy * EvmWord.wordsForBytes(size.longValueSafe)
     memCost + copyCost
   }
 }
 
-case object EXTCODEHASH extends OpCode[UInt256](0x3f, 1, 1) with ConstGas[UInt256] {
+case object EXTCODEHASH extends OpCode[EvmWord](0x3f, 1, 1) with ConstGas[EvmWord] {
   protected def constGasFn(s: FeeSchedule) = s.G_extcodehash
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(addr) = state.stack.pop()
     addr
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): ProgramState[W, S] = {
     val addr = params
-    val codeHash = state.world.getCodeHash(Address(addr)).getOrElse(UInt256.Zero)
+    val codeHash = state.world.getCodeHash(Address(addr)).getOrElse(EvmWord.Zero)
     state.stack.push(codeHash)
     state.step()
   }
@@ -624,12 +624,12 @@ case object RETURNDATASIZE extends OpCode[Unit](0x3d, 0, 1) with ConstGas[Unit] 
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
     val dataSize = state.returnDataBuffer.length
-    state.stack.push(UInt256(dataSize))
+    state.stack.push(EvmWord(dataSize))
     state.step()
   }
 }
 
-case object RETURNDATACOPY extends OpCode[(UInt256, UInt256, UInt256)](0x3e, 3, 0) {
+case object RETURNDATACOPY extends OpCode[(EvmWord, EvmWord, EvmWord)](0x3e, 3, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
@@ -637,17 +637,17 @@ case object RETURNDATACOPY extends OpCode[(UInt256, UInt256, UInt256)](0x3e, 3, 
     (memOffset, dataOffset, size)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): ProgramState[W, S] = {
     val (memOffset, dataOffset, size) = params
     val data = OpCode.sliceBytes(state.returnDataBuffer, dataOffset.intValueSafe, size.intValueSafe)
     state.memory.store(memOffset.intValueSafe, data)
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): Long = {
     val (memOffset, _, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
-    val copyCost = state.config.feeSchedule.G_copy * UInt256.wordsForBytes(size.longValueSafe)
+    val copyCost = state.config.feeSchedule.G_copy * EvmWord.wordsForBytes(size.longValueSafe)
     memCost + copyCost
   }
 }
@@ -662,7 +662,7 @@ case object BLOCKHASH extends OpCode[Int](0x40, 1, 1) with ConstGas[Int] {
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Int): ProgramState[W, S] = {
     val blockNumber = params
     val outOfLimits = state.env.blockHeader.number - blockNumber > 256 || blockNumber >= state.env.blockHeader.number
-    val hash = if (outOfLimits) UInt256.Zero else state.world.getBlockHash(blockNumber).getOrElse(UInt256.Zero)
+    val hash = if (outOfLimits) EvmWord.Zero else state.world.getBlockHash(blockNumber).getOrElse(EvmWord.Zero)
     state.stack.push(hash)
     state.step()
   }
@@ -678,59 +678,59 @@ case object POP extends OpCode[Unit](0x50, 1, 0) with ConstGas[Unit] {
   }
 }
 
-case object MLOAD extends OpCode[UInt256](0x51, 1, 1) {
+case object MLOAD extends OpCode[EvmWord](0x51, 1, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset) = state.stack.pop()
-    if (offset.compareTo(UInt256.MaxInt) > 0) {
+    if (offset.compareTo(EvmWord.MaxInt) > 0) {
       state.withError(ArithmeticException) // why MLOAD/MSTORE requires bounded offset
     }
     offset
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): ProgramState[W, S] = {
     val offset = params
     val word = state.memory.load(offset.intValueSafe)
     state.stack.push(word)
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): Long = {
     val offset = params
-    state.config.calcMemCost(state.memory.size, offset.longValueSafe, UInt256.SIZE)
+    state.config.calcMemCost(state.memory.size, offset.longValueSafe, EvmWord.SIZE)
   }
 }
 
-case object MSTORE extends OpCode[(UInt256, UInt256)](0x52, 2, 0) {
+case object MSTORE extends OpCode[(EvmWord, EvmWord)](0x52, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, value) = state.stack.pop(2)
-    if (offset.compareTo(UInt256.MaxInt) > 0) {
+    if (offset.compareTo(EvmWord.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (offset, value)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): ProgramState[W, S] = {
     val (offset, value) = params
     state.memory.store(offset.intValueSafe, value)
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): Long = {
     val (offset, _) = params
-    state.config.calcMemCost(state.memory.size, offset.longValueSafe, UInt256.SIZE)
+    state.config.calcMemCost(state.memory.size, offset.longValueSafe, EvmWord.SIZE)
   }
 }
 
-case object SLOAD extends OpCode[UInt256](0x54, 1, 1) with ConstGas[UInt256] {
+case object SLOAD extends OpCode[EvmWord](0x54, 1, 1) with ConstGas[EvmWord] {
   protected def constGasFn(s: FeeSchedule) = s.G_sload
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(key) = state.stack.pop()
     key
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): ProgramState[W, S] = {
     val key = params
     val value = state.storage.load(key)
     state.stack.push(value)
@@ -738,7 +738,7 @@ case object SLOAD extends OpCode[UInt256](0x54, 1, 1) with ConstGas[UInt256] {
   }
 }
 
-case object MSTORE8 extends OpCode[(UInt256, UInt256)](0x53, 2, 0) {
+case object MSTORE8 extends OpCode[(EvmWord, EvmWord)](0x53, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
@@ -746,27 +746,27 @@ case object MSTORE8 extends OpCode[(UInt256, UInt256)](0x53, 2, 0) {
     (offset, value)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): ProgramState[W, S] = {
     val (offset, value) = params
-    val valueToByte = (value mod UInt256.TwoFiveSix).n.byteValue
+    val valueToByte = (value mod EvmWord.TwoFiveSix).n.byteValue
     state.memory.store(offset.intValueSafe, valueToByte)
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): Long = {
     val (offset, _) = params
     state.config.calcMemCost(state.memory.size, offset.longValueSafe, 1)
   }
 }
 
-case object SSTORE extends OpCode[(UInt256, UInt256)](0x55, 2, 0) {
+case object SSTORE extends OpCode[(EvmWord, EvmWord)](0x55, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(key, value) = state.stack.pop(2)
     (key, value)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): ProgramState[W, S] = {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
@@ -774,7 +774,7 @@ case object SSTORE extends OpCode[(UInt256, UInt256)](0x55, 2, 0) {
       val oldValue = state.storage.load(key)
       var refund = 0L
       if (state.config.eip1283) {
-        val origValue = state.storage.getOriginalValue(key).getOrElse(UInt256.Zero)
+        val origValue = state.storage.getOriginalValue(key).getOrElse(EvmWord.Zero)
         if (oldValue == origValue) {
           if (origValue.isZero) {
             // no refund 
@@ -816,14 +816,14 @@ case object SSTORE extends OpCode[(UInt256, UInt256)](0x55, 2, 0) {
     }
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): Long = {
     val (key, value) = params
     val oldValue = state.storage.load(key)
     if (state.config.eip1283) {
       if (value == oldValue) {
         state.config.feeSchedule.G_sreuse
       } else {
-        val origValue = state.storage.getOriginalValue(key).getOrElse(UInt256.Zero)
+        val origValue = state.storage.getOriginalValue(key).getOrElse(EvmWord.Zero)
         if (oldValue == origValue) {
           if (origValue.isZero) {
             state.config.feeSchedule.G_sset
@@ -844,14 +844,14 @@ case object SSTORE extends OpCode[(UInt256, UInt256)](0x55, 2, 0) {
   }
 }
 
-case object JUMP extends OpCode[UInt256](0x56, 1, 0) with ConstGas[UInt256] {
+case object JUMP extends OpCode[EvmWord](0x56, 1, 0) with ConstGas[EvmWord] {
   protected def constGasFn(s: FeeSchedule) = s.G_mid
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(pos) = state.stack.pop()
     pos
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): ProgramState[W, S] = {
     val pos = params
     val dest = pos.toInt // fail with InvalidJump if convertion to Int is lossy
 
@@ -863,14 +863,14 @@ case object JUMP extends OpCode[UInt256](0x56, 1, 0) with ConstGas[UInt256] {
   }
 }
 
-case object JUMPI extends OpCode[(UInt256, UInt256)](0x57, 2, 0) with ConstGas[(UInt256, UInt256)] {
+case object JUMPI extends OpCode[(EvmWord, EvmWord)](0x57, 2, 0) with ConstGas[(EvmWord, EvmWord)] {
   protected def constGasFn(s: FeeSchedule) = s.G_high
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(pos, cond) = state.stack.pop(2)
     (pos, cond)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): ProgramState[W, S] = {
     val (pos, cond) = params
     val dest = pos.toInt // fail with InvalidJump if convertion to Int is lossy
 
@@ -902,7 +902,7 @@ sealed abstract class PushOp private (code: Int, val i: Int) extends OpCode[Unit
   final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
     val n = i + 1
     val bytes = state.program.getBytes(state.pc + 1, n)
-    state.stack.push(UInt256(bytes))
+    state.stack.push(EvmWord(bytes))
     state.step(n + 1)
   }
 }
@@ -995,7 +995,7 @@ case object SWAP14 extends SwapOp(0x9d)
 case object SWAP15 extends SwapOp(0x9e)
 case object SWAP16 extends SwapOp(0x9f)
 
-sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(UInt256, UInt256, List[UInt256])](code, i + 2, 0) {
+sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(EvmWord, EvmWord, List[EvmWord])](code, i + 2, 0) {
   def this(code: Int) = this(code, code - 0xa0)
 
   final protected def constGasFn(s: FeeSchedule) = s.G_log
@@ -1005,7 +1005,7 @@ sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(UInt
     (offset, size, topics)
   }
 
-  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, List[UInt256])): ProgramState[W, S] = {
+  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, List[EvmWord])): ProgramState[W, S] = {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
@@ -1016,7 +1016,7 @@ sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(UInt
     }
   }
 
-  final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, List[UInt256])): Long = {
+  final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, List[EvmWord])): Long = {
     val (offset, size, _) = params
     val memCost = state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
     val logCost = state.config.feeSchedule.G_logdata * size.toMaxLong + i * state.config.feeSchedule.G_logtopic
@@ -1031,7 +1031,7 @@ case object LOG4 extends LogOp(0xa4)
 
 sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCode[P](code.toByte, delta, alpha) {
 
-  final protected def doExec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], endowment: UInt256, inOffset: UInt256, inSize: UInt256, salt: Array[Byte], params: P): ProgramState[W, S] = {
+  final protected def doExec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], endowment: EvmWord, inOffset: EvmWord, inSize: EvmWord, salt: Array[Byte], params: P): ProgramState[W, S] = {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
@@ -1097,7 +1097,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
             val isCreationFailed = result.error.isDefined || (isRequireGasForCodeDeposit && notEnoughGasForCodeDeposit)
 
             if (isCreationFailed || result.isRevert) {
-              state.stack.push(UInt256.Zero)
+              state.stack.push(EvmWord.Zero)
 
               if (result.error.isEmpty && result.isRevert) {
                 state.spendGas(gasUsedInCreating)
@@ -1112,7 +1112,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
                 .step()
 
             } else {
-              state.stack.push(newAddress.toUInt256)
+              state.stack.push(newAddress.toEvmWord)
 
               state.spendGas(gasUsedInCreating)
 
@@ -1141,7 +1141,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
           case Left(WorldState.AddressCollisions(address)) =>
             // throws immediately, with exactly the same behavior as would arise 
             // if the first byte in the init code were an invalid opcode.
-            state.stack.push(UInt256.Zero)
+            state.stack.push(EvmWord.Zero)
 
             state
               .spendGas(startGas)
@@ -1150,7 +1150,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
               .step()
         }
       } else { // invalid call
-        state.stack.push(UInt256.Zero)
+        state.stack.push(EvmWord.Zero)
 
         if (endowment <= state.ownBalance) {
           state.withParallelRaceCondition(ProgramState.OnAccount)
@@ -1163,17 +1163,17 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
 
   protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): Either[WorldState.AddressCollisions, (Address, W)]
 }
-case object CREATE extends CreatOp[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
+case object CREATE extends CreatOp[(EvmWord, EvmWord, EvmWord)](0xf0, 3, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_create
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(endowment, inOffset, inSize) = state.stack.pop(3)
-    if (inOffset.compareTo(UInt256.MaxInt) > 0 || inSize.compareTo(UInt256.MaxInt) > 0) {
+    if (inOffset.compareTo(EvmWord.MaxInt) > 0 || inSize.compareTo(EvmWord.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (endowment, inOffset, inSize)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): ProgramState[W, S] = {
     val (endowment, inOffset, inSize) = params
     doExec(state, endowment, inOffset, inSize, null, params)
   }
@@ -1182,24 +1182,24 @@ case object CREATE extends CreatOp[(UInt256, UInt256, UInt256)](0xf0, 3, 1) {
     state.world.createContractAddress(state.env.ownerAddr)
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord)): Long = {
     val (_, inOffset, inSize) = params
     val memCost = state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
     memCost
   }
 }
 
-case object CREATE2 extends CreatOp[(UInt256, UInt256, UInt256, UInt256)](0xf5, 4, 1) {
+case object CREATE2 extends CreatOp[(EvmWord, EvmWord, EvmWord, EvmWord)](0xf5, 4, 1) {
   protected def constGasFn(s: FeeSchedule) = s.G_create
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(endowment, inOffset, inSize, salt) = state.stack.pop(4)
-    if (inOffset.compareTo(UInt256.MaxInt) > 0 || inSize.compareTo(UInt256.MaxInt) > 0) {
+    if (inOffset.compareTo(EvmWord.MaxInt) > 0 || inSize.compareTo(EvmWord.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (endowment, inOffset, inSize, salt)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord, EvmWord)): ProgramState[W, S] = {
     val (endowment, inOffset, inSize, salt) = params
     doExec(state, endowment, inOffset, inSize, salt.bytes, params)
   }
@@ -1208,24 +1208,24 @@ case object CREATE2 extends CreatOp[(UInt256, UInt256, UInt256, UInt256)](0xf5, 
     state.world.createContractAddress(state.env.ownerAddr, initCode, salt)
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord, EvmWord)): Long = {
     val (_, inOffset, inSize, _) = params
     val memCost = state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
-    val shaCost = state.config.feeSchedule.G_sha3word * UInt256.wordsForBytes(inSize.longValueSafe)
+    val shaCost = state.config.feeSchedule.G_sha3word * EvmWord.wordsForBytes(inSize.longValueSafe)
     memCost + shaCost
   }
 }
 
-sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolean, isStateless: Boolean, isStatic: Boolean) extends OpCode[(UInt256, UInt256, UInt256, UInt256, UInt256, UInt256, UInt256)](code.toByte, delta, alpha) {
+sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolean, isStateless: Boolean, isStatic: Boolean) extends OpCode[(EvmWord, EvmWord, EvmWord, EvmWord, EvmWord, EvmWord, EvmWord)](code.toByte, delta, alpha) {
   final protected def constGasFn(s: FeeSchedule) = s.G_zero
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(gas, target, callValue, inOffset, inSize, outOffset, outSize) = if (hasValue) {
       state.stack.pop(7)
     } else {
       val List(gas, target, inOffset, inSize, outOffset, outSize) = state.stack.pop(6)
-      List(gas, target, UInt256.Zero, inOffset, inSize, outOffset, outSize)
+      List(gas, target, EvmWord.Zero, inOffset, inSize, outOffset, outSize)
     }
-    if (inOffset.compareTo(UInt256.MaxInt) > 0 || inSize.compareTo(UInt256.MaxInt) > 0 || outOffset.compareTo(UInt256.MaxInt) > 0 || outOffset.compareTo(UInt256.MaxInt) > 0) {
+    if (inOffset.compareTo(EvmWord.MaxInt) > 0 || inSize.compareTo(EvmWord.MaxInt) > 0 || outOffset.compareTo(EvmWord.MaxInt) > 0 || outOffset.compareTo(EvmWord.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (gas, target, callValue, inOffset, inSize, outOffset, outSize)
@@ -1236,7 +1236,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
    *   https://github.com/ethereum/EIPs/issues/716   "Clarification about when touchedness is reverted during state clearance"
    *   https://github.com/ethereum/go-ethereum/pull/3341/files#r89547994
    */
-  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256, UInt256, UInt256, UInt256)): ProgramState[W, S] = {
+  final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord, EvmWord, EvmWord, EvmWord, EvmWord)): ProgramState[W, S] = {
     val (gas, target, callValue, inOffset, inSize, outOffset, outSize) = params
 
     if (state.context.isStaticCall && this == CALL && callValue.nonZero) { // alreay in staticCall and call with noZero value
@@ -1338,7 +1338,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
         }
 
         if (result.error.isEmpty && !result.isRevert) { // everything ok
-          state.stack.push(UInt256.One)
+          state.stack.push(EvmWord.One)
 
           state
             .spendGas(-result.gasRemaining)
@@ -1350,7 +1350,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
             .step()
 
         } else {
-          state.stack.push(UInt256.Zero)
+          state.stack.push(EvmWord.Zero)
 
           //println(s"error in $this: ${error} with result: ${result}")
 
@@ -1380,7 +1380,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
         }
 
       } else { // invalid call
-        state.stack.push(UInt256.Zero)
+        state.stack.push(EvmWord.Zero)
 
         if (endowment <= state.ownBalance) {
           state.withParallelRaceCondition(ProgramState.OnAccount)
@@ -1392,7 +1392,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
     }
   }
 
-  final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256, UInt256, UInt256, UInt256, UInt256, UInt256)): Long = {
+  final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord, EvmWord, EvmWord, EvmWord, EvmWord, EvmWord)): Long = {
     val (gas, target, callValue, inOffset, inSize, outOffset, outSize) = params
 
     // TODO how about gas < 0? return a Long.MaxValue?
@@ -1418,11 +1418,11 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
     }
   }
 
-  private def gasExtra[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], endowment: UInt256, target: Address): Long = {
+  private def gasExtra[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], endowment: EvmWord, target: Address): Long = {
     val c_new = this match {
       case CALL =>
         if (state.config.eip161) {
-          if (state.world.isAccountDead(target) && endowment.compare(UInt256.Zero) != 0) {
+          if (state.world.isAccountDead(target) && endowment.compare(EvmWord.Zero) != 0) {
             state.config.feeSchedule.G_newaccount
           } else {
             0
@@ -1466,45 +1466,45 @@ case object DELEGATECALL extends CallOp(0xf4, 6, 1, hasValue = false, isStateles
  */
 case object STATICCALL extends CallOp(0xfa, 6, 1, hasValue = false, isStateless = false, isStatic = true)
 
-case object RETURN extends OpCode[(UInt256, UInt256)](0xf3, 2, 0) {
+case object RETURN extends OpCode[(EvmWord, EvmWord)](0xf3, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, size) = state.stack.pop(2)
-    if (offset.compareTo(UInt256.MaxInt) > 0 || size.compareTo(UInt256.MaxInt) > 0) {
+    if (offset.compareTo(EvmWord.MaxInt) > 0 || size.compareTo(EvmWord.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (offset, size)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): ProgramState[W, S] = {
     val (offset, size) = params
     val data = state.memory.load(offset.intValueSafe, size.intValueSafe)
     state.withReturnData(data).halt()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): Long = {
     val (offset, size) = params
     state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
   }
 }
 
-case object REVERT extends OpCode[(UInt256, UInt256)](0xfd, 2, 0) {
+case object REVERT extends OpCode[(EvmWord, EvmWord)](0xfd, 2, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, size) = state.stack.pop(2)
-    if (offset.compareTo(UInt256.MaxInt) > 0 || size.compareTo(UInt256.MaxInt) > 0) {
+    if (offset.compareTo(EvmWord.MaxInt) > 0 || size.compareTo(EvmWord.MaxInt) > 0) {
       state.withError(ArithmeticException)
     }
     (offset, size)
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): ProgramState[W, S] = {
     val (offset, size) = params
     val ret = state.memory.load(offset.intValueSafe, size.intValueSafe)
     state.withReturnData(ret).halt().revert()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (UInt256, UInt256)): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (EvmWord, EvmWord)): Long = {
     val (offset, size) = params
     state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
   }
@@ -1523,14 +1523,14 @@ case object INVALID extends OpCode[Unit](0xfe, 0, 0) with ConstGas[Unit] {
  * Also as SUICIDE, Renaming SUICIDE opcode to SELFDESTRUCT as in eip-6
  * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-6.md
  */
-case object SELFDESTRUCT extends OpCode[UInt256](0xff, 1, 0) {
+case object SELFDESTRUCT extends OpCode[EvmWord](0xff, 1, 0) {
   protected def constGasFn(s: FeeSchedule) = s.G_selfdestruct
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(refundAddr) = state.stack.pop()
     refundAddr
   }
 
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): ProgramState[W, S] = {
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): ProgramState[W, S] = {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
@@ -1556,7 +1556,7 @@ case object SELFDESTRUCT extends OpCode[UInt256](0xff, 1, 0) {
     }
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: UInt256): Long = {
+  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: EvmWord): Long = {
     val refundAddr = params
     val refundAddress = Address(refundAddr)
 

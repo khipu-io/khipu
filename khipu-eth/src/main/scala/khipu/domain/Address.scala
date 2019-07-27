@@ -2,7 +2,7 @@ package khipu.domain
 
 import akka.util.ByteString
 import java.util.Arrays
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto
 import khipu.util.BytesUtil
 import khipu.rlp
@@ -27,8 +27,8 @@ object Address {
     }
   }
 
-  def apply(addr: Long): Address = apply(UInt256(addr))
-  def apply(uint: UInt256): Address = apply(uint.bytes)
+  def apply(addr: Long): Address = apply(EvmWord(addr))
+  def apply(uint: EvmWord): Address = apply(uint.bytes)
   def apply(hexString: String): Address = {
     val bytes = khipu.hexDecode(hexString.replaceFirst("^0x", ""))
     require(bytes.length <= Length, s"Invalid address: $hexString")
@@ -41,7 +41,7 @@ final class Address private (val bytes: ByteString) {
   lazy val id = khipu.toHexString(bytes)
 
   def toArray = bytes.toArray
-  def toUInt256 = if (bytes.length == 0) UInt256.Zero else UInt256(bytes)
+  def toEvmWord = if (bytes.length == 0) EvmWord.Zero else EvmWord(bytes)
 
   override def equals(any: Any): Boolean = {
     any match {

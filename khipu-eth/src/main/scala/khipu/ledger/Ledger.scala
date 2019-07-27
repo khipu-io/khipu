@@ -5,7 +5,7 @@ import akka.event.Logging
 import akka.pattern.ask
 import akka.util.ByteString
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.domain.Account
 import khipu.domain.Address
 import khipu.domain.Block
@@ -55,7 +55,7 @@ object Ledger {
 
   final case class BlockResult(world: BlockWorldState, gasUsed: Long = 0, receipts: Seq[Receipt] = Nil, stats: Stats)
   final case class BlockPreparationResult(block: Block, blockResult: BlockResult, stateRootHash: Hash)
-  final case class TxResult(stx: SignedTransaction, postWorld: BlockWorldState, intermediateRootHash: Hash, gasUsed: Long, txFee: UInt256, logs: Seq[TxLogEntry], touchedAddresses: Set[Address], vmReturnData: ByteString, error: Option[ProgramError], isRevert: Boolean, parallelRaceConditions: Set[ProgramState.ParallelRace])
+  final case class TxResult(stx: SignedTransaction, postWorld: BlockWorldState, intermediateRootHash: Hash, gasUsed: Long, txFee: EvmWord, logs: Seq[TxLogEntry], touchedAddresses: Set[Address], vmReturnData: ByteString, error: Option[ProgramError], isRevert: Boolean, parallelRaceConditions: Set[ProgramState.ParallelRace])
 
   sealed trait BlockExecutionError {
     def blockNumber: Long
@@ -77,7 +77,7 @@ object Ledger {
    * @param tx Target transaction
    * @return Upfront cost
    */
-  private def calculateUpfrontCost(tx: Transaction): UInt256 =
+  private def calculateUpfrontCost(tx: Transaction): EvmWord =
     calculateUpfrontGas(tx) + tx.value
 
   /**
@@ -86,8 +86,8 @@ object Ledger {
    * @param tx Target transaction
    * @return Upfront cost
    */
-  private def calculateUpfrontGas(tx: Transaction): UInt256 =
-    UInt256(tx.gasLimit) * tx.gasPrice
+  private def calculateUpfrontGas(tx: Transaction): EvmWord =
+    EvmWord(tx.gasLimit) * tx.gasPrice
 
 }
 final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(implicit system: ActorSystem) extends Ledger.I {
@@ -179,7 +179,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
     val totalGasToRefund = calcTotalGasToRefund(gasLimit, result)
     val gasUsed = stx.tx.gasLimit - totalGasToRefund
-    val txFee = UInt256(gasUsed) * stx.tx.gasPrice
+    val txFee = EvmWord(gasUsed) * stx.tx.gasPrice
 
     val elapsed = System.nanoTime - start
 
@@ -468,7 +468,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     stats:       Stats
   )(world: BlockWorldState): Either[BlockExecutionError, BlockResult] = {
     try {
-      val (accGas, accTxFee, accTouchedAddresses, accReceipts) = txResults.foldLeft(0L, UInt256.Zero, Set[Address](), Vector[Receipt]()) {
+      val (accGas, accTxFee, accTouchedAddresses, accReceipts) = txResults.foldLeft(0L, EvmWord.Zero, Set[Address](), Vector[Receipt]()) {
         case ((accGas, accTxFee, accTouchedAddresses, accReceipts), TxResult(stx, postWorld, intermediateRootHash, gasUsed, txFee, logs, touchedAddresses, _, error, isRevert, _)) =>
 
           val postTxState = if (evmCfg.eip658) {

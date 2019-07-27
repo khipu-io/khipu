@@ -1,7 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto
 import khipu.domain.Account
 import khipu.domain.Address
@@ -41,8 +41,8 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
 
   def getCode(address: Address): ByteString
   def getStorage(address: Address): S
-  def getBlockHash(number: Long): Option[UInt256]
-  def getCodeHash(address: Address): Option[UInt256]
+  def getBlockHash(number: Long): Option[EvmWord]
+  def getCodeHash(address: Address): Option[EvmWord]
 
   def saveCode(address: Address, code: ByteString): W
   def saveStorage(address: Address, storage: S): W
@@ -59,10 +59,10 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
   def isAccountNonEmptyNonceOrCode(account: Account) =
     account.nonce.nonZero || account.codeHash != Account.EMPTY_CODE_HASH
 
-  def getBalance(address: Address): UInt256 =
-    getAccount(address).map(a => a.balance).getOrElse(UInt256.Zero)
+  def getBalance(address: Address): EvmWord =
+    getAccount(address).map(a => a.balance).getOrElse(EvmWord.Zero)
 
-  def transfer(from: Address, to: Address, value: UInt256): W = {
+  def transfer(from: Address, to: Address, value: EvmWord): W = {
     if (from == to) {
       this
     } else {
@@ -72,12 +72,12 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
     }
   }
 
-  def pay(address: Address, value: UInt256): W = {
+  def pay(address: Address, value: EvmWord): W = {
     val account = getAccount(address).getOrElse(emptyAccount).increaseBalance(value)
     saveAccount(address, account)
   }
 
-  def withdraw(address: Address, value: UInt256): W = {
+  def withdraw(address: Address, value: EvmWord): W = {
     val account = getAccount(address).getOrElse(emptyAccount).increaseBalance(-value)
     saveAccount(address, account)
   }
@@ -96,7 +96,7 @@ trait WorldState[W <: WorldState[W, S], S <: Storage[S]] { self: W =>
    */
   def createAddress(creatorAddr: Address): Address = {
     val creatorAccount = getGuaranteedAccount(creatorAddr)
-    val addr = crypto.kec256(rlp.encode(RLPList(creatorAddr.bytes, rlp.toRLPEncodable(creatorAccount.nonce - UInt256.One))))
+    val addr = crypto.kec256(rlp.encode(RLPList(creatorAddr.bytes, rlp.toRLPEncodable(creatorAccount.nonce - EvmWord.One))))
     Address(addr)
   }
 

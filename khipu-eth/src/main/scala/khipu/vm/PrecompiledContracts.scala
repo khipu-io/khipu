@@ -1,7 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.crypto.zksnark.BN128Fp
@@ -110,7 +110,7 @@ object PrecompiledContracts {
       if (input == null) {
         60
       } else {
-        60 + 12 * UInt256.wordsForBytes(input.size)
+        60 + 12 * EvmWord.wordsForBytes(input.size)
       }
     }
 
@@ -125,7 +125,7 @@ object PrecompiledContracts {
       if (input == null) {
         600
       } else {
-        600 + 120 * UInt256.wordsForBytes(input.size)
+        600 + 120 * EvmWord.wordsForBytes(input.size)
       }
     }
 
@@ -140,7 +140,7 @@ object PrecompiledContracts {
       if (input == null) {
         15
       } else {
-        15 + 3 * UInt256.wordsForBytes(input.size)
+        15 + 3 * EvmWord.wordsForBytes(input.size)
       }
     }
 
@@ -226,7 +226,7 @@ object PrecompiledContracts {
 
     private def parseLen(data: ByteString, idx: Int): Int = {
       val bytes = BytesUtil.parseBytes(data, 32 * idx, 32)
-      UInt256(bytes).intValueSafe
+      EvmWord(bytes).intValueSafe
     }
 
     private def parseArg(data: ByteString, offset: Int, len: Int): BigInteger = {
@@ -369,7 +369,7 @@ object PrecompiledContracts {
       check.run()
       val result = check.result()
 
-      (true, ByteString(UInt256(result).bytes))
+      (true, ByteString(EvmWord(result).bytes))
     }
 
     private def decodePair(in: ByteString, offset: Int): (BN128G1, BN128G2) = {

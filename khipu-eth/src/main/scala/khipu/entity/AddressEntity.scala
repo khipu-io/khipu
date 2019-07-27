@@ -15,7 +15,7 @@ import khipu.ActiveCheckTick
 import khipu.ActiveCheckTickKey
 import khipu.Command
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.domain.Account
 import khipu.ledger.TrieStorage
 import khipu.service.ServiceBoard
@@ -63,7 +63,7 @@ object AddressEntity {
 
   final case class UpdateAccount(id: String, account: Account) extends Command
   final case class UpdateCode(id: String, code: ByteString) extends Command
-  final case class UpdateStorage(id: String, storage: Map[UInt256, UInt256]) extends Command
+  final case class UpdateStorage(id: String, storage: Map[EvmWord, EvmWord]) extends Command
 
   final case class Commit(id: String) extends Command
   final case class Rollback(id: String) extends Command
@@ -81,11 +81,11 @@ final class AddressEntity(nodeStorage: NodeKeyValueStorage) extends Actor with T
 
   private var persistedAccount: Option[Account] = None
   private var persistedCode: Option[ByteString] = None
-  private var persistedStorage: Option[Map[UInt256, UInt256]] = None
+  private var persistedStorage: Option[Map[EvmWord, EvmWord]] = None
 
   private var account: Option[Account] = None
   private var code: Option[ByteString] = None
-  private var storage: Option[Map[UInt256, UInt256]] = None
+  private var storage: Option[Map[EvmWord, EvmWord]] = None
 
   private var isChanged = false
 

@@ -1,6 +1,6 @@
 package khipu.vm
 
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.domain.Address
 
 /**
@@ -14,7 +14,7 @@ final case class InvalidOpCode(code: Byte) extends ProgramError {
   override def toString: String =
     f"InvalidOpCode(0x${code.toInt & 0xff}%02x)"
 }
-final case class InvalidJump(dest: UInt256) extends ProgramError {
+final case class InvalidJump(dest: EvmWord) extends ProgramError {
   override def toString: String =
     f"InvalidJump(${dest.toHexString})"
 }

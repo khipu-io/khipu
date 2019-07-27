@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.event.LogSource
 import akka.event.Logging
 import khipu.Hash
-import khipu.UInt256
+import khipu.EvmWord
 import khipu.domain.Account
 import khipu.rlp
 import khipu.service.ServiceBoard
@@ -127,7 +127,7 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
   private val storageNodeStorage = storages.storageNodeStorageFor(None)
   private val evmcodeStorage = storages.evmcodeStorage
 
-  private val storageReader = new NodeReader[UInt256](dbConfig.storage, storageNodeStorage)(trie.rlpUInt256Serializer) {
+  private val storageReader = new NodeReader[EvmWord](dbConfig.storage, storageNodeStorage)(trie.rlpEvmWordSerializer) {
     override def nodeGot(k: Array[Byte], v: Array[Byte]) {
       if (checkList.contains(Hash(k))) {
         log.info(s"found ${Hash(k)}")
