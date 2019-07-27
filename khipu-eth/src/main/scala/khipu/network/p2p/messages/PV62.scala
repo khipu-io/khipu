@@ -110,7 +110,7 @@ object PV62 {
         case RLPList(parentHash, ommersHash, beneficiary, stateRoot, transactionsRoot, receiptsRoot,
           logsBloom, difficulty, number, gasLimit, gasUsed, unixTimestamp, extraData, mixHash, nonce) =>
           BlockHeader(parentHash, ommersHash, beneficiary, stateRoot, transactionsRoot, receiptsRoot,
-            logsBloom, rlp.toEvmWord(difficulty), number, gasLimit, gasUsed, unixTimestamp, extraData, mixHash, nonce)
+            logsBloom, rlp.toDataWord(difficulty), number, gasLimit, gasUsed, unixTimestamp, extraData, mixHash, nonce)
       }
 
     implicit final class BlockHeaderEnc(blockHeader: BlockHeader) extends RLPSerializable {

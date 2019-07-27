@@ -4,8 +4,8 @@ import akka.util.ByteString
 import java.math.BigInteger
 import khipu.util.BytesUtil
 
-object EvmWord_bigint {
-  object EvmWord {
+object DataWord_bigint {
+  object DataWord {
 
     val SIZE = 32 // size in bytes
     val SIZE_IN_BITS = 256 // 32 * 8
@@ -25,42 +25,42 @@ object EvmWord_bigint {
     private val MAX_VALUE = TWO.copy.j_pow(SIZE_IN_BITS) j_subtract ONE.copy
     private val MAX_SIGNED_VALUE = TWO.copy.j_pow(SIZE_IN_BITS - 1) j_subtract ONE.copy
 
-    // EvmWord value should be put behind MODULUS (will be used in EvmWord constructor) etc
+    // DataWord value should be put behind MODULUS (will be used in DataWord constructor) etc
 
     def Modulus = safe(MODULUS.copy)
 
-    def Zero: EvmWord = safe(ZERO.copy)
-    def One: EvmWord = safe(ONE.copy)
-    def Two: EvmWord = safe(TWO.copy)
-    def Ten: EvmWord = safe(TEN.copy)
-    def MaxInt: EvmWord = safe(MAX_INT.copy)
-    def MaxLong: EvmWord = safe(MAX_LONG.copy)
-    def ThirtyTwo: EvmWord = safe(THIRTY_TWO.copy)
+    def Zero: DataWord = safe(ZERO.copy)
+    def One: DataWord = safe(ONE.copy)
+    def Two: DataWord = safe(TWO.copy)
+    def Ten: DataWord = safe(TEN.copy)
+    def MaxInt: DataWord = safe(MAX_INT.copy)
+    def MaxLong: DataWord = safe(MAX_LONG.copy)
+    def ThirtyTwo: DataWord = safe(THIRTY_TWO.copy)
     def TwoFiveSix = safe(TWO_FIVE_SIX.copy)
 
-    def apply(n: Int): EvmWord = safe(n)
-    def apply(n: Long): EvmWord = safe(n)
-    def apply(b: Boolean): EvmWord = if (b) safe(ONE.copy) else safe(ZERO.copy)
-    def apply(bytes: ByteString): EvmWord = apply(bytes.toArray)
-    def apply(bytes: Hash): EvmWord = apply(bytes.bytes)
+    def apply(n: Int): DataWord = safe(n)
+    def apply(n: Long): DataWord = safe(n)
+    def apply(b: Boolean): DataWord = if (b) safe(ONE.copy) else safe(ZERO.copy)
+    def apply(bytes: ByteString): DataWord = apply(bytes.toArray)
+    def apply(bytes: Hash): DataWord = apply(bytes.bytes)
 
     // with bound limited
-    def apply(n: BigInt): EvmWord = new EvmWord(boundBigInt(n))
-    def apply(n: BigInteger): EvmWord = new EvmWord(boundBigInt(new BigInt(n)))
-    def apply(bigEndianBytes: Array[Byte]): EvmWord = {
+    def apply(n: BigInt): DataWord = new DataWord(boundBigInt(n))
+    def apply(n: BigInteger): DataWord = new DataWord(boundBigInt(new BigInt(n)))
+    def apply(bigEndianBytes: Array[Byte]): DataWord = {
       require(bigEndianBytes.length <= SIZE, s"Input byte array cannot be longer than $SIZE: ${bigEndianBytes.length}")
       if (bigEndianBytes.length == 0) {
-        EvmWord.Zero
+        DataWord.Zero
       } else {
         safe(bigEndianBytes)
       }
     }
 
-    def safe(n: Int): EvmWord = new EvmWord(new BigInt(n))
-    def safe(n: Long): EvmWord = new EvmWord(new BigInt(n))
-    def safe(n: BigInt): EvmWord = new EvmWord(n)
-    def safe(n: BigInteger): EvmWord = new EvmWord(new BigInt(n))
-    def safe(bigEndianBytes: Array[Byte]): EvmWord = new EvmWord(new BigInt(new BigInteger(1, bigEndianBytes)))
+    def safe(n: Int): DataWord = new DataWord(new BigInt(n))
+    def safe(n: Long): DataWord = new DataWord(new BigInt(n))
+    def safe(n: BigInt): DataWord = new DataWord(n)
+    def safe(n: BigInteger): DataWord = new DataWord(new BigInt(n))
+    def safe(bigEndianBytes: Array[Byte]): DataWord = new DataWord(new BigInt(new BigInteger(1, bigEndianBytes)))
 
     private def boundBigInt(n: BigInt): BigInt = {
       if (n.isPositive) {
@@ -82,7 +82,7 @@ object EvmWord_bigint {
     }
 
     /**
-     * Number of 32-byte EvmWords required to hold n bytes (~= math.ceil(n / 32))
+     * Number of 32-byte DataWords required to hold n bytes (~= math.ceil(n / 32))
      * We assume n is not neseccary to exceed Long.MaxValue, and use Long here
      */
     def wordsForBytes(n: Long): Long = if (n == 0) 0 else (n - 1) / SIZE + 1
@@ -90,10 +90,10 @@ object EvmWord_bigint {
 
   /**
    * Represents 256 bit unsigned integers with standard arithmetic, byte-wise operation and EVM-specific extensions
-   * require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid EvmWord value: $n") --- already checked in apply(n: BigInteger)
+   * require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid DataWord value: $n") --- already checked in apply(n: BigInteger)
    */
-  final class EvmWord private (val n: BigInt) extends Ordered[EvmWord] {
-    import EvmWord._
+  final class DataWord private (val n: BigInt) extends Ordered[DataWord] {
+    import DataWord._
 
     // ==== NOTE: n is mutable
 
@@ -118,8 +118,8 @@ object EvmWord_bigint {
     }
 
     /**
-     * Converts an EvmWord to an Array[Byte].
-     * Output Array[Byte] is padded with zeros from the left side up to EvmWord.Size bytes.
+     * Converts an DataWord to an Array[Byte].
+     * Output Array[Byte] is padded with zeros from the left side up to DataWord.Size bytes.
      */
     lazy val bytes: Array[Byte] = {
       val src = bigEndianMag
@@ -149,54 +149,54 @@ object EvmWord_bigint {
       }
     }
 
-    def getByte(that: EvmWord): EvmWord = {
+    def getByte(that: DataWord): DataWord = {
       if (that.n.compareTo(THIRTY_ONE.copy) > 0) {
         Zero
       } else {
-        EvmWord.safe(bytes(that.n.intValue).toInt & 0xff)
+        DataWord.safe(bytes(that.n.intValue).toInt & 0xff)
       }
     }
 
     // standard arithmetic (note the use of new instead of apply where result is guaranteed to be within bounds)
-    def &(that: EvmWord): EvmWord = EvmWord.safe(n.copy j_and that.n.copy)
-    def |(that: EvmWord): EvmWord = EvmWord.safe(n.copy j_or that.n.copy)
-    def ^(that: EvmWord): EvmWord = EvmWord.safe(n.copy j_xor that.n.copy)
-    def unary_- : EvmWord = EvmWord(n.copy.negate)
-    def unary_~ : EvmWord = EvmWord(n.copy.j_not)
-    def +(that: EvmWord): EvmWord = EvmWord(n.copy j_add that.n.copy)
-    def -(that: EvmWord): EvmWord = EvmWord(n.copy j_subtract that.n.copy)
-    def *(that: EvmWord): EvmWord = EvmWord(n.copy j_multiply that.n.copy)
-    def /(that: EvmWord): EvmWord = EvmWord.safe(n.copy j_divide that.n.copy)
-    def **(that: EvmWord): EvmWord = EvmWord.safe(n.copy.j_modPow(that.n.copy, MODULUS.copy))
+    def &(that: DataWord): DataWord = DataWord.safe(n.copy j_and that.n.copy)
+    def |(that: DataWord): DataWord = DataWord.safe(n.copy j_or that.n.copy)
+    def ^(that: DataWord): DataWord = DataWord.safe(n.copy j_xor that.n.copy)
+    def unary_- : DataWord = DataWord(n.copy.negate)
+    def unary_~ : DataWord = DataWord(n.copy.j_not)
+    def +(that: DataWord): DataWord = DataWord(n.copy j_add that.n.copy)
+    def -(that: DataWord): DataWord = DataWord(n.copy j_subtract that.n.copy)
+    def *(that: DataWord): DataWord = DataWord(n.copy j_multiply that.n.copy)
+    def /(that: DataWord): DataWord = DataWord.safe(n.copy j_divide that.n.copy)
+    def **(that: DataWord): DataWord = DataWord.safe(n.copy.j_modPow(that.n.copy, MODULUS.copy))
 
-    def +(that: Int): EvmWord = EvmWord(n.copy j_add new BigInt(that))
-    def -(that: Int): EvmWord = EvmWord(n.copy j_subtract new BigInt(that))
-    def *(that: Int): EvmWord = EvmWord(n.copy j_multiply new BigInt(that))
-    def /(that: Int): EvmWord = EvmWord.safe(n.copy j_divide new BigInt(that))
+    def +(that: Int): DataWord = DataWord(n.copy j_add new BigInt(that))
+    def -(that: Int): DataWord = DataWord(n.copy j_subtract new BigInt(that))
+    def *(that: Int): DataWord = DataWord(n.copy j_multiply new BigInt(that))
+    def /(that: Int): DataWord = DataWord.safe(n.copy j_divide new BigInt(that))
 
-    def +(that: Long): EvmWord = EvmWord(n.copy j_add new BigInt(that))
-    def -(that: Long): EvmWord = EvmWord(n.copy j_subtract new BigInt(that))
-    def *(that: Long): EvmWord = EvmWord(n.copy j_multiply new BigInt(that))
-    def /(that: Long): EvmWord = EvmWord.safe(n.copy j_divide new BigInt(that))
+    def +(that: Long): DataWord = DataWord(n.copy j_add new BigInt(that))
+    def -(that: Long): DataWord = DataWord(n.copy j_subtract new BigInt(that))
+    def *(that: Long): DataWord = DataWord(n.copy j_multiply new BigInt(that))
+    def /(that: Long): DataWord = DataWord.safe(n.copy j_divide new BigInt(that))
 
-    def pow(that: Int): EvmWord = EvmWord(n.copy j_pow that)
+    def pow(that: Int): DataWord = DataWord(n.copy j_pow that)
 
-    def min(that: EvmWord): EvmWord = if (n.compareTo(that.n) < 0) this else that
-    def max(that: EvmWord): EvmWord = if (n.compareTo(that.n) > 0) this else that
+    def min(that: DataWord): DataWord = if (n.compareTo(that.n) < 0) this else that
+    def max(that: DataWord): DataWord = if (n.compareTo(that.n) > 0) this else that
     def isZero: Boolean = n.isZero
     def nonZero: Boolean = !n.isZero
 
-    def div(that: EvmWord): EvmWord = if (that.n.isZero) Zero else new EvmWord(n.copy j_divide that.n.copy)
-    def sdiv(that: EvmWord): EvmWord = if (that.n.isZero) Zero else EvmWord(signed.copy j_divide that.signed.copy)
-    def mod(that: EvmWord): EvmWord = if (that.n.isZero) Zero else EvmWord(n.copy j_mod that.n.copy)
-    def smod(that: EvmWord): EvmWord = if (that.n.isZero) Zero else EvmWord(signed.copy j_remainder that.signed.copy.abs)
-    def addmod(that: EvmWord, modulus: EvmWord): EvmWord = if (modulus.n.isZero) Zero else EvmWord.safe((n.copy j_add that.n.copy) j_remainder modulus.n.copy)
-    def mulmod(that: EvmWord, modulus: EvmWord): EvmWord = if (modulus.n.isZero) Zero else EvmWord.safe((n.copy j_multiply that.n.copy) j_mod modulus.n.copy)
+    def div(that: DataWord): DataWord = if (that.n.isZero) Zero else new DataWord(n.copy j_divide that.n.copy)
+    def sdiv(that: DataWord): DataWord = if (that.n.isZero) Zero else DataWord(signed.copy j_divide that.signed.copy)
+    def mod(that: DataWord): DataWord = if (that.n.isZero) Zero else DataWord(n.copy j_mod that.n.copy)
+    def smod(that: DataWord): DataWord = if (that.n.isZero) Zero else DataWord(signed.copy j_remainder that.signed.copy.abs)
+    def addmod(that: DataWord, modulus: DataWord): DataWord = if (modulus.n.isZero) Zero else DataWord.safe((n.copy j_add that.n.copy) j_remainder modulus.n.copy)
+    def mulmod(that: DataWord, modulus: DataWord): DataWord = if (modulus.n.isZero) Zero else DataWord.safe((n.copy j_multiply that.n.copy) j_mod modulus.n.copy)
 
-    def slt(that: EvmWord): Boolean = signed.compareTo(that.signed) < 0
-    def sgt(that: EvmWord): Boolean = signed.compareTo(that.signed) > 0
+    def slt(that: DataWord): Boolean = signed.compareTo(that.signed) < 0
+    def sgt(that: DataWord): Boolean = signed.compareTo(that.signed) > 0
 
-    def signExtend(that: EvmWord): EvmWord = {
+    def signExtend(that: DataWord): DataWord = {
       if (that.n.isNegative || that.n.compareTo(THIRTY_ONE.copy) > 0) {
         this
       } else {
@@ -208,21 +208,21 @@ object EvmWord_bigint {
         } else {
           n.copy j_and mask.copy
         }
-        EvmWord.safe(newN)
+        DataWord.safe(newN)
       }
     }
 
-    def compare(that: EvmWord): Int = n.compareTo(that.n)
+    def compare(that: DataWord): Int = n.compareTo(that.n)
 
     override def equals(that: Any): Boolean = {
       that match {
-        case that: EvmWord => (this eq that) || this.n == that.n
-        case that: BigInt  => this.n == that
-        case that: Byte    => this.n == that
-        case that: Short   => this.n == that
-        case that: Int     => this.n == that
-        case that: Long    => this.n == that
-        case _             => false
+        case that: DataWord => (this eq that) || this.n == that.n
+        case that: BigInt   => this.n == that
+        case that: Byte     => this.n == that
+        case that: Short    => this.n == that
+        case that: Int      => this.n == that
+        case that: Long     => this.n == that
+        case _              => false
       }
     }
 

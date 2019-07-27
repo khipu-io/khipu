@@ -2,7 +2,7 @@ package khipu.jsonrpc
 
 import akka.util.ByteString
 import khipu.Hash
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.BlockHeader
 import khipu.domain.SignedTransaction
 
@@ -29,14 +29,14 @@ object TransactionResponse {
 }
 final case class TransactionResponse(
   hash:             Hash,
-  nonce:            EvmWord,
+  nonce:            DataWord,
   blockHash:        Option[Hash],
   blockNumber:      Option[Long],
   transactionIndex: Option[Long],
   from:             ByteString,
   to:               Option[ByteString],
-  value:            EvmWord,
-  gasPrice:         EvmWord,
+  value:            DataWord,
+  gasPrice:         DataWord,
   gas:              Long,
   input:            ByteString
 )

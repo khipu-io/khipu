@@ -11,7 +11,7 @@ import java.util.function.UnaryOperator
 import java.util.Date
 import java.util.concurrent.atomic.AtomicReference
 import khipu.Hash
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.Account
 import khipu.domain.Address
 import khipu.domain.Block
@@ -69,7 +69,7 @@ object EthService {
   final case class UncleByBlockNumberAndIndexRequest(block: BlockParam, uncleIndex: Long)
   final case class UncleByBlockNumberAndIndexResponse(uncleBlockResponse: Option[BlockResponse])
 
-  final case class SubmitHashRateRequest(hashRate: EvmWord, id: Hash)
+  final case class SubmitHashRateRequest(hashRate: DataWord, id: Hash)
   final case class SubmitHashRateResponse(success: Boolean)
 
   final case class GetMiningRequest()
@@ -85,10 +85,10 @@ object EthService {
   final case class GetTransactionByBlockNumberAndIndexResponse(transactionResponse: Option[TransactionResponse])
 
   final case class GetHashRateRequest()
-  final case class GetHashRateResponse(hashRate: EvmWord)
+  final case class GetHashRateResponse(hashRate: DataWord)
 
   final case class GetGasPriceRequest()
-  final case class GetGasPriceResponse(price: EvmWord)
+  final case class GetGasPriceResponse(price: DataWord)
 
   final case class GetWorkRequest()
   final case class GetWorkResponse(powHeaderHash: Hash, dagSeed: ByteString, target: ByteString)
@@ -106,7 +106,7 @@ object EthService {
   sealed trait BlockParam
 
   object BlockParam {
-    final case class WithNumber(n: EvmWord) extends BlockParam
+    final case class WithNumber(n: DataWord) extends BlockParam
     case object Latest extends BlockParam
     case object Pending extends BlockParam
     case object Earliest extends BlockParam
@@ -116,8 +116,8 @@ object EthService {
     from:     Option[ByteString],
     to:       Option[ByteString],
     gas:      Option[Long],
-    gasPrice: EvmWord,
-    value:    EvmWord,
+    gasPrice: DataWord,
+    value:    DataWord,
     data:     ByteString
   )
   final case class CallRequest(tx: CallTx, block: BlockParam)
@@ -140,13 +140,13 @@ object EthService {
   final case class GetBlockTransactionCountByNumberResponse(result: Long)
 
   final case class GetBalanceRequest(address: Address, block: BlockParam)
-  final case class GetBalanceResponse(value: EvmWord)
+  final case class GetBalanceResponse(value: DataWord)
 
-  final case class GetStorageAtRequest(address: Address, position: EvmWord, block: BlockParam)
+  final case class GetStorageAtRequest(address: Address, position: DataWord, block: BlockParam)
   final case class GetStorageAtResponse(value: ByteString)
 
   final case class GetTransactionCountRequest(address: Address, block: BlockParam)
-  final case class GetTransactionCountResponse(value: EvmWord)
+  final case class GetTransactionCountResponse(value: DataWord)
 
   final case class ResolvedBlock(block: Block, pending: Boolean)
 
@@ -161,15 +161,15 @@ object EthService {
   final case class NewBlockFilterRequest()
   final case class NewPendingTransactionFilterRequest()
 
-  final case class NewFilterResponse(filterId: EvmWord)
+  final case class NewFilterResponse(filterId: DataWord)
 
-  final case class UninstallFilterRequest(filterId: EvmWord)
+  final case class UninstallFilterRequest(filterId: DataWord)
   final case class UninstallFilterResponse(success: Boolean)
 
-  final case class GetFilterChangesRequest(filterId: EvmWord)
+  final case class GetFilterChangesRequest(filterId: DataWord)
   final case class GetFilterChangesResponse(filterChanges: FilterChanges)
 
-  final case class GetFilterLogsRequest(filterId: EvmWord)
+  final case class GetFilterLogsRequest(filterId: DataWord)
   final case class GetFilterLogsResponse(filterLogs: FilterLogs)
 
   final case class GetLogsRequest(filter: Filter)
@@ -191,7 +191,7 @@ class EthService(
 
   def syncService = SyncService.proxy(system)
 
-  val hashRate: AtomicReference[Map[Hash, (EvmWord, Date)]] = new AtomicReference[Map[Hash, (EvmWord, Date)]](Map())
+  val hashRate: AtomicReference[Map[Hash, (DataWord, Date)]] = new AtomicReference[Map[Hash, (DataWord, Date)]](Map())
   val lastActive = new AtomicReference[Option[Date]](None)
 
   def pendingTransactionsService = PendingTransactionsService.proxy(system)
@@ -391,8 +391,8 @@ class EthService(
 
   def submitHashRate(req: SubmitHashRateRequest): ServiceResponse[SubmitHashRateResponse] = {
     reportActive()
-    hashRate.updateAndGet(new UnaryOperator[Map[Hash, (EvmWord, Date)]] {
-      override def apply(t: Map[Hash, (EvmWord, Date)]): Map[Hash, (EvmWord, Date)] = {
+    hashRate.updateAndGet(new UnaryOperator[Map[Hash, (DataWord, Date)]] {
+      override def apply(t: Map[Hash, (DataWord, Date)]): Map[Hash, (DataWord, Date)] = {
         val now = new Date
         removeObsoleteHashrates(now, t + (req.id -> (req.hashRate, now)))
       }
@@ -411,10 +411,10 @@ class EthService(
         .flatMap(_.body.transactionList)
         .map(_.tx.gasPrice)
       if (gasPrice.nonEmpty) {
-        val avgGasPrice = gasPrice.foldLeft(EvmWord.Zero)(_ + _) / EvmWord(gasPrice.length)
+        val avgGasPrice = gasPrice.foldLeft(DataWord.Zero)(_ + _) / DataWord(gasPrice.length)
         Right(GetGasPriceResponse(avgGasPrice))
       } else {
-        Right(GetGasPriceResponse(EvmWord.Zero))
+        Right(GetGasPriceResponse(DataWord.Zero))
       }
     }
   }
@@ -438,17 +438,17 @@ class EthService(
   }
 
   def getHashRate(req: GetHashRateRequest): ServiceResponse[GetHashRateResponse] = {
-    val hashRates: Map[Hash, (EvmWord, Date)] = hashRate.updateAndGet(new UnaryOperator[Map[Hash, (EvmWord, Date)]] {
-      override def apply(t: Map[Hash, (EvmWord, Date)]): Map[Hash, (EvmWord, Date)] = {
+    val hashRates: Map[Hash, (DataWord, Date)] = hashRate.updateAndGet(new UnaryOperator[Map[Hash, (DataWord, Date)]] {
+      override def apply(t: Map[Hash, (DataWord, Date)]): Map[Hash, (DataWord, Date)] = {
         removeObsoleteHashrates(new Date, t)
       }
     })
 
     //sum all reported hashRates
-    Future.successful(Right(GetHashRateResponse(hashRates.mapValues { case (hr, _) => hr }.values.foldLeft(EvmWord.Zero)(_ + _))))
+    Future.successful(Right(GetHashRateResponse(hashRates.mapValues { case (hr, _) => hr }.values.foldLeft(DataWord.Zero)(_ + _))))
   }
 
-  private def removeObsoleteHashrates(now: Date, rates: Map[Hash, (EvmWord, Date)]): Map[Hash, (EvmWord, Date)] = {
+  private def removeObsoleteHashrates(now: Date, rates: Map[Hash, (DataWord, Date)]): Map[Hash, (DataWord, Date)] = {
     rates.filter {
       case (_, (_, reported)) =>
         Duration.between(reported.toInstant, now.toInstant).toMillis < miningConfig.activeTimeout.toMillis
@@ -468,7 +468,7 @@ class EthService(
             Right(GetWorkResponse(
               powHeaderHash = Hash(crypto.kec256(BlockHeader.getEncodedWithoutNonce(pb.block.header))),
               dagSeed = seedForBlock(pb.block.header.number),
-              target = ByteString((EvmWord.Modulus / pb.block.header.difficulty).bigEndianMag)
+              target = ByteString((DataWord.Modulus / pb.block.header.difficulty).bigEndianMag)
             ))
           case Left(err) =>
             //log.error(s"unable to prepare block because of $err")
@@ -744,7 +744,7 @@ class EthService(
     }
 
     gasLimit.flatMap { gl =>
-      val tx = Transaction(EvmWord.Zero, req.tx.gasPrice, gl, toAddress, req.tx.value, req.tx.data)
+      val tx = Transaction(DataWord.Zero, req.tx.gasPrice, gl, toAddress, req.tx.value, req.tx.data)
       val fakeSignature = ECDSASignature(BigInteger.ZERO, BigInteger.ZERO, 0.toByte)
       // TODO chainId
       val stx = SignedTransaction(tx, fakeSignature, None, fromAddress)

@@ -6,7 +6,7 @@ import akka.pattern.pipe
 import akka.util.ByteString
 import java.util.concurrent.ThreadLocalRandom
 import khipu.Hash
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.blockchain.sync
 import khipu.blockchain.sync.HandshakedPeersService.BlacklistPeer
 import khipu.crypto
@@ -74,7 +74,7 @@ object FastSyncService {
   )
 
   sealed trait Work
-  final case class HeadersWork(enqueueHashs: List[Hash], headers: Map[Hash, BlockHeader], tds: Map[Hash, EvmWord], lastNumber: Option[Long]) extends Work
+  final case class HeadersWork(enqueueHashs: List[Hash], headers: Map[Hash, BlockHeader], tds: Map[Hash, DataWord], lastNumber: Option[Long]) extends Work
   final case class BodiesWork(workHashes: List[Hash], enqueueHashs: List[Hash], bodies: Map[Hash, PV62.BlockBody], receivedHashes: List[Hash]) extends Work
   final case class ReceiptsWork(workHashes: List[Hash], enqueueHashs: List[Hash], receipts: Map[Hash, Seq[Receipt]]) extends Work
   final case class NodesWork(workHashes: List[NodeHash], enqueueHashs: List[NodeHash], downloadedCount: Int, accountNodes: Map[Hash, Array[Byte]], storageNodes: Map[Hash, Array[Byte]], evmcodes: Map[Hash, ByteString]) extends Work
@@ -675,7 +675,7 @@ trait FastSyncService { _: SyncService =>
 
     private def toHeadersWork(headers: List[BlockHeader]): HeadersWork = {
       // calculate total difficulties
-      val (obtains, hds, tds, lastNumber) = headers.foldLeft(mutable.ListBuffer[Hash](), Map[Hash, BlockHeader](), Map[Hash, EvmWord](), None: Option[Long]) {
+      val (obtains, hds, tds, lastNumber) = headers.foldLeft(mutable.ListBuffer[Hash](), Map[Hash, BlockHeader](), Map[Hash, DataWord](), None: Option[Long]) {
         case ((obtains, hds, tds, lastNumber), h) =>
           tds.get(h.parentHash) orElse blockchain.getTotalDifficultyByHash(h.parentHash) match {
             case Some(parentTotalDifficulty) =>
@@ -725,7 +725,7 @@ trait FastSyncService { _: SyncService =>
       log.debug(s"SaveBodies ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
-    private def saveTotalDifficulties(kvs: Map[Hash, EvmWord]) {
+    private def saveTotalDifficulties(kvs: Map[Hash, DataWord]) {
       val start = System.nanoTime
       blockchain.saveTotalDifficulty(kvs)
       log.debug(s"SaveDifficulties ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")

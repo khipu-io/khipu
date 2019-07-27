@@ -2,16 +2,16 @@ package khipu.jsonrpc
 
 import akka.util.ByteString
 import khipu.Hash
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.{ Block, BlockHeader }
 import khipu.network.p2p.messages.PV62.BlockBody
 
 object BlockResponse {
   def apply(
     block:           Block,
-    totalDifficulty: Option[EvmWord] = None,
-    fullTxs:         Boolean         = false,
-    pendingBlock:    Boolean         = false
+    totalDifficulty: Option[DataWord] = None,
+    fullTxs:         Boolean          = false,
+    pendingBlock:    Boolean          = false
   ): BlockResponse = {
     val transactions =
       if (fullTxs)
@@ -45,7 +45,7 @@ object BlockResponse {
     )
   }
 
-  def apply(blockHeader: BlockHeader, totalDifficulty: Option[EvmWord], pendingBlock: Boolean): BlockResponse =
+  def apply(blockHeader: BlockHeader, totalDifficulty: Option[DataWord], pendingBlock: Boolean): BlockResponse =
     BlockResponse(
       block = Block(blockHeader, BlockBody(Nil, Nil)),
       totalDifficulty = totalDifficulty,
@@ -63,8 +63,8 @@ final case class BlockResponse(
   stateRoot:        Hash,
   receiptsRoot:     Hash,
   miner:            Option[ByteString],
-  difficulty:       EvmWord,
-  totalDifficulty:  Option[EvmWord],
+  difficulty:       DataWord,
+  totalDifficulty:  Option[DataWord],
   extraData:        ByteString,
   size:             Long,
   gasLimit:         Long,

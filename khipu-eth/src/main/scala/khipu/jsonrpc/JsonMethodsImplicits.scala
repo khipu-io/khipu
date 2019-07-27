@@ -3,7 +3,7 @@ package khipu.jsonrpc
 import akka.util.ByteString
 import java.math.BigInteger
 import khipu.Hash
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.crypto.ECDSASignature
 import khipu.domain.Address
 import khipu.jsonrpc.EthService.BlockParam
@@ -35,7 +35,7 @@ trait JsonMethodsImplicits {
   protected def encodeAsHex(input: BigInteger): JString =
     JString(s"0x${input.toString(16)}")
 
-  protected def encodeAsHex(input: EvmWord): JString =
+  protected def encodeAsHex(input: DataWord): JString =
     JString(s"0x${input.toHexString}")
 
   protected def encodeAsHex(input: Long): JString =
@@ -65,20 +65,20 @@ trait JsonMethodsImplicits {
   protected def extractHash(input: String): Either[JsonRpcError, Hash] =
     extractBytes(input, 32).map(x => Hash(x.toArray))
 
-  protected def extractQuantity(input: JValue): Either[JsonRpcError, EvmWord] =
+  protected def extractQuantity(input: JValue): Either[JsonRpcError, DataWord] =
     input match {
       case JInt(n) =>
-        Right(EvmWord(n.bigInteger))
+        Right(DataWord(n.bigInteger))
 
       case JString(s) =>
-        Try(EvmWord(new BigInteger(1, decode(s)))).toEither.left.map(_ => InvalidParams())
+        Try(DataWord(new BigInteger(1, decode(s)))).toEither.left.map(_ => InvalidParams())
 
       case _ =>
         Left(InvalidParams("could not extract quantity"))
     }
 
   protected def extractTx(input: Map[String, JValue]): Either[JsonRpcError, TransactionRequest] = {
-    def optionalQuantity(name: String): Either[JsonRpcError, Option[EvmWord]] = input.get(name) match {
+    def optionalQuantity(name: String): Either[JsonRpcError, Option[DataWord]] = input.get(name) match {
       case Some(v) => extractQuantity(v).map(Some(_))
       case None    => Right(None)
     }

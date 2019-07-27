@@ -5,7 +5,7 @@ import akka.pattern.{ ask, pipe }
 import akka.util.ByteString
 import akka.util.Timeout
 import khipu.Hash
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.Address
 import khipu.domain.Block
 import khipu.domain.Blockchain
@@ -35,28 +35,28 @@ object FilterManager {
     Props(new FilterManager(blockchain, blockGenerator, appStateStorage, keyStore, filterConfig, txPoolConfig))
 
   sealed trait Filter {
-    def id: EvmWord
+    def id: DataWord
   }
   final case class LogFilter(
-    override val id: EvmWord,
+    override val id: DataWord,
     fromBlock:       Option[BlockParam],
     toBlock:         Option[BlockParam],
     address:         Option[Address],
     topics:          List[List[ByteString]]
   ) extends Filter
-  final case class BlockFilter(override val id: EvmWord) extends Filter
-  final case class PendingTransactionFilter(override val id: EvmWord) extends Filter
+  final case class BlockFilter(override val id: DataWord) extends Filter
+  final case class PendingTransactionFilter(override val id: DataWord) extends Filter
 
   final case class NewLogFilter(fromBlock: Option[BlockParam], toBlock: Option[BlockParam], address: Option[Address], topics: List[List[ByteString]])
   final case class NewBlockFilter()
   final case class NewPendingTransactionFilter()
-  final case class NewFilterResponse(id: EvmWord)
+  final case class NewFilterResponse(id: DataWord)
 
-  final case class UninstallFilter(id: EvmWord)
+  final case class UninstallFilter(id: DataWord)
   final case class UninstallFilterResponse()
 
-  final case class GetFilterLogs(id: EvmWord)
-  final case class GetFilterChanges(id: EvmWord)
+  final case class GetFilterLogs(id: DataWord)
+  final case class GetFilterChanges(id: DataWord)
 
   final case class GetLogs(fromBlock: Option[BlockParam], toBlock: Option[BlockParam], address: Option[Address], topics: List[List[ByteString]])
 
@@ -81,7 +81,7 @@ object FilterManager {
   final case class BlockFilterLogs(blockHashes: Seq[Hash]) extends FilterLogs
   final case class PendingTransactionFilterLogs(txHashes: Seq[Hash]) extends FilterLogs
 
-  private case class FilterTimeout(id: EvmWord)
+  private case class FilterTimeout(id: DataWord)
 }
 class FilterManager(
     blockchain:      Blockchain,
@@ -101,13 +101,13 @@ class FilterManager(
 
   val maxBlockHashesChanges = 256
 
-  var filters: Map[EvmWord, Filter] = Map.empty
+  var filters: Map[DataWord, Filter] = Map.empty
 
-  var lastCheckBlocks: Map[EvmWord, Long] = Map.empty
+  var lastCheckBlocks: Map[DataWord, Long] = Map.empty
 
-  var lastCheckTimestamps: Map[EvmWord, Long] = Map.empty
+  var lastCheckTimestamps: Map[DataWord, Long] = Map.empty
 
-  var filterTimeouts: Map[EvmWord, Cancellable] = Map.empty
+  var filterTimeouts: Map[DataWord, Cancellable] = Map.empty
 
   implicit val timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
 
@@ -120,11 +120,11 @@ class FilterManager(
     case GetFilterChanges(id)                              => getFilterChanges(id)
     case FilterTimeout(id)                                 => uninstallFilter(id)
     case gl: GetLogs =>
-      val filter = LogFilter(EvmWord.Zero, gl.fromBlock, gl.toBlock, gl.address, gl.topics)
+      val filter = LogFilter(DataWord.Zero, gl.fromBlock, gl.toBlock, gl.address, gl.topics)
       sender() ! LogFilterLogs(getLogs(filter, None))
   }
 
-  private def resetTimeout(id: EvmWord) {
+  private def resetTimeout(id: DataWord) {
     filterTimeouts.get(id).foreach(_.cancel())
     val timeoutCancellable = scheduler.scheduleOnce(filterConfig.filterTimeout, self, FilterTimeout(id))
     filterTimeouts += (id -> timeoutCancellable)
@@ -138,7 +138,7 @@ class FilterManager(
     sender() ! NewFilterResponse(filter.id)
   }
 
-  private def uninstallFilter(id: EvmWord) {
+  private def uninstallFilter(id: DataWord) {
     filters -= id
     lastCheckBlocks -= id
     lastCheckTimestamps -= id
@@ -147,7 +147,7 @@ class FilterManager(
     sender() ! UninstallFilterResponse()
   }
 
-  private def getFilterLogs(id: EvmWord) {
+  private def getFilterLogs(id: DataWord) {
     val filterOpt = filters.get(id)
     filterOpt.foreach { _ =>
       lastCheckBlocks += (id -> appStateStorage.getBestBlockNumber())
@@ -211,7 +211,7 @@ class FilterManager(
     else logs
   }
 
-  private def getFilterChanges(id: EvmWord) {
+  private def getFilterChanges(id: DataWord) {
     val bestBlockNumber = appStateStorage.getBestBlockNumber()
     val lastCheckBlock = lastCheckBlocks.getOrElse(id, bestBlockNumber)
     val lastCheckTimestamp = lastCheckTimestamps.getOrElse(id, System.currentTimeMillis())
@@ -301,7 +301,7 @@ class FilterManager(
       }
   }
 
-  private def generateId(): EvmWord = EvmWord.safe(Random.nextLong().abs)
+  private def generateId(): DataWord = DataWord.safe(Random.nextLong().abs)
 
   private def resolveBlockNumber(blockParam: BlockParam, bestBlockNumber: Long): Long = {
     blockParam match {

@@ -2,7 +2,7 @@ package khipu.vm
 
 import akka.util.ByteString
 import java.util.Arrays
-import khipu.EvmWord
+import khipu.DataWord
 
 /**
  * Volatile memory with 256 bit address space.
@@ -19,7 +19,7 @@ final class Memory private () {
   private var underlying: Array[Byte] = Array.emptyByteArray
 
   def store(offset: Int, b: Byte): Unit = store(offset, Array(b))
-  def store(offset: Int, uint: EvmWord): Unit = store(offset, uint.bytes)
+  def store(offset: Int, uint: DataWord): Unit = store(offset, uint.bytes)
   def store(offset: Int, bytes: ByteString): Unit = store(offset, bytes.toArray)
 
   /**
@@ -34,7 +34,7 @@ final class Memory private () {
     }
   }
 
-  def load(offset: Int): EvmWord = EvmWord(doLoad(offset, EvmWord.SIZE))
+  def load(offset: Int): DataWord = DataWord(doLoad(offset, DataWord.SIZE))
   def load(offset: Int, size: Int): ByteString = ByteString(doLoad(offset, size.toInt))
 
   /**

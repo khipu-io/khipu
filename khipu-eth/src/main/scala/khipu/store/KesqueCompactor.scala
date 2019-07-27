@@ -8,7 +8,7 @@ import kesque.HashKeyValueTable
 import kesque.Kesque
 import khipu.TKeyVal
 import khipu.TVal
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.Account
 import khipu.rlp
 import khipu.service.ServiceBoard
@@ -218,7 +218,7 @@ final class KesqueCompactor(
   private val storageWriter = new NodeWriter(dbConfig.storage, targetStorageTable, toFileNo)
   private val accountWriter = new NodeWriter(dbConfig.account, targetAccountTable, toFileNo)
 
-  private val storageReader = new NodeReader[EvmWord](dbConfig.storage, storageTable)(trie.rlpEvmWordSerializer) {
+  private val storageReader = new NodeReader[DataWord](dbConfig.storage, storageTable)(trie.rlpDataWordSerializer) {
     override def nodeGot(kv: TKeyVal) {
       val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset)
       if (fileno == fromFileNo) {

@@ -5,7 +5,7 @@ import akka.pattern.AskTimeoutException
 import akka.pattern.ask
 import java.util.concurrent.ThreadLocalRandom
 import khipu.BroadcastNewBlocks
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.blockchain.sync
 import khipu.blockchain.sync.HandshakedPeersService.BlacklistPeer
 import khipu.domain.Block
@@ -37,7 +37,7 @@ object RegularSyncService {
   private case class ProcessBlockHeaders(peer: Peer, headers: List[BlockHeader])
   private case class ProcessBlockBodies(peer: Peer, bodies: List[PV62.BlockBody])
 
-  private case class ExecuteAndInsertBlocksAborted(parentTotalDifficulty: EvmWord, newBlocks: Vector[NewBlock], errors: Vector[BlockExecutionError]) extends Throwable with NoStackTrace
+  private case class ExecuteAndInsertBlocksAborted(parentTotalDifficulty: DataWord, newBlocks: Vector[NewBlock], errors: Vector[BlockExecutionError]) extends Throwable with NoStackTrace
 }
 trait RegularSyncService { _: SyncService =>
   import context.dispatcher
@@ -188,8 +188,8 @@ trait RegularSyncService { _: SyncService =>
           if (parent.hash == firstHeader.parentHash) {
             // we have same chain prefix
             val oldBranch = getPrevBlocks(headers)
-            val oldBranchTotalDifficulty = oldBranch.map(_.header.difficulty).foldLeft(EvmWord.Zero)(_ + _)
-            val newBranchTotalDifficulty = headers.map(_.difficulty).foldLeft(EvmWord.Zero)(_ + _)
+            val oldBranchTotalDifficulty = oldBranch.map(_.header.difficulty).foldLeft(DataWord.Zero)(_ + _)
+            val newBranchTotalDifficulty = headers.map(_.difficulty).foldLeft(DataWord.Zero)(_ + _)
 
             if (newBranchTotalDifficulty.compareTo(oldBranchTotalDifficulty) > 0) { // TODO what about == 0 ?
               val transactionsToAdd = oldBranch.flatMap(_.body.transactionList)
@@ -371,7 +371,7 @@ trait RegularSyncService { _: SyncService =>
    * @param newBlocks which, after adding the corresponding NewBlock msg for blocks, will be broadcasted
    * @return list of NewBlocks to broadcast (one per block successfully executed) and  errors if happened during execution
    */
-  private def executeAndInsertBlocks(blocks: Vector[Block], parentTd: EvmWord, isBatch: Boolean): Future[(EvmWord, Vector[NewBlock], Vector[BlockExecutionError])] = {
+  private def executeAndInsertBlocks(blocks: Vector[Block], parentTd: DataWord, isBatch: Boolean): Future[(DataWord, Vector[NewBlock], Vector[BlockExecutionError])] = {
     blocks.foldLeft(Future.successful(parentTd, Vector[NewBlock](), Vector[BlockExecutionError]())) {
       case (prevFuture, block) =>
         prevFuture flatMap {
@@ -398,7 +398,7 @@ trait RegularSyncService { _: SyncService =>
     }
   }
 
-  private def executeAndInsertBlock(block: Block, parentTd: EvmWord, isBatch: Boolean): Future[Either[BlockExecutionError, NewBlock]] = {
+  private def executeAndInsertBlock(block: Block, parentTd: DataWord, isBatch: Boolean): Future[Either[BlockExecutionError, NewBlock]] = {
     try {
       val start = System.nanoTime
       ledger.executeBlock(block, validators) map {

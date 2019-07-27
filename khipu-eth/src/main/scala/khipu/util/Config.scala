@@ -4,7 +4,7 @@ import akka.util.ByteString
 import com.typesafe.config.{ ConfigFactory, Config => TypesafeConfig }
 import java.math.BigInteger
 import java.net.InetSocketAddress
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.Address
 import khipu.jsonrpc.JsonRpcController.JsonRpcConfig
 import khipu.jsonrpc.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
@@ -251,7 +251,7 @@ object BlockchainConfig {
 
       val daoForkBlockNumber = blockchainConfig.getLong("dao-fork-block-number")
       val daoForkBlockHash = ByteString(khipu.hexDecode(blockchainConfig.getString("dao-fork-block-hash")))
-      val accountStartNonce = EvmWord(blockchainConfig.getInt("account-start-nonce"))
+      val accountStartNonce = DataWord(blockchainConfig.getInt("account-start-nonce"))
 
       val chainId = khipu.hexDecode(blockchainConfig.getString("chain-id")).head
 
@@ -292,7 +292,7 @@ trait BlockchainConfig {
 
   def daoForkBlockNumber: Long
   def daoForkBlockHash: ByteString
-  def accountStartNonce: EvmWord
+  def accountStartNonce: DataWord
 
   def chainId: Byte
 
@@ -306,18 +306,18 @@ object MonetaryPolicyConfig {
     MonetaryPolicyConfig(
       mpConfig.getLong("era-duration"),
       mpConfig.getDouble("reward-reduction-rate"),
-      EvmWord(new BigInteger(mpConfig.getString("first-era-block-reward"))),
-      EvmWord(new BigInteger(mpConfig.getString("byzantium-block-reward"))),
-      EvmWord(new BigInteger(mpConfig.getString("constantinople-block-reward")))
+      DataWord(new BigInteger(mpConfig.getString("first-era-block-reward"))),
+      DataWord(new BigInteger(mpConfig.getString("byzantium-block-reward"))),
+      DataWord(new BigInteger(mpConfig.getString("constantinople-block-reward")))
     )
   }
 }
 final case class MonetaryPolicyConfig(
     eraDuration:               Long,
     rewardRedutionRate:        Double,
-    firstEraBlockReward:       EvmWord,
-    byzantiumBlockReward:      EvmWord,
-    constantinopleBlockReward: EvmWord
+    firstEraBlockReward:       DataWord,
+    byzantiumBlockReward:      DataWord,
+    constantinopleBlockReward: DataWord
 ) {
   require(
     rewardRedutionRate >= 0.0 && rewardRedutionRate <= 1.0,

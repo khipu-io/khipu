@@ -7,7 +7,7 @@ import java.io.FileNotFoundException
 import java.math.BigInteger
 import khipu.Hash
 import khipu.crypto
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.{ Account, Block, BlockHeader, Blockchain }
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.rlp
@@ -147,7 +147,7 @@ class GenesisDataLoader(
         val ephemNodeStorage = new ArchiveNodeStorage(nodeStorage)
         val mpt = MerklePatriciaTrie[Array[Byte], Account](rootHash, ephemNodeStorage)(trie.byteArraySerializable, Account.accountSerializer)
         val paddedAddress = address.reverse.padTo(addressLength, "0").reverse.mkString
-        val account = Account(blockchainConfig.accountStartNonce, EvmWord(new BigInteger(balance)), EMPTY_TRIE_ROOT_HASH, EMPTY_EVM_HASH)
+        val account = Account(blockchainConfig.accountStartNonce, DataWord(new BigInteger(balance)), EMPTY_TRIE_ROOT_HASH, EMPTY_EVM_HASH)
 
         mpt.put(crypto.kec256(khipu.hexDecode(paddedAddress)), account).persist().rootHash
     }
@@ -160,7 +160,7 @@ class GenesisDataLoader(
       transactionsRoot = EMPTY_TRIE_ROOT_HASH,
       receiptsRoot = EMPTY_TRIE_ROOT_HASH,
       logsBloom = ByteString(zeros(bloomLength)),
-      difficulty = EvmWord(new BigInteger(genesisData.difficulty.replace("0x", ""), 16)),
+      difficulty = DataWord(new BigInteger(genesisData.difficulty.replace("0x", ""), 16)),
       number = 0,
       gasLimit = new BigInteger(genesisData.gasLimit.replace("0x", ""), 16).longValue,
       gasUsed = 0,

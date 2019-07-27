@@ -4,7 +4,7 @@ import khipu.Deleted
 import khipu.Log
 import khipu.Original
 import khipu.Updated
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.vm.Storage
 import khipu.trie.MerklePatriciaTrie
 
@@ -14,23 +14,23 @@ import khipu.trie.MerklePatriciaTrie
 object TrieStorage {
   val DeletedValue = Deleted(null)
 
-  def apply(underlyingTrie: MerklePatriciaTrie[EvmWord, EvmWord]) =
+  def apply(underlyingTrie: MerklePatriciaTrie[DataWord, DataWord]) =
     new TrieStorage(underlyingTrie, Map())
 }
 final class TrieStorage private (
-    underlyingTrie:           MerklePatriciaTrie[EvmWord, EvmWord],
-    private[ledger] var logs: Map[EvmWord, Log[EvmWord]]
+    underlyingTrie:           MerklePatriciaTrie[DataWord, DataWord],
+    private[ledger] var logs: Map[DataWord, Log[DataWord]]
 ) extends Storage[TrieStorage] {
   import TrieStorage._
 
   def underlying = underlyingTrie
 
-  private var originalValues = Map[EvmWord, EvmWord]()
+  private var originalValues = Map[DataWord, DataWord]()
 
-  def getOriginalValue(address: EvmWord): Option[EvmWord] =
+  def getOriginalValue(address: DataWord): Option[DataWord] =
     originalValues.get(address) orElse underlyingTrie.get(address)
 
-  def load(address: EvmWord): EvmWord = {
+  def load(address: DataWord): DataWord = {
     logs.get(address) match {
       case None =>
         underlyingTrie.get(address) match {
@@ -40,15 +40,15 @@ final class TrieStorage private (
             }
             logs += (address -> Original(value))
             value
-          case None => EvmWord.Zero
+          case None => DataWord.Zero
         }
       case Some(Original(value)) => value
       case Some(Updated(value))  => value
-      case Some(Deleted(_))      => EvmWord.Zero
+      case Some(Deleted(_))      => DataWord.Zero
     }
   }
 
-  def store(address: EvmWord, value: EvmWord): TrieStorage = {
+  def store(address: DataWord, value: DataWord): TrieStorage = {
     val updatedLogs = if (value.isZero) {
       logs + (address -> DeletedValue)
     } else {

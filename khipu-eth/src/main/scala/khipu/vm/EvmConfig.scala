@@ -1,7 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.util.BlockchainConfig
 import java.math.BigInteger
 
@@ -210,7 +210,7 @@ final case class EvmConfig(
 
   /** See YP H.1 (222) */
   private def c(m: Long): Long = {
-    val a = EvmWord.wordsForBytes(m)
+    val a = DataWord.wordsForBytes(m)
     feeSchedule.G_memory * a + a * a / 512
   }
 

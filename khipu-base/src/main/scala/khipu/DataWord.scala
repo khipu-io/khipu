@@ -4,7 +4,7 @@ import akka.util.ByteString
 import khipu.util.BytesUtil
 import java.math.BigInteger
 
-object EvmWord {
+object DataWord {
 
   val SIZE = 32 // size in bytes
   val SIZE_IN_BITS = 256 // 32 * 8
@@ -25,40 +25,40 @@ object EvmWord {
   private val MAX_VALUE = TWO.pow(SIZE_IN_BITS) subtract BigInteger.ONE
   private val MAX_SIGNED_VALUE = TWO.pow(SIZE_IN_BITS - 1) subtract BigInteger.ONE
 
-  // EvmWord value should be put behind MODULUS (will be used in EvmWord constructor) etc
+  // DataWord value should be put behind MODULUS (will be used in DataWord constructor) etc
 
   val Modulus = safe(TWO.pow(SIZE_IN_BITS))
 
-  val Zero: EvmWord = safe(ZERO)
-  val One: EvmWord = safe(ONE)
-  val Two: EvmWord = safe(TWO)
-  val Ten: EvmWord = safe(TEN)
-  val MaxInt: EvmWord = safe(MAX_INT)
-  val MaxLong: EvmWord = safe(MAX_LONG)
-  val ThirtyTwo: EvmWord = safe(THIRTY_TWO)
+  val Zero: DataWord = safe(ZERO)
+  val One: DataWord = safe(ONE)
+  val Two: DataWord = safe(TWO)
+  val Ten: DataWord = safe(TEN)
+  val MaxInt: DataWord = safe(MAX_INT)
+  val MaxLong: DataWord = safe(MAX_LONG)
+  val ThirtyTwo: DataWord = safe(THIRTY_TWO)
   val TwoFiveSix = safe(TWO_FIVE_SIX)
 
-  def apply(n: Int): EvmWord = safe(n)
-  def apply(n: Long): EvmWord = safe(n)
-  def apply(b: Boolean): EvmWord = if (b) One else Zero
-  def apply(bytes: ByteString): EvmWord = apply(bytes.toArray)
-  def apply(bytes: Hash): EvmWord = apply(bytes.bytes)
+  def apply(n: Int): DataWord = safe(n)
+  def apply(n: Long): DataWord = safe(n)
+  def apply(b: Boolean): DataWord = if (b) One else Zero
+  def apply(bytes: ByteString): DataWord = apply(bytes.toArray)
+  def apply(bytes: Hash): DataWord = apply(bytes.bytes)
 
   // with bound limited
-  def apply(n: BigInteger): EvmWord = new EvmWord(boundBigInt(n))
-  def apply(bigEndianBytes: Array[Byte]): EvmWord = {
+  def apply(n: BigInteger): DataWord = new DataWord(boundBigInt(n))
+  def apply(bigEndianBytes: Array[Byte]): DataWord = {
     require(bigEndianBytes.length <= SIZE, s"Input byte array cannot be longer than $SIZE: ${bigEndianBytes.length}")
     if (bigEndianBytes.length == 0) {
-      EvmWord.Zero
+      DataWord.Zero
     } else {
       safe(bigEndianBytes)
     }
   }
 
-  def safe(n: Int): EvmWord = new EvmWord(BigInteger.valueOf(n))
-  def safe(n: Long): EvmWord = new EvmWord(BigInteger.valueOf(n))
-  def safe(n: BigInteger): EvmWord = new EvmWord(n)
-  def safe(bigEndianMag: Array[Byte]): EvmWord = new EvmWord(new BigInteger(1, bigEndianMag))
+  def safe(n: Int): DataWord = new DataWord(BigInteger.valueOf(n))
+  def safe(n: Long): DataWord = new DataWord(BigInteger.valueOf(n))
+  def safe(n: BigInteger): DataWord = new DataWord(n)
+  def safe(bigEndianMag: Array[Byte]): DataWord = new DataWord(new BigInteger(1, bigEndianMag))
 
   private def boundBigInt(n: BigInteger): BigInteger = {
     if (n.signum > 0) {
@@ -80,91 +80,92 @@ object EvmWord {
   }
 
   /**
-   * Number of 32-byte EvmWords required to hold n bytes (~= math.ceil(n / 32))
+   * Number of 32-byte DataWords required to hold n bytes (~= math.ceil(n / 32))
    * We assume n is not neseccary to exceed Long.MaxValue, and use Long here
    */
   def wordsForBytes(n: Long): Long = if (n == 0) 0 else (n - 1) / SIZE + 1
 
   // --- simple test
   def main(args: Array[String]) {
-    var a1 = EvmWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
-    var a2 = EvmWord(hexDecode("01"))
+    var a1 = DataWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    var a2 = DataWord(hexDecode("01"))
     var r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xc000000000000000000000000000000000000000000000000000000000000000
 
-    a1 = EvmWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = EvmWord(hexDecode("ff"))
+    a1 = DataWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = DataWord(hexDecode("ff"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = EvmWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = EvmWord(hexDecode("0100"))
+    a1 = DataWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = DataWord(hexDecode("0100"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = EvmWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = EvmWord(hexDecode("0101"))
+    a1 = DataWord(hexDecode("8000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = DataWord(hexDecode("0101"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = EvmWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = EvmWord(hexDecode("00"))
+    a1 = DataWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = DataWord(hexDecode("00"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = EvmWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = EvmWord(hexDecode("01"))
+    a1 = DataWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = DataWord(hexDecode("01"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = EvmWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = EvmWord(hexDecode("ff"))
+    a1 = DataWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = DataWord(hexDecode("ff"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = EvmWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = EvmWord(hexDecode("0100"))
+    a1 = DataWord(hexDecode("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = DataWord(hexDecode("0100"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
-    a1 = EvmWord(hexDecode("0000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = EvmWord(hexDecode("01"))
+    a1 = DataWord(hexDecode("0000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = DataWord(hexDecode("01"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
 
-    a1 = EvmWord(hexDecode("4000000000000000000000000000000000000000000000000000000000000000"))
-    a2 = EvmWord(hexDecode("fe"))
+    a1 = DataWord(hexDecode("4000000000000000000000000000000000000000000000000000000000000000"))
+    a2 = DataWord(hexDecode("fe"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000001
 
-    a1 = EvmWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = EvmWord(hexDecode("f8"))
+    a1 = DataWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = DataWord(hexDecode("f8"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x000000000000000000000000000000000000000000000000000000000000007f
 
-    a1 = EvmWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = EvmWord(hexDecode("fe"))
+    a1 = DataWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = DataWord(hexDecode("fe"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000001
 
-    a1 = EvmWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = EvmWord(hexDecode("ff"))
+    a1 = DataWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = DataWord(hexDecode("ff"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
 
-    a1 = EvmWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
-    a2 = EvmWord(hexDecode("0100"))
+    a1 = DataWord(hexDecode("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))
+    a2 = DataWord(hexDecode("0100"))
     r = a1.shiftRightSigned(a2)
     println(r.toHexString) // 0x0000000000000000000000000000000000000000000000000000000000000000
   }
 
 }
 /**
+ * Natural unit of data used by the VM design.
  * Represents 256 bit unsigned integers with standard arithmetic, byte-wise operation and EVM-specific extensions
- * require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid EvmWord value: $n") --- already checked in apply(n: BigInteger)
+ * require(n.signum >= 0 && n.compareTo(MODULUS) < 0, s"Invalid DataWord value: $n") --- already checked in apply(n: BigInteger)
  */
-final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
-  import EvmWord._
+final class DataWord private (val n: BigInteger) extends Ordered[DataWord] {
+  import DataWord._
 
   // EVM-specific arithmetic
   private lazy val signed = if (n.compareTo(MAX_SIGNED_VALUE) > 0) (n subtract MODULUS) else n
@@ -187,8 +188,8 @@ final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
   }
 
   /**
-   * Converts an EvmWord to an Array[Byte].
-   * Output Array[Byte] is padded with zeros from the left side up to EvmWord.Size bytes.
+   * Converts an DataWord to an Array[Byte].
+   * Output Array[Byte] is padded with zeros from the left side up to DataWord.Size bytes.
    */
   lazy val bytes: Array[Byte] = {
     val src = bigEndianMag
@@ -218,54 +219,54 @@ final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
     }
   }
 
-  def getByte(that: EvmWord): EvmWord = {
+  def getByte(that: DataWord): DataWord = {
     if (that.n.compareTo(THIRTY_ONE) > 0) {
       Zero
     } else {
-      EvmWord.safe(bytes(that.n.intValue).toInt & 0xff)
+      DataWord.safe(bytes(that.n.intValue).toInt & 0xff)
     }
   }
 
   // standard arithmetic (note the use of new instead of apply where result is guaranteed to be within bounds)
-  def &(that: EvmWord): EvmWord = EvmWord.safe(n and that.n)
-  def |(that: EvmWord): EvmWord = EvmWord.safe(n or that.n)
-  def ^(that: EvmWord): EvmWord = EvmWord.safe(n xor that.n)
-  def unary_- : EvmWord = EvmWord(n.negate)
-  def unary_~ : EvmWord = EvmWord(n.not)
-  def +(that: EvmWord): EvmWord = EvmWord(n add that.n)
-  def -(that: EvmWord): EvmWord = EvmWord(n subtract that.n)
-  def *(that: EvmWord): EvmWord = EvmWord(n multiply that.n)
-  def /(that: EvmWord): EvmWord = EvmWord.safe(n divide that.n)
-  def **(that: EvmWord): EvmWord = EvmWord.safe(n.modPow(that.n, MODULUS))
+  def &(that: DataWord): DataWord = DataWord.safe(n and that.n)
+  def |(that: DataWord): DataWord = DataWord.safe(n or that.n)
+  def ^(that: DataWord): DataWord = DataWord.safe(n xor that.n)
+  def unary_- : DataWord = DataWord(n.negate)
+  def unary_~ : DataWord = DataWord(n.not)
+  def +(that: DataWord): DataWord = DataWord(n add that.n)
+  def -(that: DataWord): DataWord = DataWord(n subtract that.n)
+  def *(that: DataWord): DataWord = DataWord(n multiply that.n)
+  def /(that: DataWord): DataWord = DataWord.safe(n divide that.n)
+  def **(that: DataWord): DataWord = DataWord.safe(n.modPow(that.n, MODULUS))
 
-  def +(that: Int): EvmWord = EvmWord(n add BigInteger.valueOf(that))
-  def -(that: Int): EvmWord = EvmWord(n subtract BigInteger.valueOf(that))
-  def *(that: Int): EvmWord = EvmWord(n multiply BigInteger.valueOf(that))
-  def /(that: Int): EvmWord = EvmWord.safe(n divide BigInteger.valueOf(that))
+  def +(that: Int): DataWord = DataWord(n add BigInteger.valueOf(that))
+  def -(that: Int): DataWord = DataWord(n subtract BigInteger.valueOf(that))
+  def *(that: Int): DataWord = DataWord(n multiply BigInteger.valueOf(that))
+  def /(that: Int): DataWord = DataWord.safe(n divide BigInteger.valueOf(that))
 
-  def +(that: Long): EvmWord = EvmWord(n add BigInteger.valueOf(that))
-  def -(that: Long): EvmWord = EvmWord(n subtract BigInteger.valueOf(that))
-  def *(that: Long): EvmWord = EvmWord(n multiply BigInteger.valueOf(that))
-  def /(that: Long): EvmWord = EvmWord.safe(n divide BigInteger.valueOf(that))
+  def +(that: Long): DataWord = DataWord(n add BigInteger.valueOf(that))
+  def -(that: Long): DataWord = DataWord(n subtract BigInteger.valueOf(that))
+  def *(that: Long): DataWord = DataWord(n multiply BigInteger.valueOf(that))
+  def /(that: Long): DataWord = DataWord.safe(n divide BigInteger.valueOf(that))
 
-  def pow(that: Int): EvmWord = EvmWord(n pow that)
+  def pow(that: Int): DataWord = DataWord(n pow that)
 
-  def min(that: EvmWord): EvmWord = if (n.compareTo(that.n) < 0) this else that
-  def max(that: EvmWord): EvmWord = if (n.compareTo(that.n) > 0) this else that
+  def min(that: DataWord): DataWord = if (n.compareTo(that.n) < 0) this else that
+  def max(that: DataWord): DataWord = if (n.compareTo(that.n) > 0) this else that
   def isZero: Boolean = n.signum == 0
   def nonZero: Boolean = n.signum != 0
 
-  def div(that: EvmWord): EvmWord = if (that.n.signum == 0) Zero else EvmWord.safe(n divide that.n)
-  def sdiv(that: EvmWord): EvmWord = if (that.n.signum == 0) Zero else EvmWord(signed divide that.signed)
-  def mod(that: EvmWord): EvmWord = if (that.n.signum == 0) Zero else EvmWord(n mod that.n)
-  def smod(that: EvmWord): EvmWord = if (that.n.signum == 0) Zero else EvmWord(signed remainder that.signed.abs)
-  def addmod(that: EvmWord, modulus: EvmWord): EvmWord = if (modulus.n.signum == 0) Zero else EvmWord.safe((n add that.n) remainder modulus.n)
-  def mulmod(that: EvmWord, modulus: EvmWord): EvmWord = if (modulus.n.signum == 0) Zero else EvmWord.safe((n multiply that.n) mod modulus.n)
+  def div(that: DataWord): DataWord = if (that.n.signum == 0) Zero else DataWord.safe(n divide that.n)
+  def sdiv(that: DataWord): DataWord = if (that.n.signum == 0) Zero else DataWord(signed divide that.signed)
+  def mod(that: DataWord): DataWord = if (that.n.signum == 0) Zero else DataWord(n mod that.n)
+  def smod(that: DataWord): DataWord = if (that.n.signum == 0) Zero else DataWord(signed remainder that.signed.abs)
+  def addmod(that: DataWord, modulus: DataWord): DataWord = if (modulus.n.signum == 0) Zero else DataWord.safe((n add that.n) remainder modulus.n)
+  def mulmod(that: DataWord, modulus: DataWord): DataWord = if (modulus.n.signum == 0) Zero else DataWord.safe((n multiply that.n) mod modulus.n)
 
-  def slt(that: EvmWord): Boolean = signed.compareTo(that.signed) < 0
-  def sgt(that: EvmWord): Boolean = signed.compareTo(that.signed) > 0
+  def slt(that: DataWord): Boolean = signed.compareTo(that.signed) < 0
+  def sgt(that: DataWord): Boolean = signed.compareTo(that.signed) > 0
 
-  def signExtend(that: EvmWord): EvmWord = {
+  def signExtend(that: DataWord): DataWord = {
     if (that.n.signum < 0 || that.n.compareTo(THIRTY_ONE) > 0) {
       this
     } else {
@@ -277,7 +278,7 @@ final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
       } else {
         n and mask
       }
-      EvmWord.safe(newN)
+      DataWord.safe(newN)
     }
   }
 
@@ -286,11 +287,11 @@ final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
    * @param arg
    * @return this << arg
    */
-  def shiftLeft(arg: EvmWord): EvmWord = {
+  def shiftLeft(arg: DataWord): DataWord = {
     if (arg.n.compareTo(MAX_POW) >= 0) {
       Zero
     } else {
-      EvmWord(n.shiftLeft(arg.intValueSafe))
+      DataWord(n.shiftLeft(arg.intValueSafe))
     }
   }
 
@@ -299,11 +300,11 @@ final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
    * @param arg
    * @return this >> arg
    */
-  def shiftRight(arg: EvmWord): EvmWord = {
+  def shiftRight(arg: DataWord): DataWord = {
     if (arg.n.compareTo(MAX_POW) >= 0) {
       Zero
     } else {
-      EvmWord(n.shiftRight(arg.intValueSafe))
+      DataWord(n.shiftRight(arg.intValueSafe))
     }
   }
 
@@ -312,16 +313,16 @@ final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
    * @param arg
    * @return this >> arg
    */
-  def shiftRightSigned(arg: EvmWord): EvmWord = {
+  def shiftRightSigned(arg: DataWord): DataWord = {
     if (arg.n.compareTo(MAX_POW) >= 0) {
       if (isNegative) {
-        EvmWord(BigInteger.ONE.negate)
+        DataWord(BigInteger.ONE.negate)
       } else {
         Zero
       }
     } else {
 
-      EvmWord(signed.shiftRight(arg.intValueSafe))
+      DataWord(signed.shiftRight(arg.intValueSafe))
     }
   }
 
@@ -333,11 +334,11 @@ final class EvmWord private (val n: BigInteger) extends Ordered[EvmWord] {
     signed.signum < 0
   }
 
-  def compare(that: EvmWord): Int = n.compareTo(that.n)
+  def compare(that: DataWord): Int = n.compareTo(that.n)
 
   override def equals(any: Any): Boolean = {
     any match {
-      case that: EvmWord    => (this eq that) || n == that.n
+      case that: DataWord   => (this eq that) || n == that.n
       case that: BigInteger => n == that
       case that: Byte       => n == BigInteger.valueOf(that)
       case that: Short      => n == BigInteger.valueOf(that)

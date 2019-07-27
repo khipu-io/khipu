@@ -1,7 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.Address
 import khipu.domain.TxLogEntry
 
@@ -53,7 +53,7 @@ final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: Pr
   def program: Program = env.program
   def input: ByteString = env.input
   def ownAddress: Address = env.ownerAddr
-  def ownBalance: EvmWord = world.getBalance(ownAddress)
+  def ownBalance: DataWord = world.getBalance(ownAddress)
   def storage: S = world.getStorage(ownAddress)
   def gasUsed = context.startGas - gas
 

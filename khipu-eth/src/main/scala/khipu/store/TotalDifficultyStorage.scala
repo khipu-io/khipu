@@ -2,7 +2,7 @@ package khipu.store
 
 import khipu.Hash
 import khipu.TVal
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.store.datasource.BlockDataSource
 import khipu.util.SimpleMap
 
@@ -11,20 +11,20 @@ import khipu.util.SimpleMap
  *   Key: hash of the block
  *   Value: the total difficulty
  */
-final class TotalDifficultyStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, EvmWord] {
+final class TotalDifficultyStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, DataWord] {
   type This = TotalDifficultyStorage
 
   def keySerializer: Hash => Array[Byte] = _.bytes
-  def valueSerializer: EvmWord => Array[Byte] = _.bigEndianMag
-  def valueDeserializer: Array[Byte] => EvmWord = EvmWord.safe
+  def valueSerializer: DataWord => Array[Byte] = _.bigEndianMag
+  def valueDeserializer: Array[Byte] => DataWord = DataWord.safe
 
-  override def get(key: Hash): Option[EvmWord] = {
+  override def get(key: Hash): Option[DataWord] = {
     storages.getBlockNumberByHash(key) flatMap {
-      blockNum => source.get(blockNum).map(x => EvmWord.safe(x.value))
+      blockNum => source.get(blockNum).map(x => DataWord.safe(x.value))
     }
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, EvmWord]): TotalDifficultyStorage = {
+  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, DataWord]): TotalDifficultyStorage = {
     val upsert = toUpsert flatMap {
       case (key, value) =>
         storages.getBlockNumberByHash(key) map {

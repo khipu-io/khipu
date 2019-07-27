@@ -1,7 +1,7 @@
 package khipu.vm
 
 import akka.util.ByteString
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.domain.Address
 import khipu.domain.BlockHeader
 
@@ -22,8 +22,8 @@ final case class ExecEnv(
   ownerAddr:   Address,
   callerAddr:  Address,
   originAddr:  Address,
-  gasPrice:    EvmWord,
-  value:       EvmWord,
+  gasPrice:    DataWord,
+  value:       DataWord,
   program:     Program,
   input:       ByteString,
   blockHeader: BlockHeader,

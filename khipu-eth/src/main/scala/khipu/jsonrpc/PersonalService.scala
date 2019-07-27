@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.{ ByteString, Timeout }
 import khipu.Hash
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.domain.{ Account, Address, Blockchain }
@@ -148,14 +148,14 @@ class PersonalService(
     implicit val timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
 
     val pendingTxsFuture = (pendingTransactionsService ? PendingTransactionsService.GetPendingTransactions).mapTo[PendingTransactionsService.PendingTransactionsResponse]
-    val latestPendingTxNonceFuture: Future[Option[EvmWord]] = pendingTxsFuture.map { pendingTxs =>
+    val latestPendingTxNonceFuture: Future[Option[DataWord]] = pendingTxsFuture.map { pendingTxs =>
       val senderTxsNonces = pendingTxs.pendingTransactions
         .collect { case ptx if ptx.stx.sender == wallet.address => ptx.stx.tx.nonce }
       Try(senderTxsNonces.max).toOption
     }
     latestPendingTxNonceFuture.map { maybeLatestPendingTxNonce =>
       val maybeCurrentNonce = getCurrentAccount(request.from).map(_.nonce)
-      val maybeNextTxNonce = maybeLatestPendingTxNonce.map(_ + EvmWord.Zero) orElse maybeCurrentNonce
+      val maybeNextTxNonce = maybeLatestPendingTxNonce.map(_ + DataWord.Zero) orElse maybeCurrentNonce
       val tx = request.toTransaction(maybeNextTxNonce.getOrElse(blockchainConfig.accountStartNonce))
 
       val stx = if (appStateStorage.getBestBlockNumber >= blockchainConfig.eip155BlockNumber) {

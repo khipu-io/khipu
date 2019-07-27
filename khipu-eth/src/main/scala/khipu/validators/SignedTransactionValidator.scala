@@ -1,7 +1,7 @@
 package khipu.validators
 
 import java.math.BigInteger
-import khipu.EvmWord
+import khipu.DataWord
 import khipu.crypto.ECDSASignature
 import khipu.domain.Account
 import khipu.domain.BlockHeader
@@ -14,7 +14,7 @@ sealed trait SignedTransactionError
 object SignedTransactionError {
   case object TransactionSignatureError extends SignedTransactionError
   final case class TransactionSyntaxError(reason: String) extends SignedTransactionError
-  final case class TransactionNonceError(txNonce: EvmWord, senderNonce: EvmWord) extends SignedTransactionError {
+  final case class TransactionNonceError(txNonce: DataWord, senderNonce: DataWord) extends SignedTransactionError {
     override def toString: String =
       s"${getClass.getSimpleName}(Got tx nonce $txNonce but sender in mpt is: $senderNonce)"
   }
@@ -22,7 +22,7 @@ object SignedTransactionError {
     override def toString: String =
       s"${getClass.getSimpleName}(Tx gas limit ($txGasLimit) < tx intrinsic gas ($txIntrinsicGas))"
   }
-  final case class TransactionSenderCantPayUpfrontCostError(upfrontCost: EvmWord, senderBalance: EvmWord) extends SignedTransactionError {
+  final case class TransactionSenderCantPayUpfrontCostError(upfrontCost: DataWord, senderBalance: DataWord) extends SignedTransactionError {
     override def toString: String =
       s"${getClass.getSimpleName}(Upfrontcost ($upfrontCost) > sender balance ($senderBalance))"
   }
@@ -33,9 +33,9 @@ object SignedTransactionError {
 }
 
 object SignedTransactionValidator {
-  protected val MaxNonceValue = EvmWord.Two.pow(8 * Transaction.NonceLength) - 1
-  protected val MaxGasValue = EvmWord.Two.pow(8 * Transaction.GasLength) - 1
-  protected val MaxValue = EvmWord.Two.pow(8 * Transaction.ValueLength) - 1
+  protected val MaxNonceValue = DataWord.Two.pow(8 * Transaction.NonceLength) - 1
+  protected val MaxGasValue = DataWord.Two.pow(8 * Transaction.GasLength) - 1
+  protected val MaxValue = DataWord.Two.pow(8 * Transaction.ValueLength) - 1
 
   // immutable BigInteger for ECDSASignature.r and ECDSASignature.s
   protected val TWO = BigInteger.valueOf(2)
@@ -57,7 +57,7 @@ final class SignedTransactionValidator(blockchainConfig: BlockchainConfig) {
    * @param accumGasUsed               Total amount of gas spent prior this transaction within the container block
    * @return Transaction if valid, error otherwise
    */
-  def validate(stx: SignedTransaction, senderAccount: Account, blockHeader: BlockHeader, upfrontGasCost: EvmWord, accumGasUsed: Long): Either[SignedTransactionError, Unit] = {
+  def validate(stx: SignedTransaction, senderAccount: Account, blockHeader: BlockHeader, upfrontGasCost: DataWord, accumGasUsed: Long): Either[SignedTransactionError, Unit] = {
     for {
       _ <- checkSyntacticValidity(stx)
       _ <- validateSignature(stx, blockHeader.number)
@@ -79,7 +79,7 @@ final class SignedTransactionValidator(blockchainConfig: BlockchainConfig) {
 
     if (tx.nonce.compareTo(MaxNonceValue) > 0) {
       Left(TransactionSyntaxError(s"Invalid nonce: ${tx.nonce} > $MaxNonceValue"))
-    } else if (EvmWord(tx.gasLimit).compareTo(MaxGasValue) > 0) {
+    } else if (DataWord(tx.gasLimit).compareTo(MaxGasValue) > 0) {
       Left(TransactionSyntaxError(s"Invalid gasLimit: ${tx.gasLimit} > $MaxGasValue"))
     } else if (tx.gasPrice.compareTo(MaxGasValue) > 0) {
       Left(TransactionSyntaxError(s"Invalid gasPrice: ${tx.gasPrice} > $MaxGasValue"))
@@ -125,7 +125,7 @@ final class SignedTransactionValidator(blockchainConfig: BlockchainConfig) {
    * @param senderNonce Nonce of the sender of the transaction
    * @return Either the validated transaction or a TransactionNonceError
    */
-  private def validateNonce(stx: SignedTransaction, senderNonce: EvmWord): Either[SignedTransactionError, Unit] = {
+  private def validateNonce(stx: SignedTransaction, senderNonce: DataWord): Either[SignedTransactionError, Unit] = {
     if (senderNonce == stx.tx.nonce) {
       Right(())
     } else {
@@ -158,7 +158,7 @@ final class SignedTransactionValidator(blockchainConfig: BlockchainConfig) {
    * @param upfrontCost Upfront cost of the transaction tx
    * @return Either the validated transaction or a TransactionSenderCantPayUpfrontCostError
    */
-  private def validateAccountHasEnoughGasToPayUpfrontCost(senderBalance: EvmWord, upfrontCost: EvmWord): Either[SignedTransactionError, Unit] = {
+  private def validateAccountHasEnoughGasToPayUpfrontCost(senderBalance: DataWord, upfrontCost: DataWord): Either[SignedTransactionError, Unit] = {
     if (senderBalance >= upfrontCost) {
       Right(())
     } else {

@@ -54,7 +54,7 @@ object PV63 {
     implicit final class AccountDec(val bytes: Array[Byte]) {
       def toAccount: Account = rlp.rawDecode(bytes) match {
         case RLPList(nonce, balance, stateRoot, codeHash) =>
-          Account(rlp.toEvmWord(nonce), rlp.toEvmWord(balance), stateRoot, codeHash)
+          Account(rlp.toDataWord(nonce), rlp.toDataWord(balance), stateRoot, codeHash)
         case _ => throw new RuntimeException("Cannot decode Account")
       }
     }
