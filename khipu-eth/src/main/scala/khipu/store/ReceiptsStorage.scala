@@ -72,7 +72,7 @@ final class ReceiptsStorage(storages: Storages, val source: BlockDataSource) ext
     }
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Seq[Receipt]]): ReceiptsStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Seq[Receipt])]): ReceiptsStorage = {
     val upsert = toUpsert flatMap {
       case (key, value) =>
         storages.getBlockNumberByHash(key) map {

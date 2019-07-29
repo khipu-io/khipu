@@ -15,8 +15,8 @@ final class ArchiveNodeStorage(source: NodeStorage) extends NodeKeyValueStorage 
 
   override def get(key: Hash): Option[Array[Byte]] = source.get(key)
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): ArchiveNodeStorage = {
-    source.update(Set(), toUpsert)
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): ArchiveNodeStorage = {
+    source.update(Nil, toUpsert)
     this
   }
 }

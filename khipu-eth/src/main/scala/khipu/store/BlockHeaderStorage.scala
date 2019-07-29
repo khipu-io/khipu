@@ -38,7 +38,7 @@ final class BlockHeaderStorage(storages: Storages, val source: BlockDataSource)(
     }
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockHeader]): BlockHeaderStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, BlockHeader)]): BlockHeaderStorage = {
     val upsert = toUpsert map {
       case (key, value) =>
         storages.putBlockNumber(value.number, key)

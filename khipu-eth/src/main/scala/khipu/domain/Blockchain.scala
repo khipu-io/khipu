@@ -137,17 +137,15 @@ object Blockchain {
      * @param blockHeader Block to be saved
      */
     def saveBlockHeader(blockHeader: BlockHeader): Unit
-    def saveBlockHeader(blockHeaders: Seq[BlockHeader]): Unit
-    def saveBlockHeader(hash: Hash, blockHeader: BlockHeader)
-    def saveBlockHeader(kvs: Map[Hash, BlockHeader])
+    def saveBlockHeader(blockHeaders: Iterable[BlockHeader]): Unit
     def saveBlockBody(blockHash: Hash, blockBody: BlockBody): Unit
-    def saveBlockBody(kvs: Map[Hash, BlockBody]): Unit
+    def saveBlockBody(kvs: Iterable[(Hash, BlockBody)]): Unit
     def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]): Unit
-    def saveReceipts(kvs: Map[Hash, Seq[Receipt]]): Unit
+    def saveReceipts(kvs: Iterable[(Hash, Seq[Receipt])]): Unit
     def saveEvmcode(hash: Hash, evmCode: ByteString): Unit
-    def saveEvmcode(kvs: Map[Hash, ByteString]): Unit
+    def saveEvmcode(kvs: Iterable[(Hash, ByteString)]): Unit
     def saveTotalDifficulty(blockhash: Hash, totalDifficulty: DataWord): Unit
-    def saveTotalDifficulty(kvs: Map[Hash, DataWord]): Unit
+    def saveTotalDifficulty(kvs: Iterable[(Hash, DataWord)]): Unit
 
     /**
      * Returns a block hash given a block number
@@ -205,21 +203,11 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     blockNumberStorage.put(blockHeader.hash, blockHeader.number)
   }
 
-  def saveBlockHeader(blockHeaders: Seq[BlockHeader]) {
-    val kvs = blockHeaders.map(x => x.hash -> x).toMap
-    blockHeaderStorage.update(Set(), kvs)
+  def saveBlockHeader(blockHeaders: Iterable[BlockHeader]) {
+    val kvs = blockHeaders.map(x => x.hash -> x)
+    blockHeaderStorage.update(Nil, kvs)
     val nums = kvs.map(kv => kv._1 -> kv._2.number)
-    blockNumberStorage.update(Set(), nums)
-  }
-
-  def saveBlockHeader(hash: Hash, blockHeader: BlockHeader) {
-    blockHeaderStorage.put(hash, blockHeader)
-    blockNumberStorage.put(hash, blockHeader.number)
-  }
-
-  def saveBlockHeader(kvs: Map[Hash, BlockHeader]) {
-    blockHeaderStorage.update(Set(), kvs)
-    blockNumberStorage.update(Set(), kvs.map(kv => kv._1 -> kv._2.number))
+    blockNumberStorage.update(Nil, nums)
   }
 
   def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {
@@ -227,28 +215,28 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     saveTxsLocations(blockHash, blockBody)
   }
 
-  def saveBlockBody(kvs: Map[Hash, BlockBody]) = {
-    blockBodyStorage.update(Set(), kvs)
+  def saveBlockBody(kvs: Iterable[(Hash, BlockBody)]) = {
+    blockBodyStorage.update(Nil, kvs)
     kvs foreach { case (blockHash, blockBody) => saveTxsLocations(blockHash, blockBody) }
   }
 
   def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]) =
     receiptsStorage.put(blockHash, receipts)
 
-  def saveReceipts(kvs: Map[Hash, Seq[Receipt]]) =
-    receiptsStorage.update(Set(), kvs)
+  def saveReceipts(kvs: Iterable[(Hash, Seq[Receipt])]) =
+    receiptsStorage.update(Nil, kvs)
 
   def saveEvmcode(hash: Hash, evmCode: ByteString) =
     evmcodeStorage.put(hash, evmCode.toArray)
 
-  def saveEvmcode(kvs: Map[Hash, ByteString]) =
-    evmcodeStorage.update(Set(), kvs.map(x => x._1 -> x._2.toArray))
+  def saveEvmcode(kvs: Iterable[(Hash, ByteString)]) =
+    evmcodeStorage.update(Nil, kvs.map(x => x._1 -> x._2.toArray))
 
   def saveTotalDifficulty(blockhash: Hash, td: DataWord) =
     totalDifficultyStorage.put(blockhash, td)
 
-  def saveTotalDifficulty(kvs: Map[Hash, DataWord]) =
-    totalDifficultyStorage.update(Set(), kvs)
+  def saveTotalDifficulty(kvs: Iterable[(Hash, DataWord)]) =
+    totalDifficultyStorage.update(Nil, kvs)
 
   def getWorldState(blockNumber: Long, accountStartNonce: DataWord, stateRootHash: Option[Hash]): BlockWorldState =
     BlockWorldState(

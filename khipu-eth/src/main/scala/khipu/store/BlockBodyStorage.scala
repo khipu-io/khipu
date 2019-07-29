@@ -27,7 +27,7 @@ final class BlockBodyStorage(storages: Storages, val source: BlockDataSource) ex
     }
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, BlockBody]): BlockBodyStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, BlockBody)]): BlockBodyStorage = {
     val upsert = toUpsert flatMap {
       case (key, value) =>
         storages.getBlockNumberByHash(key) map {

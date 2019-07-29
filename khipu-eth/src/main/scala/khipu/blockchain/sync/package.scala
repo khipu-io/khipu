@@ -207,26 +207,25 @@ package object sync {
 
     def processResponse(blockHeaders: PV62.BlockHeaders) = {
       val headers = (if (message.reverse) blockHeaders.headers.reverse else blockHeaders.headers).toList
-
-      if (headers.nonEmpty) {
-        if (parentHeader.fold(true) { prevHeader => headers.head.parentHash == prevHeader.hash } && isHeadersConsistent(headers)) {
-          Some(BlockHeadersResponse(peerId, headers, true))
-        } else {
-          Some(BlockHeadersResponse(peerId, List(), false))
-        }
-      } else {
+      if (headers.isEmpty) {
         None
+      } else {
+        if (isHeadersConsistent(parentHeader.toList ::: headers)) {
+          Some(BlockHeadersResponse(peerId, headers, isConsistent = true))
+        } else {
+          Some(BlockHeadersResponse(peerId, Nil, isConsistent = false))
+        }
       }
     }
 
     private def isHeadersConsistent(headers: List[BlockHeader]): Boolean = {
-      if (headers.length > 1) {
-        headers.zip(headers.tail).forall {
-          case (parent, child) => parent.hash == child.parentHash && parent.number + 1 == child.number
-        }
-      } else {
-        true
+      headers.zip(headers.tail).forall {
+        case (parent, child) => isHeaderConsistent(parent, child)
       }
+    }
+
+    private def isHeaderConsistent(parent: BlockHeader, child: BlockHeader) = {
+      parent.hash == child.parentHash && parent.number == child.number - 1
     }
   }
 

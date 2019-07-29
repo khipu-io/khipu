@@ -38,9 +38,9 @@ final class DistributedNodeStorage(source: NodeStorage)(implicit system: ActorSy
   }
 
   // TODO return Future
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): DistributedNodeStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): DistributedNodeStorage = {
     // TODO pruning mode to delete from source
-    source.update(Set(), toUpsert)
+    source.update(Nil, toUpsert)
 
     val fs1 = toRemove map { key =>
       nodeSharding ! NodeEntity.DeleteNode(key.hexString)

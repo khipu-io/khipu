@@ -247,7 +247,7 @@ final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(im
     value
   }
 
-  def update(toRemove: Set[Hash], toUpsert: Map[Hash, TVal]): KesqueDataSource = {
+  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, TVal)]): KesqueDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
     table.write(toUpsert.map { case (key, tval) => TKeyVal(key.bytes, tval.value, tval.offset, _currWritingBlockNumber) }, topic)

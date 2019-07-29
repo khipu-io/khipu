@@ -139,7 +139,7 @@ final class LmdbNodeDataSource(
     }
   }
 
-  def update(toRemove: Set[Hash], toUpsert: Map[Hash, TVal]): LmdbNodeDataSource = {
+  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, TVal)]): LmdbNodeDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
 
     var byteBufs: List[ByteBuffer] = Nil

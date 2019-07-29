@@ -61,7 +61,7 @@ final class BlockNumberStorage(storags: Storages, val source: DataSource)(implic
     source.get(namespace, key.bytes).map(x => ByteBuffer.wrap(x).getLong)
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Long]): BlockNumberStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Long)]): BlockNumberStorage = {
     val remove = toRemove map { key => key.bytes }
     val upsert = toUpsert map { case (key, value) => (key.bytes -> ByteBuffer.allocate(8).putLong(value).array) }
     source.update(namespace, remove, upsert)

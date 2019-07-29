@@ -31,9 +31,9 @@ final class CachedNodeStorage(source: NodeStorage, cache: Cache[Hash, Array[Byte
     }
   }
 
-  def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): CachedNodeStorage = {
+  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): CachedNodeStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
-    source.update(Set(), toUpsert)
+    source.update(Nil, toUpsert)
     //toUpsert foreach { case (key, value) => cache.put(key, () => Future(value)) }
     toUpsert foreach { case (key, value) => cache.put(key, value) }
     toRemove foreach { key => cache.remove(key) }

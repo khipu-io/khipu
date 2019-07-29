@@ -488,7 +488,7 @@ final class MerklePatriciaTrie[K, V] private (
    *                 If a key is already in the DataSource its value will be updated.
    * @return the new trie after the removals and insertions were done.
    */
-  override def update(toRemove: Set[K], toUpsert: Map[K, V]): MerklePatriciaTrie[K, V] = {
+  override def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): MerklePatriciaTrie[K, V] = {
     throw new UnsupportedOperationException("Use put/remove")
   }
 

@@ -10,6 +10,7 @@ import khipu.util.Clock
 import khipu.util.FIFOCache
 import org.lmdbjava.DbiFlags
 import org.lmdbjava.Env
+import org.lmdbjava.PutFlags
 import org.lmdbjava.Txn
 import scala.collection.mutable
 
@@ -77,7 +78,7 @@ final class LmdbBlockDataSource(
     }
   }
 
-  def update(toRemove: Set[Long], toUpsert: Map[Long, TVal]): LmdbBlockDataSource = {
+  def update(toRemove: Iterable[Long], toUpsert: Iterable[(Long, TVal)]): LmdbBlockDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
 
@@ -93,7 +94,7 @@ final class LmdbBlockDataSource(
 
           tableKey.putLong(key).flip()
           tableVal.put(data).flip()
-          table.put(wxn, tableKey, tableVal)
+          table.put(wxn, tableKey, tableVal, PutFlags.MDB_APPEND)
 
           keyBufs ::= tableKey
       }

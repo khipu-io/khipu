@@ -38,7 +38,7 @@ trait CachedKeyValueStorage[K, V] extends KeyValueStorage[K, V] {
    *                 If a key is already in the DataSource its value will be updated.
    * @return the new KeyValueStorage after the removals and insertions were done.
    */
-  override def update(toRemove: Set[K], toUpsert: Map[K, V]) = {
+  override def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]) = {
     val updated = super.update(toRemove, toUpsert)
     //toUpsert foreach { case (key, value) => cache.put(key, () => Future(value)) }
     toUpsert foreach { case (key, value) => cache.put(key, value) }

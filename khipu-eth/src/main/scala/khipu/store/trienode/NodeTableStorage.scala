@@ -18,7 +18,7 @@ final class NodeTableStorage(source: NodeDataSource)(implicit system: ActorSyste
     source.get(key).map(_.value)
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, Array[Byte]]): NodeTableStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): NodeTableStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     source.update(toRemove, toUpsert map { case (key, value) => key -> TVal(value, -1, -1L) })
     this

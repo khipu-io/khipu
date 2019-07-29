@@ -40,7 +40,7 @@ trait KeyValueStorage[K, V] extends SimpleMap[K, V] {
    *                 If a key is already in the DataSource its value will be updated.
    * @return the new KeyValueStorage after the removals and insertions were done.
    */
-  def update(toRemove: Set[K], toUpsert: Map[K, V]): This = {
+  def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): This = {
     val newDataSource = source.update(
       namespace = namespace,
       toRemove = toRemove.map(keySerializer),

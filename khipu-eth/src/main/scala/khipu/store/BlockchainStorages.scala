@@ -37,7 +37,7 @@ trait BlockchainStorages {
 
   def getBlockNumberByHash(hash: Hash) = blockNumbers.getBlockNumberByHash(hash)
   def getHashByBlockNumber(blockNumber: Long) = blockNumbers.getHashByBlockNumber(blockNumber)
-  def getHashsByBlockNumberRange(from: Long, to: Long) = blockNumbers.getHashsByBlockNumberRange(from, to)
+  def getHashesByBlockNumberRange(from: Long, to: Long) = blockNumbers.getHashesByBlockNumberRange(from, to)
   def putBlockNumber(blockNumber: Long, hash: Hash) = blockNumbers.putBlockNumber(blockNumber, hash)
   def removeBlockNumber(key: Hash) = blockNumbers.removeBlockNumber(key)
 }

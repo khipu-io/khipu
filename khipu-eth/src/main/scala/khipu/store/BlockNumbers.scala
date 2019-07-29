@@ -3,6 +3,7 @@ package khipu.store
 import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import khipu.Hash
+import khipu.HashWithBlockNumber
 import khipu.store.datasource.BlockDataSource
 import khipu.store.datasource.DataSource
 import scala.collection.mutable
@@ -52,24 +53,24 @@ final class BlockNumbers(blockNumberSource: DataSource, blockHeaderSource: Block
     }
   }
 
-  def getHashsByBlockNumberRange(from: Long, to: Long): (Long, List[Hash]) = {
+  def getHashesByBlockNumberRange(from: Long, to: Long): Seq[HashWithBlockNumber] = {
     try {
       readLock.lock()
 
-      val ret = new mutable.ListBuffer[Hash]()
-      var lastNumber = from
+      val ret = new mutable.ListBuffer[HashWithBlockNumber]()
+      var break = false
       var i = from
-      while (i <= to) {
+      while (i <= to && !break) {
         getHashByBlockNumber(i) match {
-          case Some(key) =>
-            ret += key
-            lastNumber = i
+          case Some(hash) =>
+            ret += HashWithBlockNumber(i, hash)
           case None =>
+            break = true
         }
         i += 1
       }
 
-      (lastNumber, ret.toList)
+      ret
     } finally {
       readLock.unlock()
     }

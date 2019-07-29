@@ -1,8 +1,8 @@
 package khipu.store
 
 import akka.util.ByteString
+import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import khipu.Hash
 import khipu.blockchain.sync.FastSyncService.SyncState
 import khipu.blockchain.sync.NodeHash
 import khipu.blockchain.sync.StateMptNodeHash
@@ -13,33 +13,37 @@ import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.store.datasource.DataSource
 
 object FastSyncStateStorage {
-  val syncStateKey: String = "fast-sync-state"
+  val namespace = Namespaces.FastSyncState
+  val T = Array[Byte]('T'.toByte)
+  val H = Array[Byte]('H'.toByte)
+  val B = Array[Byte]('B'.toByte)
+  val R = Array[Byte]('R'.toByte)
+  val N = Array[Byte]('N'.toByte)
 }
-final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage[String, SyncState] {
-  type This = FastSyncStateStorage
-
+final class FastSyncStateStorage(val source: DataSource) {
   import FastSyncStateStorage._
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
-  override val namespace: Array[Byte] = Namespaces.FastSyncState
+  def putTargetBlockHeader(syncState: SyncState) {
+    source.update(namespace, Nil, List(T -> syncState.targetBlockHeader.toBytes))
+  }
 
-  override def keySerializer: String => Array[Byte] = _.getBytes
-  override def valueSerializer: SyncState => Array[Byte] = syncState => {
+  def putBestHeaderNumber(syncState: SyncState) {
+    source.update(namespace, Nil, List(H -> longToBytes(syncState.bestHeaderNumber)))
+  }
+
+  def putBestBodyNumber(syncState: SyncState) {
+    source.update(namespace, Nil, List(B -> longToBytes(syncState.bestBodyNumber)))
+  }
+
+  def putBestReceiptsNumber(syncState: SyncState) {
+    source.update(namespace, Nil, List(R -> longToBytes(syncState.bestReceiptsNumber)))
+  }
+
+  def putNodesData(syncState: SyncState) {
     val builder = ByteString.newBuilder
 
-    builder.putLong(syncState.targetBlockNumber)
-    syncState.targetBlockHeader match {
-      case Some(blockHeader) =>
-        val blockHeaderBytes = blockHeader.toBytes
-        builder.putInt(blockHeaderBytes.length)
-        builder.putBytes(blockHeaderBytes)
-      case None =>
-        builder.putInt(0)
-    }
-    builder.putLong(syncState.bestBlockHeaderNumber)
-    builder.putLong(syncState.enqueuedBlockNumber)
-
-    builder.putInt(syncState.downloadedNodesCount)
+    builder.putLong(syncState.downloadedNodesCount)
 
     val mptNodes = syncState.workingMptNodes.map(_._1) ++ syncState.pendingMptNodes
     builder.putInt(mptNodes.size)
@@ -57,105 +61,83 @@ final class FastSyncStateStorage(val source: DataSource) extends KeyValueStorage
       builder.putBytes(x.bytes)
     }
 
-    val blockBodies = syncState.workingBlockBodies.map(_._1) ++ syncState.pendingBlockBodies
-    builder.putInt(blockBodies.size)
-    blockBodies foreach { x =>
-      builder.putInt(x.bytes.length)
-      builder.putBytes(x.bytes)
-    }
-
-    val receipts = syncState.workingReceipts.map(_._1) ++ syncState.pendingReceipts
-    builder.putInt(receipts.size)
-    receipts foreach { x =>
-      builder.putInt(x.bytes.length)
-      builder.putBytes(x.bytes)
-    }
-
-    builder.result.toArray
+    source.update(namespace, Nil, List(N -> builder.result.toArray))
   }
 
-  override def valueDeserializer: Array[Byte] => SyncState = bytes => {
-    if ((bytes eq null) || bytes.length == 0) {
-      SyncState(0)
-    } else {
-      val data = ByteString(bytes).iterator
+  private def longToBytes(long: Long): Array[Byte] = ByteBuffer.allocate(java.lang.Long.BYTES).putLong(long).array
+  private def bytesToLong(bytes: Array[Byte]): Long = {
+    val buffer = ByteBuffer.allocate(java.lang.Long.BYTES)
+    buffer.put(bytes)
+    buffer.flip()
+    buffer.getLong()
+  }
 
-      val targetBlockNumber = data.getLong
-      val targetBlockHeaderLength = data.getInt
-      val targetBlockHeader = if (targetBlockHeaderLength == 0) {
-        None
-      } else {
-        Some(data.getBytes(targetBlockHeaderLength).toBlockHeader)
-      }
-      val bestBlockHeaderNumber = data.getLong
-      val enqueuedBlockNumber = data.getLong
+  def putSyncState(syncState: SyncState) = {
+    putTargetBlockHeader(syncState)
+    putBestHeaderNumber(syncState)
+    putBestBodyNumber(syncState)
+    putBestReceiptsNumber(syncState)
+    putNodesData(syncState)
+  }
 
-      val downloadedNodesCount = data.getInt
+  def getSyncState(): Option[SyncState] = {
+    source.get(namespace, T).map(_.toBlockHeader).map { targetBlockHeader =>
 
-      var queueSize = data.getInt
-      var i = 0
-      var mptNodes = List[NodeHash]()
-      while (i < queueSize) {
-        val tpe = data.getByte
-        val length = data.getInt
-        val bs = data.getBytes(length)
-        val hash = tpe match {
-          case NodeHash.StateMptNode           => StateMptNodeHash(bs)
-          case NodeHash.StorageRoot            => StorageRootHash(bs)
-          case NodeHash.ContractStorageMptNode => ContractStorageMptNodeHash(bs)
-          case NodeHash.Evmcode                => EvmcodeHash(bs)
-        }
-        mptNodes ::= hash
-        i += 1
-      }
+      val bestHeaderNumber = source.get(namespace, H).map(bytesToLong).getOrElse(0L)
+      val bestBodyNumber = source.get(namespace, B).map(bytesToLong).getOrElse(0L)
+      val bestReceiptsNumber = source.get(namespace, R).map(bytesToLong).getOrElse(0L)
 
-      queueSize = data.getInt
-      i = 0
-      var nonMptNodes = List[NodeHash]()
-      while (i < queueSize) {
-        val tpe = data.getByte
-        val length = data.getInt
-        val bs = data.getBytes(length)
-        val hash = tpe match {
-          case NodeHash.StateMptNode           => StateMptNodeHash(bs)
-          case NodeHash.StorageRoot            => StorageRootHash(bs)
-          case NodeHash.ContractStorageMptNode => ContractStorageMptNodeHash(bs)
-          case NodeHash.Evmcode                => EvmcodeHash(bs)
-        }
-        nonMptNodes ::= hash
-        i += 1
-      }
+      val (downloadedNodesCount, mptNodes, nonMptNodes) = source.get(namespace, N) match {
+        case Some(bytes) if bytes.length != 0 =>
+          val data = ByteString(bytes).iterator
+          val downloadedNodesCount = data.getLong
 
-      queueSize = data.getInt
-      i = 0
-      var blockBodies = List[Hash]()
-      while (i < queueSize) {
-        val length = data.getInt
-        val bs = data.getBytes(length)
-        blockBodies ::= Hash(bs)
-        i += 1
-      }
+          var queueSize = data.getInt
+          var i = 0
+          var mptNodes = List[NodeHash]()
+          while (i < queueSize) {
+            val tpe = data.getByte
+            val length = data.getInt
+            val bytes = data.getBytes(length)
+            val hash = tpe match {
+              case NodeHash.StateMptNode           => StateMptNodeHash(bytes)
+              case NodeHash.StorageRoot            => StorageRootHash(bytes)
+              case NodeHash.ContractStorageMptNode => ContractStorageMptNodeHash(bytes)
+              case NodeHash.Evmcode                => EvmcodeHash(bytes)
+            }
+            mptNodes ::= hash
+            i += 1
+          }
 
-      queueSize = data.getInt
-      i = 0
-      var receipts = List[Hash]()
-      while (i < queueSize) {
-        val length = data.getInt
-        val bs = data.getBytes(length)
-        receipts ::= Hash(bs)
-        i += 1
+          queueSize = data.getInt
+          i = 0
+          var nonMptNodes = List[NodeHash]()
+          while (i < queueSize) {
+            val tpe = data.getByte
+            val length = data.getInt
+            val bytes = data.getBytes(length)
+            val hash = tpe match {
+              case NodeHash.StateMptNode           => StateMptNodeHash(bytes)
+              case NodeHash.StorageRoot            => StorageRootHash(bytes)
+              case NodeHash.ContractStorageMptNode => ContractStorageMptNodeHash(bytes)
+              case NodeHash.Evmcode                => EvmcodeHash(bytes)
+            }
+            nonMptNodes ::= hash
+            i += 1
+          }
+
+          (downloadedNodesCount, mptNodes.reverse, nonMptNodes.reverse)
+
+        case _ =>
+          (0L, Nil, Nil)
       }
 
-      SyncState(targetBlockNumber, targetBlockHeader, bestBlockHeaderNumber, enqueuedBlockNumber, downloadedNodesCount, mptNodes.reverse, nonMptNodes.reverse, blockBodies.reverse, receipts.reverse)
+      SyncState(targetBlockHeader, bestHeaderNumber, bestBodyNumber, bestReceiptsNumber, downloadedNodesCount, mptNodes, nonMptNodes, bestBodyNumber, bestReceiptsNumber)
     }
   }
 
-  protected def apply(dataSource: DataSource): FastSyncStateStorage = new FastSyncStateStorage(dataSource)
-
-  def putSyncState(syncState: SyncState): FastSyncStateStorage = put(syncStateKey, syncState)
-
-  def getSyncState(): Option[SyncState] = get(syncStateKey)
-
-  def purge(): FastSyncStateStorage = remove(syncStateKey)
+  def purge() {
+    source.update(namespace, List(T, H, B, R, N), Nil)
+  }
 
 }

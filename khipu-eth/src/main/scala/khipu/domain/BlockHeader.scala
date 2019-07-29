@@ -37,7 +37,7 @@ final case class BlockHeader(
     extraData:        ByteString, // An arbitrary byte array containing data relevant to this block. With the exception of the genesis block, this must be 32 bytes or fewer
     mixHash:          Hash,
     nonce:            ByteString // A 256-bit hash which proves that a sufficient amount of computation has been carried out on this block
-) {
+) extends Ordered[BlockHeader] {
 
   /**
    * calculates blockHash for given block header
@@ -48,6 +48,16 @@ final case class BlockHeader(
 
   def nonUncles = Arrays.equals(ommersHash.bytes, BlockHeader.EmptyOmmersHash)
   def hasUncles = !nonUncles
+
+  def compare(that: BlockHeader) = {
+    if (number < that.number) {
+      -1
+    } else if (number == that.number) {
+      0
+    } else {
+      1
+    }
+  }
 
   override def toString: String = {
     s"""BlockHeader {

@@ -1,5 +1,7 @@
 package khipu.util
 
+import scala.collection.mutable
+
 /**
  * Interface to represent a key-value structure
  * @tparams K should be HashSet/HashMap comparable
@@ -53,8 +55,8 @@ trait SimpleMap[K, V] {
 
   final def update(change: (K, Option[V])): This = {
     change match {
-      case (k, None)    => update(Set(k), Map())
-      case (k, Some(v)) => update(Set(), Map(k -> v))
+      case (k, None)    => update(Set(k), Nil)
+      case (k, Some(v)) => update(Set(), List((k -> v)))
     }
   }
 
@@ -63,9 +65,10 @@ trait SimpleMap[K, V] {
    * in both toRemove and toUpsert
    */
   final def update(changes: Iterable[(K, Option[V])]): This = {
-    val (toRemove, toUpsert) = changes.foldLeft(Set[K](), Map[K, V]()) {
-      case ((toRemove, toUpsert), (k, None))    => (toRemove + k, toUpsert)
-      case ((toRemove, toUpsert), (k, Some(v))) => (toRemove, toUpsert + (k -> v))
+    // use LinkedHashMap to keep the order
+    val (toRemove, toUpsert) = changes.foldLeft(mutable.ListBuffer[K](), mutable.ListBuffer[(K, V)]()) {
+      case ((toRemove, toUpsert), (k, None))    => (toRemove += k, toUpsert)
+      case ((toRemove, toUpsert), (k, Some(v))) => (toRemove, toUpsert += (k -> v))
     }
     update(toRemove, toUpsert)
   }
@@ -78,5 +81,5 @@ trait SimpleMap[K, V] {
    *                 If a key is already in the DataSource its value will be updated.
    * @return the new DataSource after the removals and insertions were done.
    */
-  def update(toRemove: Set[K], toUpsert: Map[K, V]): This
+  def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): This
 }

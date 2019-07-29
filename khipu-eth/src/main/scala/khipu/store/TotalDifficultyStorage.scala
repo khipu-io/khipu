@@ -1,8 +1,8 @@
 package khipu.store
 
+import khipu.DataWord
 import khipu.Hash
 import khipu.TVal
-import khipu.DataWord
 import khipu.store.datasource.BlockDataSource
 import khipu.util.SimpleMap
 
@@ -24,7 +24,7 @@ final class TotalDifficultyStorage(storages: Storages, val source: BlockDataSour
     }
   }
 
-  override def update(toRemove: Set[Hash], toUpsert: Map[Hash, DataWord]): TotalDifficultyStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, DataWord)]): TotalDifficultyStorage = {
     val upsert = toUpsert flatMap {
       case (key, value) =>
         storages.getBlockNumberByHash(key) map {
