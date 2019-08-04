@@ -86,8 +86,8 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
   protected val storages = serviceBoard.storages
   protected val fastSyncStateStorage = storages.fastSyncStateStorage
   protected val appStateStorage = storages.appStateStorage
-  protected val accountNodeStorage = storages.accountNodeStorageFor(None)
-  protected val storageNodeStorage = storages.storageNodeStorageFor(None)
+  protected val accountNodeStorage = storages.accountNodeStorage
+  protected val storageNodeStorage = storages.storageNodeStorage
   protected val evmcodeStorage = storages.evmcodeStorage
   protected val blockHeaderStorage = storages.blockHeaderStorage
 

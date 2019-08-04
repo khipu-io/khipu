@@ -39,7 +39,7 @@ import scala.util.Random
 final class DataLoader(blockchain: Blockchain)(implicit system: ActorSystem) {
   private val kafkaProps = KesqueDataSource.kafkaProps(system)
 
-  private val nodeKeyValueStorage = blockchain.storages.accountNodeStorageFor(Some(0)) // TODO if want to load from leveldb, rewrite a storage
+  private val nodeKeyValueStorage = blockchain.storages.accountNodeStorage // TODO if want to load from leveldb, rewrite a storage
   private val evmcodeStorage = blockchain.storages.evmcodeStorage
 
   private val accountTopic = "account"
@@ -232,7 +232,7 @@ final class NodeDump(blockchain: Blockchain)(implicit system: ActorSystem) {
     }
   }
 
-  private val nodeKeyValueStorage = blockchain.storages.accountNodeStorageFor(Some(0)) // TODO if want to benchmark leveldb, rewrite a storage
+  private val nodeKeyValueStorage = blockchain.storages.accountNodeStorage // TODO if want to benchmark leveldb, rewrite a storage
   private def benchmarkLoadFromLevelDb() {
     val keys = loadedKeys.toArray
     val random = new Random()

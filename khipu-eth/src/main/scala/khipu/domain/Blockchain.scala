@@ -9,7 +9,7 @@ import khipu.ledger.BlockWorldState
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.network.p2p.messages.PV63.MptNode
 import khipu.network.p2p.messages.PV63.MptNode._
-import khipu.store.BlockchainStorages
+import khipu.store.Storages
 import khipu.store.TransactionStorage
 import khipu.store.TransactionStorage.TransactionLocation
 import khipu.store.trienode.ReadOnlyNodeStorage
@@ -131,6 +131,8 @@ object Blockchain {
 
     def removeBlock(hash: Hash): Unit
 
+    def saveNewBlock(world: WorldState[_, _], block: Block, receipts: Seq[Receipt], totalDifficulty: DataWord): Unit
+
     /**
      * Persists a block header in the underlying Blockchain Database
      *
@@ -160,13 +162,13 @@ object Blockchain {
     def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: DataWord, stateRootHash: Option[Hash] = None): W
   }
 
-  def apply(storages: BlockchainStorages): Blockchain =
+  def apply(storages: Storages): Blockchain =
     new Blockchain(storages)
 }
-final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[TrieStorage, BlockWorldState] {
+final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage, BlockWorldState] {
 
-  private val accountNodeStorageFor = storages.accountNodeStorageFor
-  private val storageNodeStorageFor = storages.storageNodeStorageFor
+  private val accountNodeStorage = storages.accountNodeStorage
+  private val storageNodeStorage = storages.storageNodeStorage
   private val evmcodeStorage = storages.evmcodeStorage
 
   private val blockHeaderStorage = storages.blockHeaderStorage
@@ -176,6 +178,8 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   private val totalDifficultyStorage = storages.totalDifficultyStorage
   private val transactionStorage = storages.transactionStorage
   private val blockNumberStorage = storages.blockNumberStorage
+
+  private val appStateStorage = storages.appStateStorage
 
   def getHashByBlockNumber(number: Long): Option[Hash] =
     storages.getHashByBlockNumber(number)
@@ -241,8 +245,8 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getWorldState(blockNumber: Long, accountStartNonce: DataWord, stateRootHash: Option[Hash]): BlockWorldState =
     BlockWorldState(
       this,
-      accountNodeStorageFor(Some(blockNumber)),
-      storageNodeStorageFor(Some(blockNumber)),
+      accountNodeStorage,
+      storageNodeStorage,
       evmcodeStorage,
       accountStartNonce,
       stateRootHash
@@ -252,8 +256,8 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: DataWord, stateRootHash: Option[Hash]): BlockWorldState =
     BlockWorldState(
       this,
-      ReadOnlyNodeStorage(accountNodeStorageFor(blockNumber)),
-      ReadOnlyNodeStorage(storageNodeStorageFor(blockNumber)),
+      ReadOnlyNodeStorage(accountNodeStorage),
+      ReadOnlyNodeStorage(storageNodeStorage),
       evmcodeStorage,
       accountStartNonce,
       stateRootHash
@@ -275,7 +279,7 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
     getBlockHeaderByNumber(blockNumber).flatMap { blockheader =>
       MerklePatriciaTrie[Address, Account](
         blockheader.stateRoot.bytes,
-        accountNodeStorageFor(Some(blockNumber))
+        accountNodeStorage
       )(Address.hashedAddressEncoder, Account.accountSerializer).get(address)
     }
 
@@ -285,14 +289,14 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
   def getAccountStorageAt(accountStateRootHash: Hash, position: DataWord): ByteString = {
     val storage = MerklePatriciaTrie(
       accountStateRootHash.bytes,
-      storageNodeStorageFor(None)
+      storageNodeStorage
     )(trie.hashDataWordSerializable, trie.rlpDataWordSerializer).get(position).getOrElse(DataWord.Zero).bytes
 
     ByteString(storage)
   }
 
   def getMptNodeByHash(hash: Hash): Option[MptNode] =
-    (accountNodeStorageFor(None).get(hash) orElse storageNodeStorageFor(None).get(hash)).map(_.toMptNode)
+    (accountNodeStorage.get(hash) orElse storageNodeStorage.get(hash)).map(_.toMptNode)
 
   def getTransactionLocation(txHash: Hash): Option[TransactionLocation] =
     transactionStorage.get(txHash)
@@ -309,6 +313,23 @@ final class Blockchain(val storages: BlockchainStorages) extends Blockchain.I[Tr
 
   private def removeTxsLocations(stxs: Seq[SignedTransaction]) {
     stxs.map(_.hash).foreach(transactionStorage.remove)
+  }
+
+  def saveNewBlock(world: WorldState[_, _], block: Block, receipts: Seq[Receipt], totalDifficulty: DataWord) {
+    // TODO save in one transaction
+    saveWorld(world)
+    saveBlock(block)
+    saveReceipts(block.header.hash, receipts)
+    saveTotalDifficulty(block.header.hash, totalDifficulty)
+    saveBestBlockNumber(block.header.number)
+  }
+
+  private def saveWorld(world: WorldState[_, _]) {
+    world.persist()
+  }
+
+  private def saveBestBlockNumber(n: Long) {
+    appStateStorage.putBestBlockNumber(n)
   }
 }
 

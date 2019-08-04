@@ -23,8 +23,8 @@ trait BlockchainStorages {
   def transactionStorage: TransactionStorage
   def totalDifficultyStorage: TotalDifficultyStorage
 
-  def accountNodeStorageFor: (Option[Long]) => NodeKeyValueStorage
-  def storageNodeStorageFor: (Option[Long]) => NodeKeyValueStorage
+  def accountNodeStorage: NodeKeyValueStorage
+  def storageNodeStorage: NodeKeyValueStorage
   def evmcodeStorage: NodeKeyValueStorage
 
   def blockNumberStorage: BlockNumberStorage

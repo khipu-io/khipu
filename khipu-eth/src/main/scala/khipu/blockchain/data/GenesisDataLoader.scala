@@ -182,8 +182,8 @@ class GenesisDataLoader(
           " Use different directory for running private blockchains."))
       case None =>
         if (!Config.Sync.doFastSync) {
-          val accountNodeStorage = blockchain.storages.accountNodeStorageFor(None)
-          accountNodeStorage.update(Set(), ephemDataSource.toMap)
+          val accountNodeStorage = blockchain.storages.accountNodeStorage
+          accountNodeStorage.update(Nil, ephemDataSource.toMap)
         }
         blockchain.saveBlock(Block(header, BlockBody(Nil, Nil)))
         blockchain.saveReceipts(header.hash, Nil)

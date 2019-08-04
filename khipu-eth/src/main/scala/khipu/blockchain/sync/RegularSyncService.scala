@@ -408,12 +408,7 @@ trait RegularSyncService { _: SyncService =>
           val newTd = parentTd + block.header.difficulty
 
           val start1 = System.nanoTime
-          // TODO save in one transaction
-          world.persist()
-          blockchain.saveBlock(block)
-          blockchain.saveReceipts(block.header.hash, receipts)
-          blockchain.saveTotalDifficulty(block.header.hash, newTd)
-          appStateStorage.putBestBlockNumber(block.header.number)
+          blockchain.saveNewBlock(world, block, receipts, newTd)
           val dbWriteTime = (System.nanoTime - start1) / 1000000000.0
           log.debug(s"${block.header.number} persisted in ${(System.nanoTime - start1) / 1000000}ms")
 

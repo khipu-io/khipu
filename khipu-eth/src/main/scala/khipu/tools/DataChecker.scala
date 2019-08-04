@@ -123,8 +123,8 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
   private val log = Logging(system, this)
 
   private val blockHeaderStorage = storages.blockHeaderStorage
-  private val accountNodeStorage = storages.accountNodeStorageFor(None)
-  private val storageNodeStorage = storages.storageNodeStorageFor(None)
+  private val accountNodeStorage = storages.accountNodeStorage
+  private val storageNodeStorage = storages.storageNodeStorage
   private val evmcodeStorage = storages.evmcodeStorage
 
   private val storageReader = new NodeReader[DataWord](dbConfig.storage, storageNodeStorage)(trie.rlpDataWordSerializer) {
