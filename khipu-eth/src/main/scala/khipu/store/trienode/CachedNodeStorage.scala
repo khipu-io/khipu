@@ -2,18 +2,16 @@ package khipu.store.trienode
 
 import akka.actor.ActorSystem
 import khipu.Hash
+import khipu.util.SimpleMap
 import khipu.util.cache.sync.Cache
 
 /**
  * Global node cache
  */
-final class CachedNodeStorage(source: NodeStorage, cache: Cache[Hash, Array[Byte]])(implicit system: ActorSystem) extends NodeKeyValueStorage {
+final class CachedNodeStorage(source: NodeStorage, cache: Cache[Hash, Array[Byte]])(implicit system: ActorSystem) extends SimpleMap[Hash, Array[Byte]] {
   type This = CachedNodeStorage
 
   import system.dispatcher
-
-  def tableName = ""
-  def count = -1
 
   def get(key: Hash): Option[Array[Byte]] = {
     cache.get(key) match {

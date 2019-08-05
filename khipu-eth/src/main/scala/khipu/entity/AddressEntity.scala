@@ -19,7 +19,7 @@ import khipu.DataWord
 import khipu.domain.Account
 import khipu.ledger.TrieStorage
 import khipu.service.ServiceBoard
-import khipu.store.trienode.NodeKeyValueStorage
+import khipu.util.SimpleMap
 import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.concurrent.duration._
@@ -34,7 +34,7 @@ import scala.util.Success
  * when refer count == 0 or inactive more than
  */
 object AddressEntity {
-  def props(nodeStorage: NodeKeyValueStorage) = Props(classOf[AddressEntity], nodeStorage)
+  def props(nodeStorage: SimpleMap[Hash, Array[Byte]]) = Props(classOf[AddressEntity], nodeStorage)
 
   val typeName: String = "addressEntity"
 
@@ -46,7 +46,7 @@ object AddressEntity {
     case cmd: Command => (cmd.id.hashCode % 100).toString
   }
 
-  def startSharding(nodeStorage: NodeKeyValueStorage)(implicit system: ActorSystem) =
+  def startSharding(nodeStorage: SimpleMap[Hash, Array[Byte]])(implicit system: ActorSystem) =
     ClusterSharding(system).start(typeName, props(nodeStorage), ClusterShardingSettings(system), extractEntityId, extractShardId)
 
   def startShardingProxy(implicit system: ActorSystem) =
@@ -69,7 +69,7 @@ object AddressEntity {
   final case class Rollback(id: String) extends Command
 }
 
-final class AddressEntity(nodeStorage: NodeKeyValueStorage) extends Actor with Timers with ActorLogging {
+final class AddressEntity(nodeStorage: SimpleMap[Hash, Array[Byte]]) extends Actor with Timers with ActorLogging {
   import AddressEntity._
   import context.dispatcher
 

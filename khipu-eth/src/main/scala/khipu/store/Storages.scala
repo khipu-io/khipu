@@ -2,7 +2,7 @@ package khipu.store
 
 import akka.actor.ActorSystem
 import khipu.store.datasource.DataSources
-import khipu.store.trienode.NodeTableStorage
+import khipu.store.trienode.NodeKeyValueStorage
 import khipu.store.trienode.PruningMode
 
 object Storages {
@@ -10,9 +10,9 @@ object Storages {
   trait DefaultStorages extends Storages with DataSources {
     // use 'lazy' val to wait for other fields (cache pruningMode etc) to be set in last implementation, 
 
-    lazy val accountNodeStorage = new NodeTableStorage(accountNodeDataSource)
-    lazy val storageNodeStorage = new NodeTableStorage(storageNodeDataSource)
-    lazy val evmcodeStorage = new NodeTableStorage(evmcodeDataSource)
+    lazy val accountNodeStorage = new NodeKeyValueStorage(accountNodeDataSource)
+    lazy val storageNodeStorage = new NodeKeyValueStorage(storageNodeDataSource)
+    lazy val evmcodeStorage = new NodeKeyValueStorage(evmcodeDataSource)
 
     lazy val blockNumberStorage = new BlockNumberStorage(this, blockNumberDataSource)
 

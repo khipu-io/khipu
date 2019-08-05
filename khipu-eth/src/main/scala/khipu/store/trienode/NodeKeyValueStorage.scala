@@ -4,9 +4,10 @@ import akka.actor.ActorSystem
 import khipu.Hash
 import khipu.TVal
 import khipu.store.datasource.NodeDataSource
+import khipu.util.SimpleMap
 
-final class NodeTableStorage(source: NodeDataSource)(implicit system: ActorSystem) extends NodeKeyValueStorage {
-  type This = NodeTableStorage
+final class NodeKeyValueStorage(source: NodeDataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, Array[Byte]] {
+  type This = NodeKeyValueStorage
 
   import system.dispatcher
 
@@ -18,7 +19,7 @@ final class NodeTableStorage(source: NodeDataSource)(implicit system: ActorSyste
     source.get(key).map(_.value)
   }
 
-  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): NodeTableStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): NodeKeyValueStorage = {
     //toRemove foreach CachedNodeStorage.remove // TODO remove from repositoty when necessary (pruning)
     source.update(toRemove, toUpsert map { case (key, value) => key -> TVal(value, -1, -1L) })
     this

@@ -9,7 +9,6 @@ import khipu.Original
 import khipu.Updated
 import khipu.crypto
 import khipu.rlp
-import khipu.store.trienode.NodeKeyValueStorage
 import khipu.util.BytesUtil
 import khipu.util.SimpleMap
 import scala.annotation.tailrec
@@ -46,7 +45,7 @@ object MerklePatriciaTrie {
   )
 
   final case class MPTException(message: String) extends RuntimeException(message)
-  final case class MPTNodeMissingException(message: String, hash: Hash, table: String) extends RuntimeException(message)
+  final case class MPTNodeMissingException(message: String, hash: Hash, table: SimpleMap[Hash, Array[Byte]]) extends RuntimeException(message)
 
   private def matchingLength(a: Array[Byte], b: Array[Byte]): Int = {
     var i = 0
@@ -56,10 +55,10 @@ object MerklePatriciaTrie {
     i
   }
 
-  def apply[K, V](source: NodeKeyValueStorage)(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]): MerklePatriciaTrie[K, V] =
+  def apply[K, V](source: SimpleMap[Hash, Array[Byte]])(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]): MerklePatriciaTrie[K, V] =
     new MerklePatriciaTrie[K, V](None, source, Map())(kSerializer, vSerializer)
 
-  def apply[K, V](rootHash: Array[Byte], storage: NodeKeyValueStorage)(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]): MerklePatriciaTrie[K, V] = {
+  def apply[K, V](rootHash: Array[Byte], storage: SimpleMap[Hash, Array[Byte]])(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]): MerklePatriciaTrie[K, V] = {
     if (Arrays.equals(EMPTY_TRIE_HASH, rootHash)) {
       new MerklePatriciaTrie[K, V](None, storage, Map())(kSerializer, vSerializer)
     } else {
@@ -69,7 +68,7 @@ object MerklePatriciaTrie {
 }
 final class MerklePatriciaTrie[K, V] private (
     rootHashOpt:          Option[Array[Byte]],
-    nodeStorage:          NodeKeyValueStorage,
+    nodeStorage:          SimpleMap[Hash, Array[Byte]],
     private var nodeLogs: Map[Hash, Log[Array[Byte]]]
 )(implicit kSerializer: ByteArrayEncoder[K], vSerializer: ByteArraySerializable[V]) extends SimpleMap[K, V] {
   type This = MerklePatriciaTrie[K, V]
@@ -539,10 +538,10 @@ final class MerklePatriciaTrie[K, V] private (
               nodeLogs += (id -> Original(x))
               x
             case None =>
-              throw MPTNodeMissingException(s"Node not found ${khipu.toHexString(nodeId)}, trie is inconsistent", id, nodeStorage.tableName)
+              throw MPTNodeMissingException(s"Node not found ${khipu.toHexString(nodeId)}, trie is inconsistent", id, nodeStorage)
           }
         case Some(Deleted(_)) =>
-          throw MPTNodeMissingException(s"Node has been deleted ${khipu.toHexString(nodeId)}, trie is inconsistent", id, nodeStorage.tableName)
+          throw MPTNodeMissingException(s"Node has been deleted ${khipu.toHexString(nodeId)}, trie is inconsistent", id, nodeStorage)
       }
     }
 

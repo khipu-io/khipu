@@ -36,7 +36,7 @@ object PruningMode {
 
   //  def nodeTableStorage(pruningMode: PruningMode, nodeStorage: NodeStorage, source: HeavyDataSource)(blockNumber: Option[Long])(implicit system: ActorSystem): NodeKeyValueStorage =
   //    pruningMode match {
-  //      case ArchivePruning          => new NodeTableStorage(source) // new ArchiveNodeStorage(nodeStorage) // new DistributedNodeStorage(nodeStorage) 
+  //      case ArchivePruning          => new NodeKeyValueStorage(source) // new ArchiveNodeStorage(nodeStorage) // new DistributedNodeStorage(nodeStorage) 
   //      case HistoryPruning(history) => new ReferenceCountNodeStorage(nodeStorage, history, blockNumber)
   //    }
 }

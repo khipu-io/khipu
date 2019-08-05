@@ -18,6 +18,7 @@ import khipu.domain.TxLogEntry
 import khipu.validators._
 import khipu.trie.MerklePatriciaTrie.MPTNodeMissingException
 import khipu.util.BlockchainConfig
+import khipu.util.SimpleMap
 import khipu.validators.BlockValidator
 import khipu.validators.SignedTransactionValidator
 import khipu.vm.EvmConfig
@@ -64,7 +65,7 @@ object Ledger {
   final case class ValidationBeforeExecError(blockNumber: Long, reason: String) extends BlockExecutionError
   final case class TxsExecutionError(blockNumber: Long, stx: SignedTransaction, stateBeforeError: StateBeforeFailure, error: SignedTransactionError) extends BlockExecutionError { def reason = error.toString }
   final case class ValidationAfterExecError(blockNumber: Long, reason: String) extends BlockExecutionError
-  final case class MissingNodeExecptionError(blockNumber: Long, hash: Hash, table: String) extends BlockExecutionError { def reason = s"Missing node $hash in $table" }
+  final case class MissingNodeExecptionError(blockNumber: Long, hash: Hash, table: SimpleMap[Hash, Array[Byte]]) extends BlockExecutionError { def reason = s"Missing node $hash in $table" }
 
   final case class StateBeforeFailure(blockNumber: Long, worldState: BlockWorldState, cumGas: Long, cumReceipts: Vector[Receipt])
 

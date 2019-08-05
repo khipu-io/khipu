@@ -1,6 +1,7 @@
 package khipu.store.trienode
 
 import khipu.Hash
+import khipu.util.SimpleMap
 
 /**
  * This storage allows to read from another NodeKeyValueStorage but doesn't remove or upsert into database.
@@ -10,7 +11,7 @@ object ReadOnlyNodeStorage {
   def apply(source: NodeKeyValueStorage): ReadOnlyNodeStorage =
     new ReadOnlyNodeStorage(source, Map())
 }
-final class ReadOnlyNodeStorage private (source: NodeKeyValueStorage, cache: Map[Hash, Option[Array[Byte]]]) extends NodeKeyValueStorage {
+final class ReadOnlyNodeStorage private (source: NodeKeyValueStorage, cache: Map[Hash, Option[Array[Byte]]]) extends SimpleMap[Hash, Array[Byte]] {
   type This = ReadOnlyNodeStorage
 
   def tableName = ""

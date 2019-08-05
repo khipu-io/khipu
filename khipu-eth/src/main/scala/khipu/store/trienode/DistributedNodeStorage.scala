@@ -6,19 +6,17 @@ import akka.cluster.sharding.ClusterSharding
 import akka.util.Timeout
 import khipu.Hash
 import khipu.entity.NodeEntity
+import khipu.util.SimpleMap
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-final class DistributedNodeStorage(source: NodeStorage)(implicit system: ActorSystem) extends NodeKeyValueStorage {
+final class DistributedNodeStorage(source: NodeStorage)(implicit system: ActorSystem) extends SimpleMap[Hash, Array[Byte]] {
   type This = DistributedNodeStorage
 
   import system.dispatcher
   implicit val timeout: Timeout = 60.seconds
 
   private def nodeSharding = ClusterSharding(system).shardRegion(NodeEntity.typeName)
-
-  def tableName = ""
-  def count = -1
 
   // TODO return Future
   override def get(key: Hash): Option[Array[Byte]] = {

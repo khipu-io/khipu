@@ -20,8 +20,8 @@ import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.CommonMessages.Status
 import khipu.network.rlpx.Peer
 import khipu.network.rlpx.RLPxStage
-import khipu.store.trienode.NodeKeyValueStorage
 import khipu.util.Config
+import khipu.util.SimpleMap
 import scala.collection.immutable
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -879,7 +879,7 @@ trait FastSyncService { _: SyncService =>
       log.debug(s"saveEvmcodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
-    private def saveNodes(storage: NodeKeyValueStorage, kvs: Iterable[(Hash, Array[Byte])]) {
+    private def saveNodes(storage: SimpleMap[Hash, Array[Byte]], kvs: Iterable[(Hash, Array[Byte])]) {
       storage.update(Nil, kvs)
     }
 

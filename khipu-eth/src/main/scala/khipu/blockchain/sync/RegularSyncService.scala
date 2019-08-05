@@ -321,17 +321,9 @@ trait RegularSyncService { _: SyncService =>
                   log.info(s"[warn] Execution error $error, in block ${error.blockNumber}, try to fetch from ${peer.id}")
 
                   requestingNodeData(nodeOkPeer.getOrElse(peer), hash)(3.seconds) andThen {
-                    case Success(Some(NodeDataResponse(peerId, value))) =>
-                      table match {
-                        case util.Config.Db.account => accountNodeStorage.put(hash, value.toArray)
-                        case util.Config.Db.storage => storageNodeStorage.put(hash, value.toArray)
-                      }
-
-                    case Success(None) =>
-
-                    case Failure(e) =>
-                      nodeErrorPeers += peer
-
+                    case Success(Some(NodeDataResponse(peerId, value))) => table.put(hash, value.toArray)
+                    case Success(None)                                  =>
+                    case Failure(e)                                     => nodeErrorPeers += peer
                   } andThen {
                     case _ => resumeRegularSync()
                   }

@@ -11,9 +11,9 @@ import khipu.domain.Account
 import khipu.domain.Address
 import khipu.domain.Blockchain
 import khipu.domain.SignedTransaction
-import khipu.store.trienode.NodeKeyValueStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
+import khipu.util.SimpleMap
 import khipu.vm.WorldState
 
 /**
@@ -95,11 +95,11 @@ object BlockWorldState {
 
   def apply(
     blockchain:         Blockchain,
-    accountNodeStorage: NodeKeyValueStorage,
-    storageNodeStorage: NodeKeyValueStorage,
-    evmCodeStorage:     NodeKeyValueStorage,
+    accountNodeStorage: SimpleMap[Hash, Array[Byte]],
+    storageNodeStorage: SimpleMap[Hash, Array[Byte]],
+    evmCodeStorage:     SimpleMap[Hash, Array[Byte]],
     accountStartNonce:  DataWord,
-    stateRootHash:      Option[Hash]        = None
+    stateRootHash:      Option[Hash]                 = None
   ): BlockWorldState = {
 
     /**
@@ -150,9 +150,9 @@ object BlockWorldState {
  */
 final class BlockWorldState private (
     blockchain:                   Blockchain,
-    accountNodeStorage:           NodeKeyValueStorage,
-    storageNodeStorage:           NodeKeyValueStorage,
-    evmCodeStorage:               NodeKeyValueStorage,
+    accountNodeStorage:           SimpleMap[Hash, Array[Byte]],
+    storageNodeStorage:           SimpleMap[Hash, Array[Byte]],
+    evmCodeStorage:               SimpleMap[Hash, Array[Byte]],
     accountStartNonce:            DataWord,
     private var trieAccounts:     TrieAccounts,
     private var trieStorages:     Map[Address, TrieStorage],

@@ -1,17 +1,15 @@
 package khipu.store.trienode
 
 import khipu.Hash
+import khipu.util.SimpleMap
 
 /**
  * This class is used to store Nodes (defined in mpt/Node.scala), by using:
  * Key: hash of the RLP encoded node
  * Value: the RLP encoded node
  */
-final class ArchiveNodeStorage(source: NodeStorage) extends NodeKeyValueStorage {
+final class ArchiveNodeStorage(source: NodeStorage) extends SimpleMap[Hash, Array[Byte]] {
   type This = ArchiveNodeStorage
-
-  def tableName = ""
-  def count = -1
 
   override def get(key: Hash): Option[Array[Byte]] = source.get(key)
 

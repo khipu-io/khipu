@@ -9,7 +9,7 @@ import khipu.domain.Account
 import khipu.rlp
 import khipu.service.ServiceBoard
 import khipu.store.Storages.DefaultStorages
-import khipu.store.trienode.NodeTableStorage
+import khipu.store.trienode.NodeKeyValueStorage
 import khipu.trie
 import khipu.trie.BranchNode
 import khipu.trie.ByteArraySerializable
@@ -33,7 +33,7 @@ object DataChecker {
   object NodeReader {
     final case class TNode(node: Node, blockNumber: Long)
   }
-  class NodeReader[V](topic: String, nodeStorage: NodeTableStorage)(vSerializer: ByteArraySerializable[V]) {
+  class NodeReader[V](topic: String, nodeStorage: NodeKeyValueStorage)(vSerializer: ByteArraySerializable[V]) {
     import NodeReader._
     private val log = Logging(system, this)
 
