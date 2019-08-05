@@ -4,7 +4,7 @@ import khipu.Hash
 import khipu.store.datasource.BlockDataSource
 import khipu.store.datasource.DataSource
 import khipu.store.datasource.NodeDataSource
-import khipu.store.trienode.NodeKeyValueStorage
+import khipu.store.trienode.NodeStorage
 
 trait BlockchainStorages {
   // -- data source
@@ -23,9 +23,9 @@ trait BlockchainStorages {
   def transactionStorage: TransactionStorage
   def totalDifficultyStorage: TotalDifficultyStorage
 
-  def accountNodeStorage: NodeKeyValueStorage
-  def storageNodeStorage: NodeKeyValueStorage
-  def evmcodeStorage: NodeKeyValueStorage
+  def accountNodeStorage: NodeStorage
+  def storageNodeStorage: NodeStorage
+  def evmcodeStorage: NodeStorage
 
   def blockNumberStorage: BlockNumberStorage
   def blockHeaderStorage: BlockHeaderStorage

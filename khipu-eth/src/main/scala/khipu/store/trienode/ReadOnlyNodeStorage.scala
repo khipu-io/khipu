@@ -4,14 +4,14 @@ import khipu.Hash
 import khipu.util.SimpleMap
 
 /**
- * This storage allows to read from another NodeKeyValueStorage but doesn't remove or upsert into database.
+ * This storage allows to read from another NodeStorage but doesn't remove or upsert into database.
  * To do so, it uses an internal in memory cache to apply all the changes.
  */
 object ReadOnlyNodeStorage {
-  def apply(source: NodeKeyValueStorage): ReadOnlyNodeStorage =
+  def apply(source: NodeStorage): ReadOnlyNodeStorage =
     new ReadOnlyNodeStorage(source, Map())
 }
-final class ReadOnlyNodeStorage private (source: NodeKeyValueStorage, cache: Map[Hash, Option[Array[Byte]]]) extends SimpleMap[Hash, Array[Byte]] {
+final class ReadOnlyNodeStorage private (source: NodeStorage, cache: Map[Hash, Option[Array[Byte]]]) extends SimpleMap[Hash, Array[Byte]] {
   type This = ReadOnlyNodeStorage
 
   def tableName = ""

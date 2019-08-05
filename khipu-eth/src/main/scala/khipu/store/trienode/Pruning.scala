@@ -34,9 +34,9 @@ final case class HistoryPruning(history: Int) extends PruningMode
 object PruningMode {
   type PruneFn = (=> Long, => Long) => PruneResult
 
-  //  def nodeTableStorage(pruningMode: PruningMode, nodeStorage: NodeStorage, source: HeavyDataSource)(blockNumber: Option[Long])(implicit system: ActorSystem): NodeKeyValueStorage =
+  //  def nodeTableStorage(pruningMode: PruningMode, nodeStorage: NodeStorage, source: HeavyDataSource)(blockNumber: Option[Long])(implicit system: ActorSystem): NodeStorage =
   //    pruningMode match {
-  //      case ArchivePruning          => new NodeKeyValueStorage(source) // new ArchiveNodeStorage(nodeStorage) // new DistributedNodeStorage(nodeStorage) 
+  //      case ArchivePruning          => new NodeStorage(source) // new ArchiveNodeStorage(nodeStorage) // new DistributedNodeStorage(nodeStorage) 
   //      case HistoryPruning(history) => new ReferenceCountNodeStorage(nodeStorage, history, blockNumber)
   //    }
 }

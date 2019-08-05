@@ -5,8 +5,8 @@ import khipu.TVal
 import khipu.store.datasource.NodeDataSource
 import khipu.util.SimpleMap
 
-final class NodeKeyValueStorage(source: NodeDataSource) extends SimpleMap[Hash, Array[Byte]] {
-  type This = NodeKeyValueStorage
+final class NodeStorage(source: NodeDataSource) extends SimpleMap[Hash, Array[Byte]] {
+  type This = NodeStorage
 
   def tableName = source.topic
 
@@ -16,7 +16,7 @@ final class NodeKeyValueStorage(source: NodeDataSource) extends SimpleMap[Hash, 
     source.get(key).map(_.value)
   }
 
-  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): NodeKeyValueStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): NodeStorage = {
     source.update(toRemove, toUpsert map { case (key, value) => key -> TVal(value, -1, -1L) })
     this
   }
