@@ -15,9 +15,8 @@ import khipu.mining.BlockGenerator.InvalidOmmers
 import khipu.mining.BlockGenerator.NoParent
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
-import khipu.store.datasource.EphemDataSource
+import khipu.store.datasource.EphemNodeDataSource
 import khipu.store.trienode.ArchiveNodeStorage
-import khipu.store.trienode.NodeStorage
 import khipu.trie.ByteArraySerializable
 import khipu.trie.MerklePatriciaTrie
 import khipu.util.BytesUtil
@@ -156,7 +155,7 @@ final class BlockGenerator(
 
   private def buildMpt[K](entities: Seq[K], vSerializable: ByteArraySerializable[K]): Hash = {
     val mpt = MerklePatriciaTrie[Int, K](
-      source = new ArchiveNodeStorage(new NodeStorage(EphemDataSource()))
+      source = new ArchiveNodeStorage(new EphemNodeDataSource())
     )(MptListValidator.intByteArraySerializable, vSerializable)
     val hash = entities.zipWithIndex.foldLeft(mpt) { case (trie, (value, key)) => trie.put(key, value) }.rootHash
     Hash(hash)

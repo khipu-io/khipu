@@ -8,7 +8,7 @@ import khipu.util.SimpleMap
  * Key: hash of the RLP encoded node
  * Value: the RLP encoded node
  */
-final class ArchiveNodeStorage(source: NodeStorage) extends SimpleMap[Hash, Array[Byte]] {
+final class ArchiveNodeStorage(source: SimpleMap[Hash, Array[Byte]]) extends SimpleMap[Hash, Array[Byte]] {
   type This = ArchiveNodeStorage
 
   override def get(key: Hash): Option[Array[Byte]] = source.get(key)

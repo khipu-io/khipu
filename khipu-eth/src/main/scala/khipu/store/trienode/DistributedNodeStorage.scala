@@ -10,7 +10,7 @@ import khipu.util.SimpleMap
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-final class DistributedNodeStorage(source: NodeStorage)(implicit system: ActorSystem) extends SimpleMap[Hash, Array[Byte]] {
+final class DistributedNodeStorage(source: NodeKeyValueStorage)(implicit system: ActorSystem) extends SimpleMap[Hash, Array[Byte]] {
   type This = DistributedNodeStorage
 
   import system.dispatcher

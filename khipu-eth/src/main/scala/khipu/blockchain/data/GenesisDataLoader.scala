@@ -14,9 +14,8 @@ import khipu.rlp
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
 import khipu.store.datasource.DataSource
-import khipu.store.datasource.EphemDataSource
+import khipu.store.datasource.EphemNodeDataSource
 import khipu.store.trienode.ArchiveNodeStorage
-import khipu.store.trienode.NodeStorage
 import khipu.store.trienode.PruningMode
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
@@ -138,13 +137,12 @@ class GenesisDataLoader(
   }
 
   private def loadGenesisData(genesisData: GenesisData): Try[Unit] = {
-    val ephemDataSource = EphemDataSource()
-    val nodeStorage = new NodeStorage(ephemDataSource)
+    val ephemDataSource = EphemNodeDataSource()
     val initalRootHash = trie.EMPTY_TRIE_HASH
 
     val stateMptRootHash = genesisData.alloc.zipWithIndex.foldLeft(initalRootHash) {
       case (rootHash, (((address, AllocAccount(balance)), idx))) =>
-        val ephemNodeStorage = new ArchiveNodeStorage(nodeStorage)
+        val ephemNodeStorage = new ArchiveNodeStorage(ephemDataSource)
         val mpt = MerklePatriciaTrie[Array[Byte], Account](rootHash, ephemNodeStorage)(trie.byteArraySerializable, Account.accountSerializer)
         val paddedAddress = address.reverse.padTo(addressLength, "0").reverse.mkString
         val account = Account(blockchainConfig.accountStartNonce, DataWord(new BigInteger(balance)), EMPTY_TRIE_ROOT_HASH, EMPTY_EVM_HASH)
@@ -183,7 +181,7 @@ class GenesisDataLoader(
       case None =>
         if (!Config.Sync.doFastSync) {
           val accountNodeStorage = blockchain.storages.accountNodeStorage
-          accountNodeStorage.update(Nil, ephemDataSource.toMap)
+          accountNodeStorage.update(Nil, ephemDataSource.toSeq)
         }
         blockchain.saveBlock(Block(header, BlockBody(Nil, Nil)))
         blockchain.saveReceipts(header.hash, Nil)

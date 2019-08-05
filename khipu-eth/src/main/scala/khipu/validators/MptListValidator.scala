@@ -4,9 +4,8 @@ import java.util.Arrays
 import khipu.crypto
 import khipu.rlp
 import khipu.rlp.RLPImplicits._
-import khipu.store.datasource.EphemDataSource
+import khipu.store.datasource.EphemNodeDataSource
 import khipu.store.trienode.ArchiveNodeStorage
-import khipu.store.trienode.NodeStorage
 import khipu.trie.ByteArraySerializable
 import khipu.trie.MerklePatriciaTrie
 
@@ -29,7 +28,7 @@ object MptListValidator {
    */
   def isValid[K](hash: Array[Byte], toValidates: Seq[K], vSerializable: ByteArraySerializable[K]): Boolean = {
     val trie = MerklePatriciaTrie[Int, K](
-      source = new ArchiveNodeStorage(new NodeStorage(EphemDataSource()))
+      source = new ArchiveNodeStorage(new EphemNodeDataSource())
     )(intByteArraySerializable, vSerializable)
 
     val (_, updatedTrie) = toValidates.foldLeft(0, trie) {
