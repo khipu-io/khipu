@@ -1,7 +1,5 @@
 package khipu.store
 
-import akka.actor.ActorSystem
-import akka.event.Logging
 import khipu.Hash
 import khipu.TVal
 import khipu.domain.BlockHeader
@@ -16,22 +14,13 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockHeader belong
  *   Value: the block header
  */
-final class BlockHeaderStorage(storages: Storages, val source: BlockDataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, BlockHeader] {
+final class BlockHeaderStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, BlockHeader] {
   type This = BlockHeaderStorage
-
-  def keySerializer: Hash => Array[Byte] = _.bytes
-  def valueSerializer: BlockHeader => Array[Byte] = _.toBytes
-  def valueDeserializer: Array[Byte] => BlockHeader = b => b.toBlockHeader
-
-  private val log = Logging(system, this.getClass)
 
   private val lmdbSource = source.asInstanceOf[LmdbBlockDataSource]
   private val env = lmdbSource.env
   private val table = lmdbSource.table
 
-  def getByBlockNumber(blockNumber: Long) = {
-    source.get(blockNumber).map(_.value.toBlockHeader.hash)
-  }
   override def get(key: Hash): Option[BlockHeader] = {
     storages.getBlockNumberByHash(key) flatMap {
       blockNum => source.get(blockNum).map(_.value.toBlockHeader)
@@ -53,7 +42,5 @@ final class BlockHeaderStorage(storages: Storages, val source: BlockDataSource)(
     source.update(remove, upsert)
     this
   }
-
-  protected def apply(storages: Storages, source: BlockDataSource): BlockHeaderStorage = new BlockHeaderStorage(storages, source)
 }
 

@@ -15,8 +15,8 @@ final class TransactionStorage(val source: DataSource) extends KeyValueStorage[H
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
   val namespace: Array[Byte] = Namespaces.Transaction
-  def keySerializer: Hash => Array[Byte] = _.bytes
 
+  override def keySerializer: Hash => Array[Byte] = _.bytes
   override def valueSerializer: TransactionLocation => Array[Byte] = tl => {
     val builder = ByteString.newBuilder
 
@@ -27,7 +27,6 @@ final class TransactionStorage(val source: DataSource) extends KeyValueStorage[H
 
     builder.result.toArray
   }
-
   override def valueDeserializer: Array[Byte] => TransactionLocation = bytes => {
     val data = ByteString(bytes).iterator
 
@@ -38,6 +37,6 @@ final class TransactionStorage(val source: DataSource) extends KeyValueStorage[H
     TransactionLocation(blockHash, txIndex)
   }
 
-  protected def apply(dataSource: DataSource): TransactionStorage = new TransactionStorage(dataSource)
+  override protected def apply(dataSource: DataSource): TransactionStorage = new TransactionStorage(dataSource)
 }
 

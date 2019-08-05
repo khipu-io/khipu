@@ -20,7 +20,7 @@ object BlockNumberStorage {
 final class BlockNumberStorage(storags: Storages, val source: DataSource)(implicit system: ActorSystem) extends SimpleMap[Hash, Long] {
   type This = BlockNumberStorage
 
-  import BlockNumberStorage.namespace
+  import BlockNumberStorage._
 
   private val log = Logging(system, this.getClass)
   private val lmdbSource = source.asInstanceOf[LmdbDataSource]

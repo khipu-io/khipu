@@ -14,10 +14,6 @@ import khipu.util.SimpleMap
 final class TotalDifficultyStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, DataWord] {
   type This = TotalDifficultyStorage
 
-  def keySerializer: Hash => Array[Byte] = _.bytes
-  def valueSerializer: DataWord => Array[Byte] = _.bigEndianMag
-  def valueDeserializer: Array[Byte] => DataWord = DataWord.safe
-
   override def get(key: Hash): Option[DataWord] = {
     storages.getBlockNumberByHash(key) flatMap {
       blockNum => source.get(blockNum).map(x => DataWord.safe(x.value))
@@ -37,7 +33,5 @@ final class TotalDifficultyStorage(storages: Storages, val source: BlockDataSour
     source.update(remove, upsert)
     this
   }
-
-  protected def apply(storages: Storages, dataSource: BlockDataSource): TotalDifficultyStorage = new TotalDifficultyStorage(storages, dataSource)
 }
 

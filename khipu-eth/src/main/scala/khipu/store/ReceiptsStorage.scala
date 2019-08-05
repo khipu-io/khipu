@@ -62,10 +62,6 @@ final class ReceiptsStorage(storages: Storages, val source: BlockDataSource) ext
 
   import ReceiptsStorage.ReceiptsSerializer._
 
-  def keySerializer: Hash => Array[Byte] = _.bytes
-  def valueSerializer: Seq[Receipt] => Array[Byte] = toBytes
-  def valueDeserializer: Array[Byte] => Seq[Receipt] = toReceipts
-
   override def get(key: Hash): Option[Seq[Receipt]] = {
     storages.getBlockNumberByHash(key) flatMap {
       blockNum => source.get(blockNum).map(x => toReceipts(x.value))
@@ -85,7 +81,5 @@ final class ReceiptsStorage(storages: Storages, val source: BlockDataSource) ext
     source.update(remove, upsert)
     this
   }
-
-  protected def apply(storages: Storages, source: BlockDataSource): ReceiptsStorage = new ReceiptsStorage(storages, source)
 }
 

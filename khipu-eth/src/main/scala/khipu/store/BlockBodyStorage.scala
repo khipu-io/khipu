@@ -17,10 +17,6 @@ final class BlockBodyStorage(storages: Storages, val source: BlockDataSource) ex
 
   import BlockBody.BlockBodyDec
 
-  def keySerializer: Hash => Array[Byte] = _.bytes
-  def valueSerializer: BlockBody => Array[Byte] = _.toBytes
-  def valueDeserializer: Array[Byte] => BlockBody = b => b.toBlockBody
-
   override def get(key: Hash): Option[BlockBody] = {
     storages.getBlockNumberByHash(key) flatMap {
       blockNum => source.get(blockNum).map(_.value.toBlockBody)
@@ -40,6 +36,4 @@ final class BlockBodyStorage(storages: Storages, val source: BlockDataSource) ex
     source.update(remove, upsert)
     this
   }
-
-  protected def apply(storages: Storages, source: BlockDataSource): BlockBodyStorage = new BlockBodyStorage(storages, source)
 }
