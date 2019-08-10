@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import akka.event.Logging
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import khipu.TVal
 import khipu.crypto
 import khipu.util.Clock
 import khipu.util.FIFOCache
@@ -24,7 +23,7 @@ final class LmdbBlockDataSource(
   private val log = Logging(system, this.getClass)
   private val keyPool = DirectByteBufferPool.KeyPool
 
-  private val cache = new FIFOCache[Long, TVal](cacheSize)
+  private val cache = new FIFOCache[Long, Array[Byte]](cacheSize)
 
   val table = env.openDbi(
     topic,
@@ -34,7 +33,7 @@ final class LmdbBlockDataSource(
 
   val clock = new Clock()
 
-  def get(key: Long): Option[TVal] = {
+  def get(key: Long): Option[Array[Byte]] = {
     cache.get(key) match {
       case None =>
         val start = System.nanoTime
@@ -72,13 +71,13 @@ final class LmdbBlockDataSource(
 
         clock.elapse(System.nanoTime - start)
 
-        ret.map(TVal(_, -1, key))
+        ret
 
       case x => x
     }
   }
 
-  def update(toRemove: Iterable[Long], toUpsert: Iterable[(Long, TVal)]): LmdbBlockDataSource = {
+  def update(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Array[Byte])]): LmdbBlockDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
 
@@ -88,7 +87,7 @@ final class LmdbBlockDataSource(
       wxn = env.txnWrite()
 
       toUpsert foreach {
-        case (key, tval @ TVal(data, _, _)) =>
+        case (key, data) =>
           val tableKey = keyPool.acquire().order(ByteOrder.nativeOrder)
           val tableVal = ByteBuffer.allocateDirect(data.length)
 

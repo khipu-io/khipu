@@ -1,6 +1,7 @@
 package khipu.util
 
 import scala.reflect.ClassTag
+import scala.collection.mutable
 
 object CircularArrayQueue {
   class EmptyCollectionException(message: String) extends Exception(message)
@@ -15,7 +16,7 @@ object CircularArrayQueue {
       val v = i.toString
       println
       queue.enqueue(v)
-      println(queue + ": " + queue.first + " -> " + queue.last)
+      printQueue
       i += 1
     }
 
@@ -24,15 +25,28 @@ object CircularArrayQueue {
       println
       println(queue.dequeue)
       print(queue)
+      printQueue
+    }
+
+    println("\n--- clear")
+    queue.clear()
+    printQueue
+
+    println("\n--- enqueue")
+    queue.enqueue("abcd")
+    printQueue
+
+    def printQueue {
+      print(queue)
       if (queue.nonEmpty) {
-        println(": " + queue.first + " -> " + queue.last)
+        println(": " + queue.head + " -> " + queue.last)
       } else {
         println
       }
     }
   }
 }
-final class CircularArrayQueue[T](capacity: Int)(implicit _m: ClassTag[T]) {
+class CircularArrayQueue[T: ClassTag](capacity: Int) {
   import CircularArrayQueue._
 
   private var count, front = 0
@@ -56,9 +70,8 @@ final class CircularArrayQueue[T](capacity: Int)(implicit _m: ClassTag[T]) {
       throw new EmptyCollectionException("queue")
     } else {
       val ret = queue(front)
-      ret match {
-        case _: AnyRef => queue(front) = null.asInstanceOf[T]
-        case _         =>
+      if (ret.isInstanceOf[AnyRef]) {
+        queue(front) = null.asInstanceOf[T]
       }
       front = (front + 1) % queue.length
       count -= 1
@@ -67,11 +80,19 @@ final class CircularArrayQueue[T](capacity: Int)(implicit _m: ClassTag[T]) {
   }
 
   @throws(classOf[EmptyCollectionException])
-  def first: T = {
+  def head: T = {
     if (isEmpty) {
       throw new EmptyCollectionException("queue")
     } else {
       queue(front)
+    }
+  }
+
+  def headOption: Option[T] = {
+    if (isEmpty) {
+      None
+    } else {
+      Some(queue(front))
     }
   }
 
@@ -84,7 +105,36 @@ final class CircularArrayQueue[T](capacity: Int)(implicit _m: ClassTag[T]) {
     }
   }
 
+  def lastOption: Option[T] = {
+    if (isEmpty) {
+      None
+    } else {
+      Some(queue(rear))
+    }
+  }
+
+  def clear() {
+    var i = 0
+    var ptr = front
+    while (i < count) {
+      val elem = queue(ptr)
+      if (elem.isInstanceOf[AnyRef]) {
+        queue(ptr) = null.asInstanceOf[T]
+      }
+      ptr += 1
+      if (ptr >= queue.length) {
+        ptr = queue.length - ptr
+      }
+      i += 1
+    }
+
+    count = 0
+    front = 0
+    rear = -1
+  }
+
   def size = count
+  def isFull = count == capacity
   def isEmpty = count == 0
   def nonEmpty = !isEmpty
 
@@ -106,4 +156,26 @@ final class CircularArrayQueue[T](capacity: Int)(implicit _m: ClassTag[T]) {
   }
 
   override def toString() = toArray.mkString("(", ",", ")")
+}
+
+class KeyValueCircularArrayQueue[K, V](capacity: Int) extends CircularArrayQueue[Iterable[(K, V)]](capacity) {
+  private val map = mutable.HashMap[K, V]()
+
+  override def enqueue(element: Iterable[(K, V)]) {
+    super.enqueue(element)
+    element foreach { kv => map += (kv._1 -> kv._2) }
+  }
+
+  override def dequeue() = {
+    val element = super.dequeue()
+    element foreach { kv => map.remove(kv._1) }
+    element
+  }
+
+  override def clear() {
+    super.clear()
+    map.clear()
+  }
+
+  def get(key: K): Option[V] = map.get(key)
 }

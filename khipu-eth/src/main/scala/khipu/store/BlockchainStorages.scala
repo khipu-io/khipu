@@ -1,10 +1,8 @@
 package khipu.store
 
-import khipu.Hash
 import khipu.store.datasource.BlockDataSource
 import khipu.store.datasource.DataSource
 import khipu.store.datasource.NodeDataSource
-import khipu.store.trienode.NodeStorage
 
 trait BlockchainStorages {
   // -- data source
@@ -32,12 +30,8 @@ trait BlockchainStorages {
   def blockBodyStorage: BlockBodyStorage
   def receiptsStorage: ReceiptsStorage
 
+  def unconfirmedDepth: Int
+
   // ---
   def blockNumbers: BlockNumbers
-
-  def getBlockNumberByHash(hash: Hash) = blockNumbers.getBlockNumberByHash(hash)
-  def getHashByBlockNumber(blockNumber: Long) = blockNumbers.getHashByBlockNumber(blockNumber)
-  def getHashesByBlockNumberRange(from: Long, to: Long) = blockNumbers.getHashesByBlockNumberRange(from, to)
-  def putBlockNumber(blockNumber: Long, hash: Hash) = blockNumbers.putBlockNumber(blockNumber, hash)
-  def removeBlockNumber(key: Hash) = blockNumbers.removeBlockNumber(key)
 }

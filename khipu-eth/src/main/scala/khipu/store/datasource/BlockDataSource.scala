@@ -1,10 +1,9 @@
 package khipu.store.datasource
 
-import khipu.TVal
 import khipu.util.Clock
 import khipu.util.SimpleMap
 
-trait BlockDataSource extends SimpleMap[Long, TVal] {
+trait BlockDataSource extends SimpleMap[Long, Array[Byte]] {
   type This <: BlockDataSource
 
   def topic: String

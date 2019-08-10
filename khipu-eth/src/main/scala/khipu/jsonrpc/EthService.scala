@@ -30,7 +30,7 @@ import khipu.ledger.Ledger
 import khipu.mining.BlockGenerator
 import khipu.util
 import khipu.store.AppStateStorage
-import khipu.store.TransactionStorage.TransactionLocation
+import khipu.store.TransactionStorage.TxLocation
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
 import khipu.rlp
@@ -205,7 +205,7 @@ class EthService(
    * @return Current block number the client is on.
    */
   def bestBlockNumber(req: BestBlockNumberRequest): ServiceResponse[BestBlockNumberResponse] = Future {
-    Right(BestBlockNumberResponse(appStateStorage.getBestBlockNumber()))
+    Right(BestBlockNumberResponse(appStateStorage.getBestBlockNumber))
   }
 
   /**
@@ -266,7 +266,7 @@ class EthService(
       Future {
         txPending.orElse {
           for {
-            TransactionLocation(blockHash, txIndex) <- blockchain.getTransactionLocation(req.txHash)
+            TxLocation(blockHash, txIndex) <- blockchain.getTransactionLocation(req.txHash)
             Block(header, body) <- blockchain.getBlockByHash(blockHash)
             stx <- body.transactionList.lift(txIndex)
           } yield TransactionResponse(stx, Some(header), Some(txIndex))
@@ -279,7 +279,7 @@ class EthService(
 
   def getTransactionReceipt(req: GetTransactionReceiptRequest): ServiceResponse[GetTransactionReceiptResponse] = Future {
     val result: Option[TransactionReceiptResponse] = for {
-      TransactionLocation(blockHash, txIndex) <- blockchain.getTransactionLocation(req.txHash)
+      TxLocation(blockHash, txIndex) <- blockchain.getTransactionLocation(req.txHash)
       Block(header, body) <- blockchain.getBlockByHash(blockHash)
       stx <- body.transactionList.lift(txIndex)
       receipts <- blockchain.getReceiptsByHash(blockHash)
@@ -403,7 +403,7 @@ class EthService(
 
   def getGetGasPrice(req: GetGasPriceRequest): ServiceResponse[GetGasPriceResponse] = {
     val blockDifference = 30
-    val bestBlock = appStateStorage.getBestBlockNumber()
+    val bestBlock = appStateStorage.getBestBlockNumber
 
     Future {
       val gasPrice = ((bestBlock - blockDifference) to bestBlock)
@@ -459,7 +459,7 @@ class EthService(
     reportActive()
     import khipu.mining.pow.PowCache._
 
-    val blockNumber = appStateStorage.getBestBlockNumber() + 1
+    val blockNumber = appStateStorage.getBestBlockNumber + 1
 
     getOmmersFromPool(blockNumber).zip(getTransactionsFromPool).map {
       case (ommers, pendingTxs) =>
@@ -522,7 +522,7 @@ class EthService(
    * @return The syncing status if the node is syncing or None if not
    */
   def syncing(req: SyncingRequest): ServiceResponse[SyncingResponse] = Future {
-    val currentBlock = appStateStorage.getBestBlockNumber()
+    val currentBlock = appStateStorage.getBestBlockNumber
     val highestBlock = appStateStorage.getEstimatedHighestBlock()
 
     //The node is syncing if there's any block that other peers have and this peer doesn't
@@ -718,7 +718,7 @@ class EthService(
     blockParam match {
       case BlockParam.WithNumber(blockNumber) => getBlock(blockNumber.longValue).map(ResolvedBlock(_, pending = false))
       case BlockParam.Earliest                => getBlock(0).map(ResolvedBlock(_, pending = false))
-      case BlockParam.Latest                  => getBlock(appStateStorage.getBestBlockNumber()).map(ResolvedBlock(_, pending = false))
+      case BlockParam.Latest                  => getBlock(appStateStorage.getBestBlockNumber).map(ResolvedBlock(_, pending = false))
       case BlockParam.Pending =>
         blockGenerator.getPending.map(pb => ResolvedBlock(pb.block, pending = true))
           .map(Right.apply)

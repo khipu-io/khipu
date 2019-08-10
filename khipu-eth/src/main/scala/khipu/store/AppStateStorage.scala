@@ -2,6 +2,7 @@ package khipu.store
 
 import java.nio.ByteBuffer
 import khipu.store.datasource.DataSource
+import khipu.util.CircularArrayQueue
 
 object AppStateStorage {
   final case class Key private (name: String)
@@ -23,25 +24,43 @@ object AppStateStorage {
  *   Value: stored string value
  */
 import AppStateStorage._
-final class AppStateStorage(val source: DataSource) extends KeyValueStorage[Key, Long] {
+final class AppStateStorage(val source: DataSource, unconfirmedDepth: Int) extends KeyValueStorage[Key, Long] {
   type This = AppStateStorage
 
-  val namespace: Array[Byte] = Namespaces.AppState
-  def keySerializer: Key => Array[Byte] = _.name.getBytes
-  def valueSerializer: Long => Array[Byte] = longToBytes
-  def valueDeserializer: Array[Byte] => Long = bytesToLong
+  private val unconfirmed = new CircularArrayQueue[Long](unconfirmedDepth)
 
-  protected def apply(dataSource: DataSource): AppStateStorage = new AppStateStorage(dataSource)
+  private var _withUnconfirmed = false
+  def withUnconfirmed = _withUnconfirmed
+  def withUnconfirmed(b: Boolean) = _withUnconfirmed = b
 
-  def getBestBlockNumber(): Long = get(Keys.BestBlockNumber).getOrElse(0)
+  def getBestBlockNumber: Long = (unconfirmed.lastOption orElse get(Keys.BestBlockNumber)).getOrElse(0)
 
   def putBestBlockNumber(bestBlockNumber: Long): AppStateStorage = {
-    // FIXME We need to decouple pruning from best block number storing in this fn
-    //val result = pruneFn(getLastPrunedBlock(), bestBlockNumber)
-    //putLastPrunedBlock(result.lastPrunedBlockNumber)
+    val toFlush = if (withUnconfirmed) {
+      if (unconfirmed.isFull) Some(unconfirmed.dequeue) else None
+    } else {
+      Some(bestBlockNumber)
+    }
 
-    put(Keys.BestBlockNumber, bestBlockNumber)
+    if (withUnconfirmed) {
+      unconfirmed.enqueue(bestBlockNumber)
+    }
+
+    toFlush foreach { number => put(Keys.BestBlockNumber, number) }
+
+    this
   }
+
+  def clearUnconfirmed() {
+    unconfirmed.clear()
+  }
+
+  val namespace: Array[Byte] = Namespaces.AppState
+  def keyToBytes(k: Key): Array[Byte] = k.name.getBytes
+  def valueToBytes(v: Long): Array[Byte] = longToBytes(v)
+  def valueFromBytes(bytes: Array[Byte]): Long = bytesToLong(bytes)
+
+  protected def apply(dataSource: DataSource): AppStateStorage = new AppStateStorage(dataSource, unconfirmedDepth)
 
   def isFastSyncDone(): Boolean = get(Keys.FastSyncDone).isDefined
 

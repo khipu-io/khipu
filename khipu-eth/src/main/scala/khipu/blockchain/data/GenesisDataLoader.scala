@@ -16,7 +16,6 @@ import khipu.rlp.RLPList
 import khipu.store.datasource.DataSource
 import khipu.store.datasource.EphemNodeDataSource
 import khipu.store.trienode.ArchiveNodeStorage
-import khipu.store.trienode.PruningMode
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
 import khipu.util.BlockchainConfig
@@ -72,7 +71,6 @@ object GenesisDataLoader {
 class GenesisDataLoader(
     dataSource:       DataSource,
     blockchain:       Blockchain,
-    pruningMode:      PruningMode,
     blockchainConfig: BlockchainConfig
 )(implicit system: ActorSystem) {
   import GenesisDataLoader._

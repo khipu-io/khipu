@@ -4,39 +4,50 @@ import akka.util.ByteString
 import java.nio.ByteOrder
 import khipu.Hash
 import khipu.store.datasource.DataSource
+import khipu.util.SimpleMapWithUnconfirmed
 
 object TransactionStorage {
-  final case class TransactionLocation(blockHash: Hash, txIndex: Int)
+  final case class TxLocation(blockHash: Hash, txIndex: Int)
 }
 import TransactionStorage._
-final class TransactionStorage(val source: DataSource) extends KeyValueStorage[Hash, TransactionLocation] {
+final class TransactionStorage(val source: DataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Hash, TxLocation](unconfirmedDepth) {
   type This = TransactionStorage
 
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
-  val namespace: Array[Byte] = Namespaces.Transaction
+  private val namespace = Namespaces.Transaction
 
-  override def keySerializer: Hash => Array[Byte] = _.bytes
-  override def valueSerializer: TransactionLocation => Array[Byte] = tl => {
+  private def keyToBytes(k: Hash): Array[Byte] = k.bytes
+  private def valueToBytes(v: TxLocation): Array[Byte] = {
     val builder = ByteString.newBuilder
 
-    val hashBytes = tl.blockHash.bytes
+    val hashBytes = v.blockHash.bytes
     builder.putInt(hashBytes.length)
     builder.putBytes(hashBytes)
-    builder.putInt(tl.txIndex)
+    builder.putInt(v.txIndex)
 
     builder.result.toArray
   }
-  override def valueDeserializer: Array[Byte] => TransactionLocation = bytes => {
+  private def valueFromBytes(bytes: Array[Byte]): TxLocation = {
     val data = ByteString(bytes).iterator
 
     val hashLength = data.getInt
     val blockHash = Hash(data.getBytes(hashLength))
     val txIndex = data.getInt
 
-    TransactionLocation(blockHash, txIndex)
+    TxLocation(blockHash, txIndex)
   }
 
-  override protected def apply(dataSource: DataSource): TransactionStorage = new TransactionStorage(dataSource)
+  override protected def doGet(key: Hash): Option[TxLocation] =
+    source.get(namespace, keyToBytes(key)).map(valueFromBytes)
+
+  override protected def doUpdate(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, TxLocation)]): This = {
+    source.update(
+      namespace,
+      toRemove.map(keyToBytes),
+      toUpsert.map { case (k, v) => keyToBytes(k) -> valueToBytes(v) }
+    )
+    this
+  }
 }
 

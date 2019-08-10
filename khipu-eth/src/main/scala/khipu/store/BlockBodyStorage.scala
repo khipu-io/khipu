@@ -1,10 +1,8 @@
 package khipu.store
 
-import khipu.Hash
-import khipu.TVal
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.store.datasource.BlockDataSource
-import khipu.util.SimpleMap
+import khipu.util.SimpleMapWithUnconfirmed
 import scala.collection.mutable
 
 /**
@@ -12,28 +10,20 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockBody belong
  *   Value: the block body
  */
-final class BlockBodyStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, BlockBody] {
+final class BlockBodyStorage(val source: BlockDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, BlockBody](unconfirmedDepth) {
   type This = BlockBodyStorage
 
   import BlockBody.BlockBodyDec
 
-  override def get(key: Hash): Option[BlockBody] = {
-    storages.getBlockNumberByHash(key) flatMap {
-      blockNum => source.get(blockNum).map(_.value.toBlockBody)
-    }
+  protected def doGet(key: Long): Option[BlockBody] = {
+    source.get(key).map(_.toBlockBody)
   }
 
-  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, BlockBody)]): BlockBodyStorage = {
-    val upsert = toUpsert flatMap {
-      case (key, value) =>
-        storages.getBlockNumberByHash(key) map {
-          blockNum => (blockNum -> TVal(value.toBytes, -1, blockNum))
-        }
+  protected def doUpdate(toRemove: Iterable[Long], toUpsert: Iterable[(Long, BlockBody)]): This = {
+    val upsert = toUpsert map {
+      case (key, value) => (key -> value.toBytes)
     }
-    val remove = toRemove flatMap {
-      key => storages.getBlockNumberByHash(key)
-    }
-    source.update(remove, upsert)
+    source.update(toRemove, upsert)
     this
   }
 }

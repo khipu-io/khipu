@@ -149,7 +149,7 @@ final class MerklePatriciaTrie[K, V] private (
    * @return New trie with the (key-value) pair inserted.
    * @throws khipu.trie.MerklePatriciaTrie.MPTException if there is any inconsistency in how the trie is build.
    */
-  override def put(key: K, value: V): MerklePatriciaTrie[K, V] = {
+  override def put(key: K, value: V): This = {
     val keyNibbles = HexPrefix.bytesToNibbles(kSerializer.toBytes(key))
 
     rootHashOpt map { rootId =>
@@ -178,7 +178,7 @@ final class MerklePatriciaTrie[K, V] private (
    * @return New trie with the (key-value) pair associated with the key passed deleted from the trie.
    * @throws khipu.trie.MerklePatriciaTrie.MPTException if there is any inconsistency in how the trie is build.
    */
-  override def remove(key: K): MerklePatriciaTrie[K, V] = {
+  override def remove(key: K): This = {
     rootHashOpt map { rootId =>
       val keyNibbles = HexPrefix.bytesToNibbles(bytes = kSerializer.toBytes(key))
       val root = getNode(rootId)
@@ -487,7 +487,7 @@ final class MerklePatriciaTrie[K, V] private (
    *                 If a key is already in the DataSource its value will be updated.
    * @return the new trie after the removals and insertions were done.
    */
-  override def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): MerklePatriciaTrie[K, V] = {
+  override def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): This = {
     throw new UnsupportedOperationException("Use put/remove")
   }
 
