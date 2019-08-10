@@ -13,9 +13,6 @@ import khipu.network.rlpx.PeerConfiguration
 import khipu.network.rlpx.RLPxConfiguration
 import khipu.store.datasource.LeveldbConfig
 import khipu.store.datasource.LmdbConfig
-import khipu.store.trienode.ArchivePruning
-import khipu.store.trienode.HistoryPruning
-import khipu.store.trienode.PruningMode
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -326,6 +323,10 @@ final case class MonetaryPolicyConfig(
 }
 
 object PruningConfig {
+  sealed trait PruningMode
+  case object ArchivePruning extends PruningMode
+  final case class HistoryPruning(history: Int) extends PruningMode
+
   def apply(etcClientConfig: com.typesafe.config.Config): PruningConfig = {
     val pruningConfig = etcClientConfig.getConfig("pruning")
 
@@ -340,7 +341,7 @@ object PruningConfig {
   }
 }
 trait PruningConfig {
-  val mode: PruningMode
+  val mode: PruningConfig.PruningMode
 }
 
 object CacheConfig {

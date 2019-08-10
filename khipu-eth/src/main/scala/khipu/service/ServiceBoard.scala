@@ -130,6 +130,8 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
         lazy val receiptsDataSource = new LmdbBlockDataSource(dbConfig.receipts, env)
         lazy val totalDifficultyDataSource = new LmdbBlockDataSource(dbConfig.td, env)
 
+        lazy val unconfirmedDepth = util.Config.Sync.blockResolveDepth
+
         def closeAll() {
           log.info("db syncing...")
 
@@ -140,7 +142,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
           //accountNodeDataSource.close()
           //storageNodeDataSource.close()
           //evmCodeDataSource.close()
-          //blockNumberMappingDataSource.close()
+          //blockNumberDataSource.close()
           //blockHeaderDataSource.close()
           //blockBodyDataSource.close()
           //receiptsDataSource.close()

@@ -252,8 +252,7 @@ final class KesqueCompactor(
   private def loadSnaphot() {
     log.info(s"[comp] loading nodes of #$blockNumber")
     for {
-      hash <- storages.getHashByBlockNumber(blockNumber)
-      header <- blockHeaderStorage.get(hash)
+      header <- blockHeaderStorage.get(blockNumber)
     } {
       val stateRoot = header.stateRoot.bytes
       accountReader.getNode(stateRoot, blockNumber) map accountReader.processNode

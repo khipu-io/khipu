@@ -11,7 +11,7 @@ import khipu.network.p2p.messages.PV63.MptNode
 import khipu.network.p2p.messages.PV63.MptNode._
 import khipu.store.Storages
 import khipu.store.TransactionStorage
-import khipu.store.TransactionStorage.TransactionLocation
+import khipu.store.TransactionStorage.TxLocation
 import khipu.store.trienode.ReadOnlyNodeStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
@@ -117,7 +117,7 @@ object Blockchain {
      */
     def getTotalDifficultyByHash(blockhash: Hash): Option[DataWord]
 
-    def getTransactionLocation(txHash: Hash): Option[TransactionLocation]
+    def getTransactionLocation(txHash: Hash): Option[TxLocation]
 
     /**
      * Persists a block in the underlying Blockchain Database
@@ -135,19 +135,21 @@ object Blockchain {
 
     /**
      * Persists a block header in the underlying Blockchain Database
-     *
-     * @param blockHeader Block to be saved
      */
     def saveBlockHeader(blockHeader: BlockHeader): Unit
-    def saveBlockHeader(blockHeaders: Iterable[BlockHeader]): Unit
     def saveBlockBody(blockHash: Hash, blockBody: BlockBody): Unit
-    def saveBlockBody(kvs: Iterable[(Hash, BlockBody)]): Unit
     def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]): Unit
-    def saveReceipts(kvs: Iterable[(Hash, Seq[Receipt])]): Unit
     def saveEvmcode(hash: Hash, evmCode: ByteString): Unit
-    def saveEvmcode(kvs: Iterable[(Hash, ByteString)]): Unit
     def saveTotalDifficulty(blockhash: Hash, totalDifficulty: DataWord): Unit
-    def saveTotalDifficulty(kvs: Iterable[(Hash, DataWord)]): Unit
+
+    /**
+     * To get unconfirmed queue working, batched saving methods can only be used in fast sync
+     */
+    def saveBlockHeader_batched(blockHeaders: Iterable[BlockHeader]): Unit
+    def saveBlockBody_batched(kvs: Iterable[(Hash, BlockBody)]): Unit
+    def saveReceipts_batched(kvs: Iterable[(Hash, Seq[Receipt])]): Unit
+    def saveEvmcode_batched(kvs: Iterable[(Hash, ByteString)]): Unit
+    def saveTotalDifficulty_batched(kvs: Iterable[(Hash, DataWord)]): Unit
 
     /**
      * Returns a block hash given a block number
@@ -162,8 +164,7 @@ object Blockchain {
     def getReadOnlyWorldState(blockNumber: Option[Long], accountStartNonce: DataWord, stateRootHash: Option[Hash] = None): W
   }
 
-  def apply(storages: Storages): Blockchain =
-    new Blockchain(storages)
+  def apply(storages: Storages): Blockchain = new Blockchain(storages)
 }
 final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage, BlockWorldState] {
 
@@ -174,73 +175,105 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
   private val blockHeaderStorage = storages.blockHeaderStorage
   private val blockBodyStorage = storages.blockBodyStorage
   private val receiptsStorage = storages.receiptsStorage
+  private val blockNumberStorage = storages.blockNumberStorage
 
   private val totalDifficultyStorage = storages.totalDifficultyStorage
   private val transactionStorage = storages.transactionStorage
-  private val blockNumberStorage = storages.blockNumberStorage
 
   private val appStateStorage = storages.appStateStorage
 
+  private val blockNumbers = storages.blockNumbers
+
   def getHashByBlockNumber(number: Long): Option[Hash] =
-    storages.getHashByBlockNumber(number)
+    blockNumbers.getHashByBlockNumber(number)
 
-  def getNumberByBlockHash(hash: Hash): Option[Long] =
-    storages.getBlockNumberByHash(hash)
+  def getNumberByBlockHash(blockHash: Hash): Option[Long] =
+    blockNumbers.get(blockHash)
 
-  def getBlockHeaderByHash(hash: Hash): Option[BlockHeader] =
-    blockHeaderStorage.get(hash)
+  def getBlockHeaderByHash(blockHash: Hash): Option[BlockHeader] =
+    blockNumbers.get(blockHash) flatMap blockHeaderStorage.get
 
-  def getBlockBodyByHash(hash: Hash): Option[BlockBody] =
-    blockBodyStorage.get(hash)
+  def getBlockBodyByHash(blockHash: Hash): Option[BlockBody] =
+    blockNumbers.get(blockHash) flatMap blockBodyStorage.get
 
-  def getReceiptsByHash(blockhash: Hash): Option[Seq[Receipt]] =
-    receiptsStorage.get(blockhash)
+  def getReceiptsByHash(blockHash: Hash): Option[Seq[Receipt]] =
+    blockNumbers.get(blockHash) flatMap receiptsStorage.get
 
   def getEvmcodeByHash(hash: Hash): Option[ByteString] =
     evmcodeStorage.get(hash).map(ByteString(_))
 
-  def getTotalDifficultyByHash(blockhash: Hash): Option[DataWord] =
-    totalDifficultyStorage.get(blockhash)
+  def getTotalDifficultyByHash(hash: Hash): Option[DataWord] =
+    blockNumbers.get(hash) flatMap totalDifficultyStorage.get
 
   def saveBlockHeader(blockHeader: BlockHeader) {
-    blockHeaderStorage.put(blockHeader.hash, blockHeader)
+    blockHeaderStorage.put(blockHeader.number, blockHeader)
     blockNumberStorage.put(blockHeader.hash, blockHeader.number)
+    blockNumbers.put(blockHeader.hash, blockHeader.number)
   }
 
-  def saveBlockHeader(blockHeaders: Iterable[BlockHeader]) {
-    val kvs = blockHeaders.map(x => x.hash -> x)
+  def saveBlockHeader_batched(blockHeaders: Iterable[BlockHeader]) {
+    val kvs = blockHeaders.map(x => x.number -> x)
     blockHeaderStorage.update(Nil, kvs)
-    val nums = kvs.map(kv => kv._1 -> kv._2.number)
+    val nums = blockHeaders.map(x => x.hash -> x.number)
     blockNumberStorage.update(Nil, nums)
+    nums foreach { case (hash, number) => blockNumbers.put(hash, number) }
   }
 
   def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {
-    blockBodyStorage.put(blockHash, blockBody)
-    saveTxsLocations(blockHash, blockBody)
+    blockNumbers.get(blockHash) foreach { blockNumber =>
+      blockBodyStorage.put(blockNumber, blockBody)
+      saveTxsLocations(blockHash, blockBody)
+    }
   }
 
-  def saveBlockBody(kvs: Iterable[(Hash, BlockBody)]) = {
-    blockBodyStorage.update(Nil, kvs)
-    kvs foreach { case (blockHash, blockBody) => saveTxsLocations(blockHash, blockBody) }
+  def saveBlockBody_batched(kvs: Iterable[(Hash, BlockBody)]) = {
+    val toSave = kvs flatMap {
+      case (hash, body) =>
+        blockNumbers.get(hash) map {
+          blockNumber => (blockNumber -> body)
+        }
+    }
+    blockBodyStorage.update(Nil, toSave)
+    kvs foreach {
+      case (blockHash, blockBody) => saveTxsLocations(blockHash, blockBody)
+    }
   }
 
   def saveReceipts(blockHash: Hash, receipts: Seq[Receipt]) =
-    receiptsStorage.put(blockHash, receipts)
+    blockNumbers.get(blockHash) foreach { blockNumber =>
+      receiptsStorage.put(blockNumber, receipts)
+    }
 
-  def saveReceipts(kvs: Iterable[(Hash, Seq[Receipt])]) =
-    receiptsStorage.update(Nil, kvs)
+  def saveReceipts_batched(kvs: Iterable[(Hash, Seq[Receipt])]) {
+    val toSave = kvs flatMap {
+      case (hash, receipts) =>
+        blockNumbers.get(hash) map {
+          blockNumber => (blockNumber -> receipts)
+        }
+    }
+    receiptsStorage.update(Nil, toSave)
+  }
 
   def saveEvmcode(hash: Hash, evmCode: ByteString) =
     evmcodeStorage.put(hash, evmCode.toArray)
 
-  def saveEvmcode(kvs: Iterable[(Hash, ByteString)]) =
+  def saveEvmcode_batched(kvs: Iterable[(Hash, ByteString)]) =
     evmcodeStorage.update(Nil, kvs.map(x => x._1 -> x._2.toArray))
 
-  def saveTotalDifficulty(blockhash: Hash, td: DataWord) =
-    totalDifficultyStorage.put(blockhash, td)
+  def saveTotalDifficulty(blockHash: Hash, td: DataWord) =
+    blockNumbers.get(blockHash) foreach { blockNumber =>
+      totalDifficultyStorage.put(blockNumber, td)
+    }
 
-  def saveTotalDifficulty(kvs: Iterable[(Hash, DataWord)]) =
-    totalDifficultyStorage.update(Nil, kvs)
+  def saveTotalDifficulty_batched(kvs: Iterable[(Hash, DataWord)]) {
+    val toSave = kvs flatMap {
+      case (hash, td) =>
+        blockNumbers.get(hash) map {
+          blockNumber => (blockNumber -> td)
+        }
+    }
+    totalDifficultyStorage.update(Nil, toSave)
+  }
 
   def getWorldState(blockNumber: Long, accountStartNonce: DataWord, stateRootHash: Option[Hash]): BlockWorldState =
     BlockWorldState(
@@ -264,12 +297,14 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
     )
 
   def removeBlock(blockHash: Hash) {
-    val maybeTxList = getBlockBodyByHash(blockHash).map(_.transactionList)
-    blockHeaderStorage.remove(blockHash)
-    blockBodyStorage.remove(blockHash)
-    totalDifficultyStorage.remove(blockHash)
-    receiptsStorage.remove(blockHash)
-    maybeTxList.foreach(removeTxsLocations)
+    blockNumbers.get(blockHash) foreach { blockNumber =>
+      blockHeaderStorage.remove(blockNumber)
+      blockBodyStorage.remove(blockNumber)
+      totalDifficultyStorage.remove(blockNumber)
+      receiptsStorage.remove(blockNumber)
+      blockNumbers.remove(blockHash)
+      getBlockBodyByHash(blockHash).map(_.transactionList).foreach(removeTxsLocations)
+    }
   }
 
   /**
@@ -298,17 +333,14 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
   def getMptNodeByHash(hash: Hash): Option[MptNode] =
     (accountNodeStorage.get(hash) orElse storageNodeStorage.get(hash)).map(_.toMptNode)
 
-  def getTransactionLocation(txHash: Hash): Option[TransactionLocation] =
+  def getTransactionLocation(txHash: Hash): Option[TransactionStorage.TxLocation] =
     transactionStorage.get(txHash)
-
-  private def saveBlockNumberMapping(hash: Hash, number: Long): Unit =
-    blockNumberStorage.put(hash, number)
 
   private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody) {
     val kvs = blockBody.transactionList.zipWithIndex map {
-      case (tx, index) => (tx.hash, TransactionLocation(blockHash, index))
+      case (tx, index) => (tx.hash, TxLocation(blockHash, index))
     }
-    transactionStorage.update(Set(), kvs.toMap)
+    transactionStorage.update(Nil, kvs)
   }
 
   private def removeTxsLocations(stxs: Seq[SignedTransaction]) {
@@ -322,6 +354,40 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
     saveReceipts(block.header.hash, receipts)
     saveTotalDifficulty(block.header.hash, totalDifficulty)
     saveBestBlockNumber(block.header.number)
+  }
+
+  def swithToWithUnconfirmed() {
+    accountNodeStorage.swithToWithUnconfirmed()
+    storageNodeStorage.swithToWithUnconfirmed()
+    evmcodeStorage.swithToWithUnconfirmed()
+
+    blockNumberStorage.swithToWithUnconfirmed()
+
+    blockHeaderStorage.swithToWithUnconfirmed()
+    blockBodyStorage.swithToWithUnconfirmed()
+    receiptsStorage.swithToWithUnconfirmed()
+
+    totalDifficultyStorage.swithToWithUnconfirmed()
+    transactionStorage.swithToWithUnconfirmed()
+    appStateStorage.swithToWithUnconfirmed()
+  }
+
+  def clearUnconfirmed() {
+    accountNodeStorage.clearUnconfirmed()
+    storageNodeStorage.clearUnconfirmed()
+    evmcodeStorage.clearUnconfirmed()
+
+    blockNumberStorage.clearUnconfirmed()
+
+    blockHeaderStorage.clearUnconfirmed()
+    blockBodyStorage.clearUnconfirmed()
+    receiptsStorage.clearUnconfirmed()
+
+    totalDifficultyStorage.clearUnconfirmed()
+    transactionStorage.clearUnconfirmed()
+    appStateStorage.clearUnconfirmed()
+
+    blockNumbers.clearUnconfirmed()
   }
 
   private def saveWorld(world: WorldState[_, _]) {

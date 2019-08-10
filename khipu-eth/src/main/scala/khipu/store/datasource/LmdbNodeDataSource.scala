@@ -5,7 +5,6 @@ import akka.event.Logging
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import khipu.Hash
-import khipu.TVal
 import khipu.crypto
 import khipu.util.Clock
 import khipu.util.FIFOCache
@@ -33,7 +32,7 @@ final class LmdbNodeDataSource(
   private val log = Logging(system, this.getClass)
   private val keyPool = DirectByteBufferPool.KeyPool
 
-  private val cache = new FIFOCache[Hash, TVal](cacheSize)
+  private val cache = new FIFOCache[Hash, Array[Byte]](cacheSize)
 
   // LMDB defines compile-time constant MDB_MAXKEYSIZE=511 bytes
   // Key sizes must be between 1 and mdb_env_get_maxkeysize() inclusive. 
@@ -60,7 +59,7 @@ final class LmdbNodeDataSource(
 
   log.info(s"Table $topic nodes $count")
 
-  def get(key: Hash): Option[TVal] = {
+  def get(key: Hash): Option[Array[Byte]] = {
 
     cache.get(key) match {
       case None =>
@@ -122,24 +121,31 @@ final class LmdbNodeDataSource(
           rtx.commit()
         } catch {
           case ex: Throwable =>
-            if (rtx ne null) rtx.abort()
+            if (rtx ne null) {
+              rtx.abort()
+            }
             log.error(ex, ex.getMessage)
         } finally {
-          if (indexCursor ne null) indexCursor.close()
-          if (rtx ne null) rtx.close()
+          if (indexCursor ne null) {
+            indexCursor.close()
+          }
+          if (rtx ne null) {
+            rtx.close()
+          }
 
           keyBufs foreach keyPool.release
         }
 
         clock.elapse(System.nanoTime - start)
 
-        ret.map(TVal(_, -1, -1))
+        ret foreach { data => cache.put(key, data) }
+        ret
 
       case x => x
     }
   }
 
-  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, TVal)]): LmdbNodeDataSource = {
+  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): LmdbNodeDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
 
     var byteBufs: List[ByteBuffer] = Nil
@@ -148,7 +154,7 @@ final class LmdbNodeDataSource(
       wtx = env.txnWrite()
 
       val (newNextId, bufs) = toUpsert.foldLeft(nextId, List[ByteBuffer]()) {
-        case ((id, bufs), (key, tval @ TVal(data, _, _))) =>
+        case ((id, bufs), (key, data)) =>
           log.debug(s"put $key -> ${shortKey(key.bytes).mkString(",")} -> $id -> ${Hash(crypto.kec256(data))}")
 
           val sKey = shortKey(key.bytes)
@@ -174,14 +180,18 @@ final class LmdbNodeDataSource(
       nextId = newNextId
 
       toUpsert foreach {
-        case (key, tval) => cache.put(key, tval)
+        case (key, data) => cache.put(key, data)
       }
     } catch {
       case ex: Throwable =>
-        if (wtx ne null) wtx.abort()
+        if (wtx ne null) {
+          wtx.abort()
+        }
         log.error(ex, s"$topic ${ex.getMessage}")
     } finally {
-      if (wtx ne null) wtx.close()
+      if (wtx ne null) {
+        wtx.close()
+      }
       byteBufs foreach keyPool.release
     }
 

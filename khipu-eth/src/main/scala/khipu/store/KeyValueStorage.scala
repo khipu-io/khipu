@@ -16,10 +16,10 @@ trait KeyValueStorage[K, V] extends SimpleMap[K, V] {
   type This <: KeyValueStorage[K, V]
 
   val source: DataSource
-  val namespace: Array[Byte]
-  def keySerializer: K => Array[Byte]
-  def valueSerializer: V => Array[Byte]
-  def valueDeserializer: Array[Byte] => V
+  protected val namespace: Array[Byte]
+  def keyToBytes(k: K): Array[Byte]
+  def valueToBytes(k: V): Array[Byte]
+  def valueFromBytes(bytes: Array[Byte]): V
 
   protected def apply(dataSource: DataSource): This
 
@@ -29,7 +29,8 @@ trait KeyValueStorage[K, V] extends SimpleMap[K, V] {
    * @param key
    * @return the value associated with the passed key, if there exists one.
    */
-  def get(key: K): Option[V] = source.get(namespace, keySerializer(key)).map(valueDeserializer)
+  def get(key: K): Option[V] =
+    source.get(namespace, keyToBytes(key)).map(valueFromBytes)
 
   /**
    * This function updates the KeyValueStorage by deleting, updating and inserting new (key-value) pairs
@@ -43,8 +44,8 @@ trait KeyValueStorage[K, V] extends SimpleMap[K, V] {
   def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): This = {
     val newDataSource = source.update(
       namespace = namespace,
-      toRemove = toRemove.map(keySerializer),
-      toUpsert = toUpsert.map { case (k, v) => keySerializer(k) -> valueSerializer(v) }
+      toRemove = toRemove.map(keyToBytes),
+      toUpsert = toUpsert.map { case (k, v) => keyToBytes(k) -> valueToBytes(v) }
     )
     apply(newDataSource)
   }

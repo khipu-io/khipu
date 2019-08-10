@@ -6,6 +6,7 @@ import akka.cluster.sharding.ClusterSharding
 import akka.util.Timeout
 import khipu.Hash
 import khipu.entity.NodeEntity
+import khipu.store.NodeStorage
 import khipu.util.SimpleMap
 import scala.concurrent.Await
 import scala.concurrent.duration._

@@ -1,6 +1,7 @@
 package khipu.store.trienode
 
 import khipu.Hash
+import khipu.store.NodeStorage
 import khipu.util.SimpleMap
 
 /**
@@ -13,9 +14,6 @@ object ReadOnlyNodeStorage {
 }
 final class ReadOnlyNodeStorage private (source: NodeStorage, cache: Map[Hash, Option[Array[Byte]]]) extends SimpleMap[Hash, Array[Byte]] {
   type This = ReadOnlyNodeStorage
-
-  def tableName = ""
-  def count = -1
 
   /**
    * Persists the changes into the underlying [[khipu.common.SimpleMap]]

@@ -1,7 +1,5 @@
 package khipu.store
 
-import khipu.Hash
-import khipu.TVal
 import khipu.domain.Receipt
 import khipu.ledger.BloomFilter
 import khipu.rlp
@@ -10,7 +8,7 @@ import khipu.rlp.RLPImplicitConversions._
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
 import khipu.store.datasource.BlockDataSource
-import khipu.util.SimpleMap
+import khipu.util.SimpleMapWithUnconfirmed
 
 object ReceiptsStorage {
 
@@ -57,28 +55,20 @@ object ReceiptsStorage {
  *   Key: hash of the block to which the list of receipts belong
  *   Value: the list of receipts
  */
-final class ReceiptsStorage(storages: Storages, val source: BlockDataSource) extends SimpleMap[Hash, Seq[Receipt]] {
+final class ReceiptsStorage(val source: BlockDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, Seq[Receipt]](unconfirmedDepth) {
   type This = ReceiptsStorage
 
   import ReceiptsStorage.ReceiptsSerializer._
 
-  override def get(key: Hash): Option[Seq[Receipt]] = {
-    storages.getBlockNumberByHash(key) flatMap {
-      blockNum => source.get(blockNum).map(x => toReceipts(x.value))
-    }
+  override protected def doGet(key: Long): Option[Seq[Receipt]] = {
+    source.get(key).map(toReceipts)
   }
 
-  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Seq[Receipt])]): ReceiptsStorage = {
-    val upsert = toUpsert flatMap {
-      case (key, value) =>
-        storages.getBlockNumberByHash(key) map {
-          blockNum => (blockNum -> TVal(toBytes(value), -1, blockNum))
-        }
+  override protected def doUpdate(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Seq[Receipt])]): This = {
+    val upsert = toUpsert map {
+      case (key, value) => (key -> toBytes(value))
     }
-    val remove = toRemove flatMap {
-      key => storages.getBlockNumberByHash(key)
-    }
-    source.update(remove, upsert)
+    source.update(toRemove, upsert)
     this
   }
 }

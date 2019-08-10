@@ -1,6 +1,6 @@
 package khipu.store.datasource
 
-import khipu.store.trienode.PruningMode
+import khipu.util.PruningConfig.PruningMode
 
 trait DataSources {
   val pruningMode: PruningMode

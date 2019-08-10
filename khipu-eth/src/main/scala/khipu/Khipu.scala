@@ -70,7 +70,7 @@ object Khipu {
       }
     }
 
-    val genesisDataLoader = new GenesisDataLoader(serviceBoard.storages.dataSource, serviceBoard.blockchain, serviceBoard.storages.pruningMode, serviceBoard.blockchainConfig)
+    val genesisDataLoader = new GenesisDataLoader(serviceBoard.storages.dataSource, serviceBoard.blockchain, serviceBoard.blockchainConfig)
     genesisDataLoader.loadGenesisData()
 
     //new khipu.store.HashedKeyValueStorage(serviceBoard.blockchain).loadAndSeekFromKafka(5000000)

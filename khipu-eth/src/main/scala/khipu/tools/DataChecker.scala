@@ -8,8 +8,8 @@ import khipu.DataWord
 import khipu.domain.Account
 import khipu.rlp
 import khipu.service.ServiceBoard
+import khipu.store.NodeStorage
 import khipu.store.Storages.DefaultStorages
-import khipu.store.trienode.NodeStorage
 import khipu.trie
 import khipu.trie.BranchNode
 import khipu.trie.ByteArraySerializable
@@ -158,7 +158,7 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
 
   def loadSnaphot() {
     log.info(s"loading nodes of #$blockNumber")
-    storages.getHashByBlockNumber(blockNumber) flatMap blockHeaderStorage.get map (_.stateRoot.bytes) orElse stateRoot foreach { root =>
+    blockHeaderStorage.get(blockNumber) map (_.stateRoot.bytes) orElse stateRoot foreach { root =>
       log.info(s"stateRoot: ${Hash(root)}")
       accountReader.getNode(root, blockNumber) map accountReader.processNode
     }

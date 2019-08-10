@@ -55,8 +55,8 @@ trait SimpleMap[K, V] {
 
   final def update(change: (K, Option[V])): This = {
     change match {
-      case (k, None)    => update(Set(k), Nil)
-      case (k, Some(v)) => update(Set(), List((k -> v)))
+      case (k, None)    => update(List(k), Nil)
+      case (k, Some(v)) => update(Nil, List((k -> v)))
     }
   }
 
@@ -65,7 +65,7 @@ trait SimpleMap[K, V] {
    * in both toRemove and toUpsert
    */
   final def update(changes: Iterable[(K, Option[V])]): This = {
-    // use LinkedHashMap to keep the order
+    // use ListBuffer to keep the order
     val (toRemove, toUpsert) = changes.foldLeft(mutable.ListBuffer[K](), mutable.ListBuffer[(K, V)]()) {
       case ((toRemove, toUpsert), (k, None))    => (toRemove += k, toUpsert)
       case ((toRemove, toUpsert), (k, Some(v))) => (toRemove, toUpsert += (k -> v))

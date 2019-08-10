@@ -550,7 +550,7 @@ trait FastSyncService { _: SyncService =>
         if (syncState.pendingBodies.size + syncState.pendingReceipts.size < 10000) {
           val bodyFrom = syncState.enqueuedBodyNumber + 1
           val bodyTo = math.min(bodyFrom + 199, syncState.bestHeaderNumber)
-          val enqueueBodyHashes = storages.getHashesByBlockNumberRange(bodyFrom, bodyTo)
+          val enqueueBodyHashes = storages.blockNumbers.getHashesByBlockNumberRange(bodyFrom, bodyTo)
           if (enqueueBodyHashes.nonEmpty) {
             syncState.pendingBodies ++= enqueueBodyHashes
             syncState.enqueuedBodyNumber = enqueueBodyHashes.last.number
@@ -558,7 +558,7 @@ trait FastSyncService { _: SyncService =>
 
           val receiptsFrom = syncState.enqueuedReceiptsNumber + 1
           val receiptsTo = math.min(receiptsFrom + 199, syncState.bestHeaderNumber)
-          val enqueueReceiptsHashes = storages.getHashesByBlockNumberRange(receiptsFrom, receiptsTo)
+          val enqueueReceiptsHashes = storages.blockNumbers.getHashesByBlockNumberRange(receiptsFrom, receiptsTo)
           if (enqueueReceiptsHashes.nonEmpty) {
             syncState.pendingReceipts ++= enqueueReceiptsHashes
             syncState.enqueuedReceiptsNumber = enqueueReceiptsHashes.last.number
@@ -823,7 +823,7 @@ trait FastSyncService { _: SyncService =>
     private def saveHeaders(kvs: Iterable[BlockHeader]) {
       val start = System.nanoTime
       try {
-        blockchain.saveBlockHeader(kvs)
+        blockchain.saveBlockHeader_batched(kvs)
       } catch {
         case ex: Throwable => log.error(ex, s"$kvs \n${ex.getMessage}")
       }
@@ -833,7 +833,7 @@ trait FastSyncService { _: SyncService =>
     private def saveBodies(kvs: Iterable[(Hash, PV62.BlockBody)], bestSavedBlockNumber: Long) {
       val start = System.nanoTime
       try {
-        blockchain.saveBlockBody(kvs)
+        blockchain.saveBlockBody_batched(kvs)
       } catch {
         case ex: Throwable => log.error(ex, s"$kvs \n${ex.getMessage}")
       }
@@ -844,7 +844,7 @@ trait FastSyncService { _: SyncService =>
     private def saveTotalDifficulties(kvs: Iterable[(Hash, DataWord)]) {
       val start = System.nanoTime
       try {
-        blockchain.saveTotalDifficulty(kvs)
+        blockchain.saveTotalDifficulty_batched(kvs)
       } catch {
         case ex: Throwable => log.error(ex, s"$kvs \n${ex.getMessage}")
       }
@@ -854,7 +854,7 @@ trait FastSyncService { _: SyncService =>
     private def saveReceipts(kvs: Iterable[(Hash, Seq[Receipt])]) {
       val start = System.nanoTime
       try {
-        blockchain.saveReceipts(kvs)
+        blockchain.saveReceipts_batched(kvs)
       } catch {
         case ex: Throwable => log.error(ex, s"$kvs \n${ex.getMessage}")
       }

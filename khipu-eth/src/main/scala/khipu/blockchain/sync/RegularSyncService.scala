@@ -61,6 +61,7 @@ trait RegularSyncService { _: SyncService =>
     log.info("Starting regular block synchronization")
     appStateStorage.fastSyncDone()
     setCurrBlockHeaderForChecking()
+    blockchain.swithToWithUnconfirmed()
     context become (handleRegularSync orElse peerUpdateBehavior orElse ommersBehavior orElse stopBehavior)
     resumeRegularSync()
   }
@@ -225,6 +226,8 @@ trait RegularSyncService { _: SyncService =>
           } else {
             log.info(s"[sync] Received branch block ${headers.head.number} from ${peer.id}, resolving fork ...")
 
+            blockchain.clearUnconfirmed()
+
             requestingHeaders(peer, None, Right(firstHeader.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) andThen {
               case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
                 self ! ProcessBlockHeaders(peer, headers)
@@ -374,7 +377,7 @@ trait RegularSyncService { _: SyncService =>
                 lookbackFromBlock = None
 
                 // check blockHashToDelete
-                blockchain.getBlockHeaderByNumber(block.header.number).map(_.hash).filter(_ != block.header.hash) foreach blockchain.removeBlock
+                //blockchain.getBlockHeaderByNumber(block.header.number).map(_.hash).filter(_ != block.header.hash) foreach blockchain.removeBlock
 
                 (newBlock.totalDifficulty, newBlocks :+ newBlock, Vector())
               case Left(error) =>

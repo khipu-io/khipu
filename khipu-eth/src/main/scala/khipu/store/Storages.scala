@@ -2,32 +2,31 @@ package khipu.store
 
 import akka.actor.ActorSystem
 import khipu.store.datasource.DataSources
-import khipu.store.trienode.NodeStorage
-import khipu.store.trienode.PruningMode
+import khipu.util.PruningConfig.PruningMode
 
 object Storages {
 
   trait DefaultStorages extends Storages with DataSources {
-    // use 'lazy' val to wait for other fields (cache pruningMode etc) to be set in last implementation, 
+    // use 'lazy' val to wait for other fields to be set in last implementation 
 
-    lazy val accountNodeStorage = new NodeStorage(accountNodeDataSource)
-    lazy val storageNodeStorage = new NodeStorage(storageNodeDataSource)
-    lazy val evmcodeStorage = new NodeStorage(evmcodeDataSource)
+    lazy val accountNodeStorage = new NodeStorage(accountNodeDataSource, unconfirmedDepth)
+    lazy val storageNodeStorage = new NodeStorage(storageNodeDataSource, unconfirmedDepth)
+    lazy val evmcodeStorage = new NodeStorage(evmcodeDataSource, unconfirmedDepth)
 
-    lazy val blockNumberStorage = new BlockNumberStorage(this, blockNumberDataSource)
+    lazy val blockNumberStorage = new BlockNumberStorage(blockNumberDataSource, unconfirmedDepth)
 
-    lazy val blockHeaderStorage = new BlockHeaderStorage(this, blockHeaderDataSource)
-    lazy val blockBodyStorage = new BlockBodyStorage(this, blockBodyDataSource)
-    lazy val receiptsStorage = new ReceiptsStorage(this, receiptsDataSource)
-    lazy val totalDifficultyStorage = new TotalDifficultyStorage(this, totalDifficultyDataSource)
+    lazy val blockHeaderStorage = new BlockHeaderStorage(blockHeaderDataSource, unconfirmedDepth)
+    lazy val blockBodyStorage = new BlockBodyStorage(blockBodyDataSource, unconfirmedDepth)
+    lazy val receiptsStorage = new ReceiptsStorage(receiptsDataSource, unconfirmedDepth)
+    lazy val totalDifficultyStorage = new TotalDifficultyStorage(totalDifficultyDataSource, unconfirmedDepth)
 
-    lazy val transactionStorage = new TransactionStorage(transactionDataSource)
+    lazy val transactionStorage = new TransactionStorage(transactionDataSource, unconfirmedDepth)
 
+    lazy val blockNumbers = new BlockNumbers(blockNumberStorage, blockHeaderStorage, unconfirmedDepth)
+
+    lazy val appStateStorage = new AppStateStorage(appStateDataSource, unconfirmedDepth)
     lazy val fastSyncStateStorage = new FastSyncStateStorage(fastSyncStateDataSource)
-    lazy val appStateStorage = new AppStateStorage(appStateDataSource)
     lazy val knownNodesStorage = new KnownNodesStorage(knownNodesDataSource)
-
-    lazy val blockNumbers = new BlockNumbers(blockNumberDataSource, blockHeaderDataSource)
   }
 }
 

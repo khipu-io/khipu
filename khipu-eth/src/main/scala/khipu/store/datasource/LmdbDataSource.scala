@@ -70,6 +70,7 @@ final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: 
 
         clock.elapse(System.nanoTime - start)
 
+        ret foreach { data => cache.put(Hash(combKey), data) }
         ret
 
       case x => x

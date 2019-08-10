@@ -1,28 +1,28 @@
 package khipu.store
 
-import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import khipu.Hash
 import khipu.HashWithBlockNumber
-import khipu.store.datasource.BlockDataSource
-import khipu.store.datasource.DataSource
+import khipu.util.CircularArrayQueue
 import scala.collection.mutable
 
-final class BlockNumbers(blockNumberSource: DataSource, blockHeaderSource: BlockDataSource) {
+final class BlockNumbers(blockNumberStorage: BlockNumberStorage, blockHeaderStorage: BlockHeaderStorage, unconfirmedDepth: Int) {
   private val blockNumberToHash = new mutable.HashMap[Long, Hash]()
   private val hashToBlockNumber = new mutable.HashMap[Hash, Long]()
+
+  private val unconfirmed = new CircularArrayQueue[(Hash, Long)](unconfirmedDepth)
 
   private val lock = new ReentrantReadWriteLock()
   private val readLock = lock.readLock
   private val writeLock = lock.writeLock
 
-  def getBlockNumberByHash(hash: Hash): Option[Long] = {
+  def get(hash: Hash): Option[Long] = {
     try {
       readLock.lock()
 
       hashToBlockNumber.get(hash) match {
         case None =>
-          blockNumberSource.get(BlockNumberStorage.namespace, hash.bytes).map(x => ByteBuffer.wrap(x).getLong) map { blockNumber =>
+          blockNumberStorage.get(hash).map { blockNumber =>
             blockNumberToHash += (blockNumber -> hash)
             hashToBlockNumber += (hash -> blockNumber)
             blockNumber
@@ -34,6 +34,29 @@ final class BlockNumbers(blockNumberSource: DataSource, blockHeaderSource: Block
     }
   }
 
+  def put(blockhash: Hash, blockNumber: Long) {
+    try {
+      writeLock.lock()
+
+      hashToBlockNumber += (blockhash -> blockNumber)
+      blockNumberToHash += (blockNumber -> blockhash)
+      unconfirmed.enqueue((blockhash, blockNumber))
+    } finally {
+      writeLock.unlock()
+    }
+  }
+
+  def remove(blockhash: Hash) {
+    try {
+      writeLock.lock()
+
+      hashToBlockNumber.get(blockhash) foreach blockNumberToHash.remove
+      hashToBlockNumber -= blockhash
+    } finally {
+      writeLock.unlock()
+    }
+  }
+
   def getHashByBlockNumber(blockNumber: Long): Option[Hash] = {
     import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
     try {
@@ -41,7 +64,7 @@ final class BlockNumbers(blockNumberSource: DataSource, blockHeaderSource: Block
 
       blockNumberToHash.get(blockNumber) match {
         case None =>
-          blockHeaderSource.get(blockNumber).map(_.value.toBlockHeader.hash) map { hash =>
+          blockHeaderStorage.get(blockNumber).map(_.hash) map { hash =>
             blockNumberToHash += (blockNumber -> hash)
             hashToBlockNumber += (hash -> blockNumber)
             hash
@@ -76,26 +99,17 @@ final class BlockNumbers(blockNumberSource: DataSource, blockHeaderSource: Block
     }
   }
 
-  def putBlockNumber(blockNumber: Long, hash: Hash) {
+  def clearUnconfirmed() {
     try {
       writeLock.lock()
 
-      blockNumberToHash += (blockNumber -> hash)
-      hashToBlockNumber += (hash -> blockNumber)
+      while (!unconfirmed.isEmpty) {
+        val (hash, number) = unconfirmed.dequeue()
+        hashToBlockNumber -= hash
+        blockNumberToHash -= number
+      }
     } finally {
       writeLock.unlock()
     }
   }
-
-  def removeBlockNumber(key: Hash) {
-    try {
-      writeLock.lock()
-
-      hashToBlockNumber.get(key) foreach blockNumberToHash.remove
-      hashToBlockNumber -= key
-    } finally {
-      writeLock.unlock()
-    }
-  }
-
 }

@@ -1,11 +1,10 @@
 package khipu.store.datasource
 
 import khipu.Hash
-import khipu.TVal
 import khipu.util.Clock
 import khipu.util.SimpleMap
 
-trait NodeDataSource extends SimpleMap[Hash, TVal] {
+trait NodeDataSource extends SimpleMap[Hash, Array[Byte]] {
   type This <: NodeDataSource
 
   def topic: String

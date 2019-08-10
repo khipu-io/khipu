@@ -305,21 +305,24 @@ final class BlockWorldState private (
   }
 
   /**
-   * Should be called adter committed
+   * Should be called after flush()
+   * Each storages should update batched once only per block to get unconfirmed queue working
    */
   def persist(): BlockWorldState = {
     // deduplicate codes first
-    this.codes.foldLeft(Map[Hash, ByteString]()) {
-      case (acc, (address, code)) => acc + (Hash(crypto.kec256(code)) -> code)
-    } foreach {
-      case (hash, code) => evmCodeStorage.put(hash, code.toArray)
+    val codeToSave = this.codes.foldLeft(Map[Hash, Array[Byte]]()) {
+      case (acc, (address, code)) => acc + (Hash(crypto.kec256(code)) -> code.toArray)
     }
+    evmCodeStorage.update(Nil, codeToSave)
 
-    this.trieStorages.foreach {
-      case (address, storageTrie) => storageTrie.underlying.persist()
+    val storageNodeChanges = this.trieStorages.foldLeft(Map[Hash, Option[Array[Byte]]]()) {
+      case (acc, (address, storageTrie)) =>
+        acc ++ storageTrie.underlying.changes
     }
+    storageNodeStorage.update(storageNodeChanges)
 
-    this.trieAccounts.underlying.persist()
+    val accountNodeChanges = this.trieAccounts.underlying.changes
+    accountNodeStorage.update(accountNodeChanges)
 
     this
   }
