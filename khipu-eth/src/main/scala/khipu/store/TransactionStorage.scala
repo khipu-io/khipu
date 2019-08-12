@@ -7,7 +7,7 @@ import khipu.store.datasource.DataSource
 import khipu.util.SimpleMapWithUnconfirmed
 
 object TransactionStorage {
-  final case class TxLocation(blockHash: Hash, txIndex: Int)
+  final case class TxLocation(blockNumber: Long, txIndex: Int)
 }
 import TransactionStorage._
 final class TransactionStorage(val source: DataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Hash, TxLocation](unconfirmedDepth) {
@@ -21,9 +21,7 @@ final class TransactionStorage(val source: DataSource, unconfirmedDepth: Int) ex
   private def valueToBytes(v: TxLocation): Array[Byte] = {
     val builder = ByteString.newBuilder
 
-    val hashBytes = v.blockHash.bytes
-    builder.putInt(hashBytes.length)
-    builder.putBytes(hashBytes)
+    builder.putLong(v.blockNumber)
     builder.putInt(v.txIndex)
 
     builder.result.toArray
@@ -31,11 +29,10 @@ final class TransactionStorage(val source: DataSource, unconfirmedDepth: Int) ex
   private def valueFromBytes(bytes: Array[Byte]): TxLocation = {
     val data = ByteString(bytes).iterator
 
-    val hashLength = data.getInt
-    val blockHash = Hash(data.getBytes(hashLength))
+    val blockNumber = data.getLong
     val txIndex = data.getInt
 
-    TxLocation(blockHash, txIndex)
+    TxLocation(blockNumber, txIndex)
   }
 
   override protected def doGet(key: Hash): Option[TxLocation] =

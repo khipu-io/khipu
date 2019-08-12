@@ -266,8 +266,8 @@ class EthService(
       Future {
         txPending.orElse {
           for {
-            TxLocation(blockHash, txIndex) <- blockchain.getTransactionLocation(req.txHash)
-            Block(header, body) <- blockchain.getBlockByHash(blockHash)
+            TxLocation(blockNumber, txIndex) <- blockchain.getTransactionLocation(req.txHash)
+            Block(header, body) <- blockchain.getBlockByNumber(blockNumber)
             stx <- body.transactionList.lift(txIndex)
           } yield TransactionResponse(stx, Some(header), Some(txIndex))
         }
@@ -279,10 +279,10 @@ class EthService(
 
   def getTransactionReceipt(req: GetTransactionReceiptRequest): ServiceResponse[GetTransactionReceiptResponse] = Future {
     val result: Option[TransactionReceiptResponse] = for {
-      TxLocation(blockHash, txIndex) <- blockchain.getTransactionLocation(req.txHash)
-      Block(header, body) <- blockchain.getBlockByHash(blockHash)
+      TxLocation(blockNumber, txIndex) <- blockchain.getTransactionLocation(req.txHash)
+      Block(header, body) <- blockchain.getBlockByNumber(blockNumber)
       stx <- body.transactionList.lift(txIndex)
-      receipts <- blockchain.getReceiptsByHash(blockHash)
+      receipts <- blockchain.getReceiptsByNumber(blockNumber)
       receipt: Receipt <- receipts.lift(txIndex)
     } yield {
 
@@ -308,8 +308,8 @@ class EthService(
               logIndex = index,
               transactionIndex = txIndex,
               transactionHash = stx.hash,
-              blockHash = header.hash,
               blockNumber = header.number,
+              blockHash = header.hash,
               address = txLog.loggerAddress,
               data = txLog.data,
               topics = txLog.logTopics

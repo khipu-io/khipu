@@ -95,6 +95,7 @@ object Blockchain {
      * @return Receipts if found
      */
     def getReceiptsByHash(blockhash: Hash): Option[Seq[Receipt]]
+    def getReceiptsByNumber(blockNumber: Long): Option[Seq[Receipt]]
 
     /**
      * Returns EVM code searched by it's hash
@@ -199,6 +200,9 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
   def getReceiptsByHash(blockHash: Hash): Option[Seq[Receipt]] =
     blockNumbers.get(blockHash) flatMap receiptsStorage.get
 
+  def getReceiptsByNumber(blockNumber: Long): Option[Seq[Receipt]] =
+    receiptsStorage.get(blockNumber)
+
   def getEvmcodeByHash(hash: Hash): Option[ByteString] =
     evmcodeStorage.get(hash).map(ByteString(_))
 
@@ -222,7 +226,7 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
   def saveBlockBody(blockHash: Hash, blockBody: BlockBody) = {
     blockNumbers.get(blockHash) foreach { blockNumber =>
       blockBodyStorage.put(blockNumber, blockBody)
-      saveTxsLocations(blockHash, blockBody)
+      saveTxsLocations(blockNumber, blockBody)
     }
   }
 
@@ -234,8 +238,8 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
         }
     }
     blockBodyStorage.update(Nil, toSave)
-    kvs foreach {
-      case (blockHash, blockBody) => saveTxsLocations(blockHash, blockBody)
+    toSave foreach {
+      case (blockNumber, blockBody) => saveTxsLocations(blockNumber, blockBody)
     }
   }
 
@@ -336,9 +340,9 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
   def getTransactionLocation(txHash: Hash): Option[TransactionStorage.TxLocation] =
     transactionStorage.get(txHash)
 
-  private def saveTxsLocations(blockHash: Hash, blockBody: BlockBody) {
+  private def saveTxsLocations(blockNumber: Long, blockBody: BlockBody) {
     val kvs = blockBody.transactionList.zipWithIndex map {
-      case (tx, index) => (tx.hash, TxLocation(blockHash, index))
+      case (tx, index) => (tx.hash, TxLocation(blockNumber, index))
     }
     transactionStorage.update(Nil, kvs)
   }
