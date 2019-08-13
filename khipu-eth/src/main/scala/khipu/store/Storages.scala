@@ -18,8 +18,8 @@ object Storages {
     lazy val blockHeaderStorage = new BlockHeaderStorage(blockHeaderDataSource, unconfirmedDepth)
     lazy val blockBodyStorage = new BlockBodyStorage(blockBodyDataSource, unconfirmedDepth)
     lazy val receiptsStorage = new ReceiptsStorage(receiptsDataSource, unconfirmedDepth)
-    lazy val totalDifficultyStorage = new TotalDifficultyStorage(totalDifficultyDataSource, unconfirmedDepth)
 
+    lazy val totalDifficultyStorage = new TotalDifficultyStorage(totalDifficultyDataSource, unconfirmedDepth)
     lazy val transactionStorage = new TransactionStorage(transactionDataSource, unconfirmedDepth)
 
     lazy val blockNumbers = new BlockNumbers(blockNumberStorage, blockHeaderStorage, unconfirmedDepth)
@@ -27,6 +27,7 @@ object Storages {
     lazy val appStateStorage = new AppStateStorage(appStateDataSource, unconfirmedDepth)
     lazy val fastSyncStateStorage = new FastSyncStateStorage(fastSyncStateDataSource)
     lazy val knownNodesStorage = new KnownNodesStorage(knownNodesDataSource)
+
   }
 }
 
@@ -37,5 +38,41 @@ trait Storages extends BlockchainStorages {
   def fastSyncStateStorage: FastSyncStateStorage
   def knownNodesStorage: KnownNodesStorage
   def pruningMode: PruningMode
+
+  def swithToWithUnconfirmed() {
+    accountNodeStorage.swithToWithUnconfirmed()
+    storageNodeStorage.swithToWithUnconfirmed()
+    evmcodeStorage.swithToWithUnconfirmed()
+
+    blockNumberStorage.swithToWithUnconfirmed()
+
+    blockHeaderStorage.swithToWithUnconfirmed()
+    blockBodyStorage.swithToWithUnconfirmed()
+    receiptsStorage.swithToWithUnconfirmed()
+
+    totalDifficultyStorage.swithToWithUnconfirmed()
+    transactionStorage.swithToWithUnconfirmed()
+
+    appStateStorage.swithToWithUnconfirmed()
+  }
+
+  def clearUnconfirmed() {
+    accountNodeStorage.clearUnconfirmed()
+    storageNodeStorage.clearUnconfirmed()
+    evmcodeStorage.clearUnconfirmed()
+
+    blockNumberStorage.clearUnconfirmed()
+
+    blockHeaderStorage.clearUnconfirmed()
+    blockBodyStorage.clearUnconfirmed()
+    receiptsStorage.clearUnconfirmed()
+
+    totalDifficultyStorage.clearUnconfirmed()
+    transactionStorage.clearUnconfirmed()
+
+    appStateStorage.clearUnconfirmed()
+
+    blockNumbers.clearUnconfirmed()
+  }
 }
 

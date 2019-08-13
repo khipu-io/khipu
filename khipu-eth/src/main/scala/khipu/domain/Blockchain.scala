@@ -279,6 +279,25 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
     totalDifficultyStorage.update(Nil, toSave)
   }
 
+  private def saveWorld(world: WorldState[_, _]) {
+    world.persist()
+  }
+
+  private def saveBestBlockNumber(n: Long) {
+    appStateStorage.putBestBlockNumber(n)
+  }
+
+  private def saveTxsLocations(blockNumber: Long, blockBody: BlockBody) {
+    val kvs = blockBody.transactionList.zipWithIndex map {
+      case (tx, index) => (tx.hash, TxLocation(blockNumber, index))
+    }
+    transactionStorage.update(Nil, kvs)
+  }
+
+  private def removeTxsLocations(stxs: Seq[SignedTransaction]) {
+    stxs.map(_.hash).foreach(transactionStorage.remove)
+  }
+
   def getWorldState(blockNumber: Long, accountStartNonce: DataWord, stateRootHash: Option[Hash]): BlockWorldState =
     BlockWorldState(
       this,
@@ -340,17 +359,6 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
   def getTransactionLocation(txHash: Hash): Option[TransactionStorage.TxLocation] =
     transactionStorage.get(txHash)
 
-  private def saveTxsLocations(blockNumber: Long, blockBody: BlockBody) {
-    val kvs = blockBody.transactionList.zipWithIndex map {
-      case (tx, index) => (tx.hash, TxLocation(blockNumber, index))
-    }
-    transactionStorage.update(Nil, kvs)
-  }
-
-  private def removeTxsLocations(stxs: Seq[SignedTransaction]) {
-    stxs.map(_.hash).foreach(transactionStorage.remove)
-  }
-
   def saveNewBlock(world: WorldState[_, _], block: Block, receipts: Seq[Receipt], totalDifficulty: DataWord) {
     // TODO save in one transaction
     saveWorld(world)
@@ -361,45 +369,11 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
   }
 
   def swithToWithUnconfirmed() {
-    accountNodeStorage.swithToWithUnconfirmed()
-    storageNodeStorage.swithToWithUnconfirmed()
-    evmcodeStorage.swithToWithUnconfirmed()
-
-    blockNumberStorage.swithToWithUnconfirmed()
-
-    blockHeaderStorage.swithToWithUnconfirmed()
-    blockBodyStorage.swithToWithUnconfirmed()
-    receiptsStorage.swithToWithUnconfirmed()
-
-    totalDifficultyStorage.swithToWithUnconfirmed()
-    transactionStorage.swithToWithUnconfirmed()
-    appStateStorage.swithToWithUnconfirmed()
+    storages.swithToWithUnconfirmed()
   }
 
   def clearUnconfirmed() {
-    accountNodeStorage.clearUnconfirmed()
-    storageNodeStorage.clearUnconfirmed()
-    evmcodeStorage.clearUnconfirmed()
-
-    blockNumberStorage.clearUnconfirmed()
-
-    blockHeaderStorage.clearUnconfirmed()
-    blockBodyStorage.clearUnconfirmed()
-    receiptsStorage.clearUnconfirmed()
-
-    totalDifficultyStorage.clearUnconfirmed()
-    transactionStorage.clearUnconfirmed()
-    appStateStorage.clearUnconfirmed()
-
-    blockNumbers.clearUnconfirmed()
-  }
-
-  private def saveWorld(world: WorldState[_, _]) {
-    world.persist()
-  }
-
-  private def saveBestBlockNumber(n: Long) {
-    appStateStorage.putBestBlockNumber(n)
+    storages.clearUnconfirmed()
   }
 }
 

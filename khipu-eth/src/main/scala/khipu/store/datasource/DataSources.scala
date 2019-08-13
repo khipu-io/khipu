@@ -7,8 +7,6 @@ trait DataSources {
 
   val dataSource: DataSource
 
-  val transactionDataSource: DataSource
-
   val blockHeightsHashesDataSource: DataSource
 
   val appStateDataSource: DataSource
