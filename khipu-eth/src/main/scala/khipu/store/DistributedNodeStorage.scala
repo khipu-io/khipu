@@ -1,4 +1,4 @@
-package khipu.store.trienode
+package khipu.store
 
 import akka.actor.ActorSystem
 import akka.pattern.ask

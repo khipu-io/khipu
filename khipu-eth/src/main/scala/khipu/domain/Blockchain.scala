@@ -9,10 +9,10 @@ import khipu.ledger.BlockWorldState
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.network.p2p.messages.PV63.MptNode
 import khipu.network.p2p.messages.PV63.MptNode._
+import khipu.store.ReadOnlyNodeStorage
 import khipu.store.Storages
 import khipu.store.TransactionStorage
 import khipu.store.TransactionStorage.TxLocation
-import khipu.store.trienode.ReadOnlyNodeStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
 import khipu.vm.Storage

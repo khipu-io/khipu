@@ -1,7 +1,6 @@
-package khipu.store.trienode
+package khipu.store
 
 import khipu.Hash
-import khipu.store.NodeStorage
 import khipu.util.SimpleMap
 
 /**

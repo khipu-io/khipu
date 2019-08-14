@@ -1,4 +1,4 @@
-package khipu.store.trienode
+package khipu.store
 
 import khipu.Hash
 import khipu.util.SimpleMap

@@ -13,9 +13,9 @@ import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.rlp
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
+import khipu.store.ArchiveNodeStorage
 import khipu.store.datasource.DataSource
 import khipu.store.datasource.EphemNodeDataSource
-import khipu.store.trienode.ArchiveNodeStorage
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
 import khipu.util.BlockchainConfig
