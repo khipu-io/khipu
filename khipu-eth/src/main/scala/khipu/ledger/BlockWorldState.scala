@@ -15,6 +15,7 @@ import khipu.trie
 import khipu.trie.MerklePatriciaTrie
 import khipu.util.SimpleMap
 import khipu.vm.WorldState
+import scala.collection.mutable
 
 /**
  * == Tries in Ethereum ==
@@ -315,7 +316,8 @@ final class BlockWorldState private (
     }
     evmCodeStorage.update(Nil, codeToSave)
 
-    val storageNodeChanges = this.trieStorages.foldLeft(Map[Hash, Option[Array[Byte]]]()) {
+    // NOTE: don't use Map as acc, which may cause node missing (why?)
+    val storageNodeChanges = this.trieStorages.foldLeft(mutable.ListBuffer[(Hash, Option[Array[Byte]])]()) {
       case (acc, (address, storageTrie)) =>
         acc ++ storageTrie.underlying.changes
     }
