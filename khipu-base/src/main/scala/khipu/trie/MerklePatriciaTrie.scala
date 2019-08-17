@@ -45,7 +45,7 @@ object MerklePatriciaTrie {
   )
 
   final case class MPTException(message: String) extends RuntimeException(message)
-  final case class MPTNodeMissingException(message: String, hash: Hash, table: SimpleMap[Hash, Array[Byte]]) extends RuntimeException(message)
+  final case class MPTNodeMissingException(message: String, hash: Hash, storage: SimpleMap[Hash, Array[Byte]]) extends RuntimeException(message)
 
   private def matchingLength(a: Array[Byte], b: Array[Byte]): Int = {
     var i = 0
@@ -77,6 +77,8 @@ final class MerklePatriciaTrie[K, V] private (
 
   // The root hash will be already here via a series of put/remove operations
   def rootHash: Array[Byte] = rootHashOpt.getOrElse(EMPTY_TRIE_HASH)
+
+  def topic = nodeStorage.topic
 
   /**
    * Obtains the value asociated with the key passed, if there exists one.

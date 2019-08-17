@@ -15,6 +15,8 @@ final class BlockBodyStorage(val source: BlockDataSource, unconfirmedDepth: Int)
 
   import BlockBody.BlockBodyDec
 
+  def topic = source.topic
+
   protected def doGet(key: Long): Option[BlockBody] = {
     source.get(key).map(_.toBlockBody)
   }

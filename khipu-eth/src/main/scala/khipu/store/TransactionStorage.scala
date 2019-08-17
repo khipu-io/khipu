@@ -17,6 +17,8 @@ final class TransactionStorage(val source: DataSource, unconfirmedDepth: Int) ex
 
   private val namespace = Namespaces.Transaction
 
+  def topic = source.topic
+
   private def keyToBytes(k: Hash): Array[Byte] = k.bytes
   private def valueToBytes(v: TxLocation): Array[Byte] = {
     val builder = ByteString.newBuilder

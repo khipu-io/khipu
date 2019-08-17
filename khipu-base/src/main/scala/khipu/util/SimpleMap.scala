@@ -9,8 +9,9 @@ import scala.collection.mutable
  * @tparams T type of self
  */
 trait SimpleMap[K, V] {
-
   type This <: SimpleMap[K, V]
+
+  def topic: String
 
   /**
    * This function obtains the value asociated with the key passed, if there exists one.

@@ -65,7 +65,7 @@ object Ledger {
   final case class ValidationBeforeExecError(blockNumber: Long, reason: String) extends BlockExecutionError
   final case class TxsExecutionError(blockNumber: Long, stx: SignedTransaction, stateBeforeError: StateBeforeFailure, error: SignedTransactionError) extends BlockExecutionError { def reason = error.toString }
   final case class ValidationAfterExecError(blockNumber: Long, reason: String) extends BlockExecutionError
-  final case class MissingNodeExecptionError(blockNumber: Long, hash: Hash, table: SimpleMap[Hash, Array[Byte]]) extends BlockExecutionError { def reason = s"Missing node $hash in $table" }
+  final case class MissingNodeExecptionError(blockNumber: Long, hash: Hash, storage: SimpleMap[Hash, Array[Byte]]) extends BlockExecutionError { def reason = s"Missing node $hash in ${storage.topic}, block $blockNumber" }
 
   final case class StateBeforeFailure(blockNumber: Long, worldState: BlockWorldState, cumGas: Long, cumReceipts: Vector[Receipt])
 
@@ -510,8 +510,8 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       log.debug(s"$blockHeader, accGas $accGas, receipts = $accReceipts")
       Right(BlockResult(worldDeletedDeadAccounts, accGas, accReceipts, stats))
     } catch {
-      case MPTNodeMissingException(_, hash, table) => Left(MissingNodeExecptionError(blockHeader.number, hash, table))
-      case e: Throwable                            => throw e
+      case MPTNodeMissingException(_, hash, storage) => Left(MissingNodeExecptionError(blockHeader.number, hash, storage))
+      case e: Throwable                              => throw e
     }
   }
 
@@ -541,8 +541,8 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
           Left(TxsExecutionError(blockHeader.number, stx, StateBeforeFailure(blockHeader.number, world, 0L, Vector()), error)) // TODO content of StateBeforeFailure
       }
     } catch {
-      case MPTNodeMissingException(_, hash, table) => Left(MissingNodeExecptionError(blockHeader.number, hash, table))
-      case e: Throwable                            => throw e
+      case MPTNodeMissingException(_, hash, storage) => Left(MissingNodeExecptionError(blockHeader.number, hash, storage))
+      case e: Throwable                              => throw e
     }
   }
 

@@ -24,6 +24,8 @@ import AppStateStorage._
 final class AppStateStorage(val source: DataSource, unconfirmedDepth: Int) extends KeyValueStorage[Key, Long] {
   type This = AppStateStorage
 
+  def topic = source.topic
+
   private val unconfirmed = new CircularArrayQueue[Long](unconfirmedDepth)
 
   private var _withUnconfirmed = false

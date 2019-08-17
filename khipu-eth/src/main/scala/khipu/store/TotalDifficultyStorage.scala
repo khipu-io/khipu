@@ -12,6 +12,8 @@ import khipu.util.SimpleMapWithUnconfirmed
 final class TotalDifficultyStorage(val source: BlockDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, DataWord](unconfirmedDepth) {
   type This = TotalDifficultyStorage
 
+  def topic = source.topic
+
   override protected def doGet(key: Long): Option[DataWord] = {
     source.get(key).map(DataWord.safe)
   }

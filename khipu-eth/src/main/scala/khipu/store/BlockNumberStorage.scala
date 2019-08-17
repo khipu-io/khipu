@@ -18,6 +18,8 @@ final class BlockNumberStorage(val source: DataSource, unconfirmedDepth: Int) ex
 
   import BlockNumberStorage._
 
+  def topic = source.topic
+
   private def keyToBytes(k: Hash): Array[Byte] = k.bytes
   private def valueToBytes(v: Long): Array[Byte] = ByteBuffer.allocate(8).putLong(v).array
   private def valueFromBytes(bytes: Array[Byte]): Long = ByteBuffer.wrap(bytes).getLong

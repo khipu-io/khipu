@@ -14,6 +14,8 @@ final class EphemNodeDataSource() extends SimpleMap[Hash, Array[Byte]] {
 
   private var storage: Map[Hash, Array[Byte]] = Map()
 
+  def topic = "EphemNode"
+
   override def get(key: Hash): Option[Array[Byte]] = storage.get(key)
 
   override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): EphemNodeDataSource = {

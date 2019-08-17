@@ -14,6 +14,8 @@ object ReadOnlyNodeStorage {
 final class ReadOnlyNodeStorage private (source: NodeStorage, cache: Map[Hash, Option[Array[Byte]]]) extends SimpleMap[Hash, Array[Byte]] {
   type This = ReadOnlyNodeStorage
 
+  def topic = source.topic
+
   /**
    * Persists the changes into the underlying [[khipu.common.SimpleMap]]
    *

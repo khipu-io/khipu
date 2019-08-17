@@ -14,6 +14,8 @@ import scala.collection.mutable
 final class BlockHeaderStorage(val source: BlockDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, BlockHeader](unconfirmedDepth) {
   type This = BlockHeaderStorage
 
+  def topic = source.topic
+
   override protected def doGet(key: Long): Option[BlockHeader] = {
     source.get(key).map(_.toBlockHeader)
   }

@@ -60,6 +60,8 @@ final class ReceiptsStorage(val source: BlockDataSource, unconfirmedDepth: Int) 
 
   import ReceiptsStorage.ReceiptsSerializer._
 
+  def topic = source.topic
+
   override protected def doGet(key: Long): Option[Seq[Receipt]] = {
     source.get(key).map(toReceipts)
   }

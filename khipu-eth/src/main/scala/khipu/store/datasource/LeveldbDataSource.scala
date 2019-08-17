@@ -38,6 +38,8 @@ final class LeveldbDataSource(
     private val levelDbConfig: LeveldbConfig
 ) extends DataSource {
 
+  def topic = levelDbConfig.path
+
   /**
    * This function obtains the associated value to a key, if there exists one.
    *

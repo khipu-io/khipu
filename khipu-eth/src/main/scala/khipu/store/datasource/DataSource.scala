@@ -4,6 +4,8 @@ import khipu.util.Clock
 
 trait DataSource {
 
+  def topic: String
+
   /**
    * This function obtains the associated value to a key. It requires the (key-value) pair to be in the DataSource
    *

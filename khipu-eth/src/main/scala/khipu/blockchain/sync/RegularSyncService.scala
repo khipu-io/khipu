@@ -320,12 +320,12 @@ trait RegularSyncService { _: SyncService =>
                     scheduleResume()
                   }
 
-                case Vector(error @ MissingNodeExecptionError(number, hash, table), _*) =>
-                  log.info(s"[warn] Execution error $error, in block ${error.blockNumber}, try to fetch from ${peer.id}")
+                case Vector(error @ MissingNodeExecptionError(number, hash, storage), _*) =>
+                  log.info(s"[warn] Execution error ${error.reason}, in block ${error.blockNumber}, try to fetch from ${peer.id}")
 
-                  requestingNodeData(nodeOkPeer.getOrElse(peer), hash)(3.seconds) andThen {
-                    case Success(Some(NodeDataResponse(peerId, value))) => table.put(hash, value.toArray)
-                    case Success(None)                                  =>
+                  requestingNodeData(nodeOkPeer.getOrElse(peer), hash)(10.seconds) andThen {
+                    case Success(Some(NodeDataResponse(peerId, value))) => storage.put(hash, value.toArray)
+                    case Success(None)                                  => log.debug(s"Cannot get node $hash from ${peer.id}")
                     case Failure(e)                                     => nodeErrorPeers += peer
                   } andThen {
                     case _ => resumeRegularSync()

@@ -12,6 +12,8 @@ final class KnownNodesStorage(val source: DataSource) extends KeyValueStorage[St
 
   val key = "KnownNodes"
 
+  def topic = source.topic
+
   val namespace: Array[Byte] = Namespaces.KnownNodes
   def keyToBytes(k: String): Array[Byte] = k.getBytes
   def valueToBytes(v: Set[String]): Array[Byte] = v.mkString(" ").getBytes
