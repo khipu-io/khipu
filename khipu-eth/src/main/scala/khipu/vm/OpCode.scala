@@ -1239,7 +1239,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
   final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord, DataWord, DataWord, DataWord, DataWord)): ProgramState[W, S] = {
     val (gas, target, callValue, inOffset, inSize, outOffset, outSize) = params
 
-    if (state.context.isStaticCall && this == CALL && callValue.nonZero) { // alreay in staticCall and call with noZero value
+    if (state.context.isStaticCall && (this == CALL || this == CALLCODE) && callValue.nonZero) { // alreay in staticCall and call with noZero value
       state.withError(StaticCallModification)
     } else {
       state.resetReturnDataBuffer() // reset before call
