@@ -1,4 +1,4 @@
-package khipu.store.datasource
+package khipu.util
 
 import java.nio.ByteBuffer
 import scala.util.control.NonFatal

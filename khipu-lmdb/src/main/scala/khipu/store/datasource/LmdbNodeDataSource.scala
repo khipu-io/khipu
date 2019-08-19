@@ -7,6 +7,7 @@ import java.nio.ByteOrder
 import khipu.Hash
 import khipu.crypto
 import khipu.util.Clock
+import khipu.util.DirectByteBufferPool
 import khipu.util.FIFOCache
 import org.lmdbjava.Cursor
 import org.lmdbjava.DbiFlags
