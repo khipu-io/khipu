@@ -15,7 +15,7 @@ import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.Versions
 import khipu.network.p2p.messages.WireProtocol.{ Capability, Disconnect, Hello }
 import khipu.network.rlpx.PeerConfiguration
-import khipu.store.AppStateStorage
+import khipu.storage.AppStateStorage
 import scala.concurrent.duration._
 
 /**

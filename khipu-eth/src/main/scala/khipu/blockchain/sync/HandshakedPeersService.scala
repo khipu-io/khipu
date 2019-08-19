@@ -10,7 +10,7 @@ import khipu.network.rlpx.OutgoingPeer
 import khipu.network.rlpx.Peer
 import khipu.network.rlpx.PeerEntity
 import khipu.network.rlpx.PeerManager
-import khipu.store.AppStateStorage
+import khipu.storage.AppStateStorage
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration

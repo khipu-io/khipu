@@ -23,7 +23,7 @@ import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.rlp
 import khipu.rlp.RLPEncoder
-import khipu.store.KnownNodesStorage
+import khipu.storage.KnownNodesStorage
 import org.spongycastle.crypto.AsymmetricCipherKeyPair
 import org.spongycastle.util.BigIntegers
 import scala.util.Failure

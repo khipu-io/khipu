@@ -9,8 +9,8 @@ import khipu.config.DbConfig
 import khipu.domain.Account
 import khipu.rlp
 import khipu.service.ServiceBoard
-import khipu.store.NodeStorage
-import khipu.store.Storages.DefaultStorages
+import khipu.storage.NodeStorage
+import khipu.storage.Storages.DefaultStorages
 import khipu.trie
 import khipu.trie.BranchNode
 import khipu.trie.ByteArraySerializable

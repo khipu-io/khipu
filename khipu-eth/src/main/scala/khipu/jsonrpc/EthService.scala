@@ -31,8 +31,8 @@ import khipu.jsonrpc.FilterManager.{ FilterChanges, FilterLogs, LogFilterLogs, T
 import khipu.keystore.KeyStore
 import khipu.ledger.Ledger
 import khipu.mining.BlockGenerator
-import khipu.store.AppStateStorage
-import khipu.store.TransactionStorage.TxLocation
+import khipu.storage.AppStateStorage
+import khipu.storage.TransactionStorage.TxLocation
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
 import khipu.rlp

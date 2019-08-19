@@ -6,8 +6,8 @@ import khipu.DataWord
 import khipu.domain.Account
 import khipu.domain.Blockchain
 import khipu.rlp
-import khipu.store.datasource.KesqueDataSource
-import khipu.store.datasource.NodeRecord
+import khipu.storage.datasource.KesqueDataSource
+import khipu.storage.datasource.NodeRecord
 import khipu.trie
 import khipu.trie.Node
 import khipu.trie.BranchNode

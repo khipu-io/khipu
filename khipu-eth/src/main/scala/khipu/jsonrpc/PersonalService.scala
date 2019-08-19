@@ -13,7 +13,7 @@ import khipu.domain.{ Account, Address, Blockchain }
 import khipu.jsonrpc.PersonalService._
 import khipu.keystore.{ KeyStore, Wallet }
 import khipu.jsonrpc.JsonRpcErrors._
-import khipu.store.AppStateStorage
+import khipu.storage.AppStateStorage
 import khipu.transactions.PendingTransactionsService
 import scala.collection.mutable
 import scala.concurrent.Future

@@ -17,8 +17,8 @@ import khipu.mining.BlockGenerator.InvalidOmmers
 import khipu.mining.BlockGenerator.NoParent
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
-import khipu.store.ArchiveNodeStorage
-import khipu.store.datasource.EphemNodeDataSource
+import khipu.storage.ArchiveNodeStorage
+import khipu.storage.datasource.EphemNodeDataSource
 import khipu.trie.ByteArraySerializable
 import khipu.trie.MerklePatriciaTrie
 import khipu.util.BytesUtil

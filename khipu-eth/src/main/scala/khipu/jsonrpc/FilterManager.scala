@@ -16,7 +16,7 @@ import khipu.jsonrpc.EthService.BlockParam
 import khipu.keystore.KeyStore
 import khipu.ledger.BloomFilter
 import khipu.mining.BlockGenerator
-import khipu.store.AppStateStorage
+import khipu.storage.AppStateStorage
 import khipu.transactions.PendingTransactionsService
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global

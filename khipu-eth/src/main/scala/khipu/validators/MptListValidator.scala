@@ -4,8 +4,8 @@ import java.util.Arrays
 import khipu.crypto
 import khipu.rlp
 import khipu.rlp.RLPImplicits._
-import khipu.store.ArchiveNodeStorage
-import khipu.store.datasource.EphemNodeDataSource
+import khipu.storage.ArchiveNodeStorage
+import khipu.storage.datasource.EphemNodeDataSource
 import khipu.trie.ByteArraySerializable
 import khipu.trie.MerklePatriciaTrie
 

@@ -8,7 +8,7 @@ import akka.cluster.singleton.ClusterSingletonProxy
 import akka.cluster.singleton.ClusterSingletonProxySettings
 import com.typesafe.config.Config
 import java.net.URI
-import khipu.store.KnownNodesStorage
+import khipu.storage.KnownNodesStorage
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 

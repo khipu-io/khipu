@@ -15,9 +15,9 @@ import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.rlp
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
-import khipu.store.ArchiveNodeStorage
-import khipu.store.datasource.DataSource
-import khipu.store.datasource.EphemNodeDataSource
+import khipu.storage.ArchiveNodeStorage
+import khipu.storage.datasource.DataSource
+import khipu.storage.datasource.EphemNodeDataSource
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
 import org.json4s.{ CustomSerializer, DefaultFormats, JString, JValue }
