@@ -11,13 +11,6 @@ import org.lmdbjava.Dbi
 import org.lmdbjava.DbiFlags
 import org.lmdbjava.Txn
 
-trait LmdbConfig {
-  val path: String
-  val mapSize: Long
-  val maxDbs: Int
-  val maxReaders: Int
-}
-
 final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: Int = 10000)(implicit system: ActorSystem) extends DataSource {
   private val log = Logging(system, this.getClass)
 

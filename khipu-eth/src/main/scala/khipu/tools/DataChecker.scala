@@ -5,6 +5,7 @@ import akka.event.LogSource
 import akka.event.Logging
 import khipu.Hash
 import khipu.DataWord
+import khipu.config.DbConfig
 import khipu.domain.Account
 import khipu.rlp
 import khipu.service.ServiceBoard
@@ -127,7 +128,7 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
   private val storageNodeStorage = storages.storageNodeStorage
   private val evmcodeStorage = storages.evmcodeStorage
 
-  private val storageReader = new NodeReader[DataWord](dbConfig.storage, storageNodeStorage)(trie.rlpDataWordSerializer) {
+  private val storageReader = new NodeReader[DataWord](DbConfig.storage, storageNodeStorage)(trie.rlpDataWordSerializer) {
     override def nodeGot(k: Array[Byte], v: Array[Byte]) {
       if (checkList.contains(Hash(k))) {
         log.info(s"found ${Hash(k)}")
@@ -135,7 +136,7 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
     }
   }
 
-  private val accountReader = new NodeReader[Account](dbConfig.account, accountNodeStorage)(Account.accountSerializer) {
+  private val accountReader = new NodeReader[Account](DbConfig.account, accountNodeStorage)(Account.accountSerializer) {
     override def entityGot(account: Account, blocknumber: Long) {
       // try to extracted storage node hash
       if (account.stateRoot != Account.EMPTY_STATE_ROOT_HASH) {

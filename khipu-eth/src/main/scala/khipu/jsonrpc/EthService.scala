@@ -21,6 +21,9 @@ import khipu.domain.Receipt
 import khipu.domain.SignedTransaction
 import khipu.blockchain.sync.SyncService
 import khipu.blockchain.sync.SyncService.MinedBlock
+import khipu.config.BlockchainConfig
+import khipu.config.FilterConfig
+import khipu.config.MiningConfig
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.domain.Transaction
@@ -28,7 +31,6 @@ import khipu.jsonrpc.FilterManager.{ FilterChanges, FilterLogs, LogFilterLogs, T
 import khipu.keystore.KeyStore
 import khipu.ledger.Ledger
 import khipu.mining.BlockGenerator
-import khipu.util
 import khipu.store.AppStateStorage
 import khipu.store.TransactionStorage.TxLocation
 import khipu.transactions.PendingTransactionsService
@@ -180,12 +182,12 @@ class EthService(
     blockchain:       Blockchain,
     blockGenerator:   BlockGenerator,
     appStateStorage:  AppStateStorage,
-    miningConfig:     util.MiningConfig,
+    miningConfig:     MiningConfig,
     ledger:           Ledger.I,
     keyStore:         KeyStore.I,
     filterManager:    ActorRef,
-    filterConfig:     util.FilterConfig,
-    blockchainConfig: util.BlockchainConfig
+    filterConfig:     FilterConfig,
+    blockchainConfig: BlockchainConfig
 )(implicit system: ActorSystem) {
   import EthService._
 

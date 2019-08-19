@@ -4,7 +4,7 @@ import sbt.Keys._
 object Build extends sbt.Build {
 
   lazy val root = Project("khipu", file("."))
-    .aggregate(khipu_base, khipu_eth, khipu_lmdb, khipu_kesque, khipu_bdb, khipu_rocksdb)
+    .aggregate(khipu_base, khipu_storage, khipu_eth, khipu_lmdb, khipu_kesque, khipu_bdb, khipu_rocksdb)
     .settings(basicSettings: _*)
     .settings(Formatting.buildFileSettings: _*)
     .settings(noPublishing: _*)
@@ -22,8 +22,17 @@ object Build extends sbt.Build {
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
 
+  lazy val khipu_storage = Project("khipu-storage", file("khipu-storage"))
+    .dependsOn(khipu_base)
+    .settings(basicSettings: _*)
+    .settings(noPublishing: _*)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka)
+    .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
+    .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+
   lazy val khipu_kesque = Project("khipu-kesque", file("khipu-kesque"))
     .dependsOn(khipu_base)
+    .dependsOn(khipu_storage)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
     .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.kafka ++ Dependencies.spongycastle ++ Dependencies.caffeine ++ Dependencies.lmdb)
@@ -32,6 +41,7 @@ object Build extends sbt.Build {
 
   lazy val khipu_bdb = Project("khipu-bdb", file("khipu-bdb"))
     .dependsOn(khipu_base)
+    .dependsOn(khipu_storage)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
     .settings(unmanagedJars in Compile ++= Seq(baseDirectory.value / "lib" / "db-5.3.28.jar").classpath)
@@ -41,6 +51,7 @@ object Build extends sbt.Build {
 
   lazy val khipu_rocksdb = Project("khipu-rocksdb", file("khipu-rocksdb"))
     .dependsOn(khipu_base)
+    .dependsOn(khipu_storage)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
     .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.rocksdb)
@@ -49,6 +60,7 @@ object Build extends sbt.Build {
 
   lazy val khipu_lmdb = Project("khipu-lmdb", file("khipu-lmdb"))
     .dependsOn(khipu_base)
+    .dependsOn(khipu_storage)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
     .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.lmdb)
@@ -57,6 +69,7 @@ object Build extends sbt.Build {
 
   lazy val khipu_eth = Project("khipu-eth", file("khipu-eth"))
     .dependsOn(khipu_base)
+    .dependsOn(khipu_storage)
     .dependsOn(khipu_lmdb)
     .dependsOn(khipu_kesque)
     .settings(basicSettings: _*)

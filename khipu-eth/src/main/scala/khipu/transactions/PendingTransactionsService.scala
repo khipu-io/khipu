@@ -13,10 +13,10 @@ import akka.util.Timeout
 import khipu.BroadcastTransactions
 import khipu.ProcessedTransactions
 import khipu.blockchain.sync
+import khipu.config.TxPoolConfig
 import khipu.domain.SignedTransaction
 import khipu.network.p2p.messages.CommonMessages.SignedTransactions
 import khipu.network.rlpx.PeerEntity
-import khipu.util.TxPoolConfig
 import scala.concurrent.duration._
 
 object PendingTransactionsService {

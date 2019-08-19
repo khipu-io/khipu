@@ -9,6 +9,8 @@ import kesque.Kesque
 import khipu.TKeyVal
 import khipu.TVal
 import khipu.DataWord
+import khipu.config.DbConfig
+import khipu.config.KhipuConfig
 import khipu.domain.Account
 import khipu.rlp
 import khipu.service.ServiceBoard
@@ -160,20 +162,20 @@ object KesqueCompactor {
     val configFile = new File(configDir, "kafka.server.properties")
     val kafkaProps = {
       val props = org.apache.kafka.common.utils.Utils.loadProps(configFile.getAbsolutePath)
-      props.put("log.dirs", util.Config.kesqueDir)
+      props.put("log.dirs", KhipuConfig.kesqueDir)
       props
     }
 
     val kesque = new Kesque(kafkaProps)
     val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(dbConfig.account), 4096, CompressionType.NONE, 1024)),
-      Future(kesque.getTable(Array(dbConfig.storage), 4096, CompressionType.NONE, 1024)),
-      Future(kesque.getTable(Array(dbConfig.evmcode), 24576)),
+      Future(kesque.getTable(Array(DbConfig.account), 4096, CompressionType.NONE, 1024)),
+      Future(kesque.getTable(Array(DbConfig.storage), 4096, CompressionType.NONE, 1024)),
+      Future(kesque.getTable(Array(DbConfig.evmcode), 24576)),
       Future(kesque.getTimedTable(Array(
-        dbConfig.header,
-        dbConfig.body,
-        dbConfig.receipts,
-        dbConfig.td
+        DbConfig.header,
+        DbConfig.body,
+        DbConfig.receipts,
+        DbConfig.td
       ), 102400))
     ))
     val List(accountTable, storageTable, evmcodeTable, blockTable) = Await.result(futureTables, Duration.Inf)
@@ -212,13 +214,13 @@ final class KesqueCompactor(
 
   val log = Logging(system, this)
 
-  private val targetStorageTable = kesque.getTable(Array(dbConfig.storage), 4096, CompressionType.NONE, 1024)
-  private val targetAccountTable = kesque.getTable(Array(dbConfig.account), 4096, CompressionType.NONE, 1024)
+  private val targetStorageTable = kesque.getTable(Array(DbConfig.storage), 4096, CompressionType.NONE, 1024)
+  private val targetAccountTable = kesque.getTable(Array(DbConfig.account), 4096, CompressionType.NONE, 1024)
 
-  private val storageWriter = new NodeWriter(dbConfig.storage, targetStorageTable, toFileNo)
-  private val accountWriter = new NodeWriter(dbConfig.account, targetAccountTable, toFileNo)
+  private val storageWriter = new NodeWriter(DbConfig.storage, targetStorageTable, toFileNo)
+  private val accountWriter = new NodeWriter(DbConfig.account, targetAccountTable, toFileNo)
 
-  private val storageReader = new NodeReader[DataWord](dbConfig.storage, storageTable)(trie.rlpDataWordSerializer) {
+  private val storageReader = new NodeReader[DataWord](DbConfig.storage, storageTable)(trie.rlpDataWordSerializer) {
     override def nodeGot(kv: TKeyVal) {
       val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset)
       if (fileno == fromFileNo) {
@@ -227,7 +229,7 @@ final class KesqueCompactor(
     }
   }
 
-  private val accountReader = new NodeReader[Account](dbConfig.account, accountTable)(Account.accountSerializer) {
+  private val accountReader = new NodeReader[Account](DbConfig.account, accountTable)(Account.accountSerializer) {
     override def entityGot(account: Account, blocknumber: Long) {
       // try to extracted storage node hash
       if (account.stateRoot != Account.EMPTY_STATE_ROOT_HASH) {
@@ -273,7 +275,7 @@ final class KesqueCompactor(
         var offset = storageWriter.maxOffset + 1
         var nRead = 0
         do {
-          val (lastOffset, recs) = accountTable.readBatch(dbConfig.account, offset, 4096)
+          val (lastOffset, recs) = accountTable.readBatch(DbConfig.account, offset, 4096)
           recs foreach accountWriter.write
           nRead = recs.length
           offset = lastOffset + 1
@@ -291,7 +293,7 @@ final class KesqueCompactor(
         var offset = accountWriter.maxOffset + 1
         var nRead = 0
         do {
-          val (lastOffset, recs) = accountTable.readBatch(dbConfig.account, offset, 4096)
+          val (lastOffset, recs) = accountTable.readBatch(DbConfig.account, offset, 4096)
           recs foreach accountWriter.write
           nRead = recs.length
           offset = lastOffset + 1
@@ -315,13 +317,13 @@ final class KesqueCompactor(
    */
   private def gc() {
     log.info(s"[comp] gc ...")
-    targetStorageTable.removeIndexEntries(dbConfig.storage) {
+    targetStorageTable.removeIndexEntries(DbConfig.storage) {
       case (k, mixedOffset) =>
         val (fileNo, _) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
         fileNo == fromFileNo
     }
 
-    targetAccountTable.removeIndexEntries(dbConfig.account) {
+    targetAccountTable.removeIndexEntries(DbConfig.account) {
       case (k, mixedOffset) =>
         val (fileNo, _) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
         fileNo == fromFileNo

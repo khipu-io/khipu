@@ -18,8 +18,8 @@ import khipu.trie.MerklePatriciaTrie.MPTException
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
-import scala.collection.mutable
 import org.apache.kafka.common.TopicPartition
+import scala.collection.mutable
 import scala.collection.JavaConverters._
 import scala.util.Random
 

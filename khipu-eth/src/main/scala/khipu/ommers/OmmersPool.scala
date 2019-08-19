@@ -1,8 +1,8 @@
 package khipu.ommers
 
 import akka.actor.{ Actor, Props }
+import khipu.config.MiningConfig
 import khipu.domain.{ BlockHeader, Blockchain }
-import khipu.util.MiningConfig
 
 /**
  * The term "ommer" is a gender-neutral alternative to aunt / uncle

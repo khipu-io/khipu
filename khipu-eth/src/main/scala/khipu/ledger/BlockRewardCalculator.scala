@@ -1,7 +1,7 @@
 package khipu.ledger
 
 import khipu.DataWord
-import khipu.util.BlockchainConfig
+import khipu.config.BlockchainConfig
 
 /**
  * Calculates rewards for mining blocks and ommers.

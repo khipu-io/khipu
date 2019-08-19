@@ -6,6 +6,7 @@ import akka.pattern.ask
 import akka.util.ByteString
 import khipu.Hash
 import khipu.DataWord
+import khipu.config.BlockchainConfig
 import khipu.domain.Account
 import khipu.domain.Address
 import khipu.domain.Block
@@ -17,7 +18,6 @@ import khipu.domain.Transaction
 import khipu.domain.TxLogEntry
 import khipu.validators._
 import khipu.trie.MerklePatriciaTrie.MPTNodeMissingException
-import khipu.util.BlockchainConfig
 import khipu.util.SimpleMap
 import khipu.validators.BlockValidator
 import khipu.validators.SignedTransactionValidator

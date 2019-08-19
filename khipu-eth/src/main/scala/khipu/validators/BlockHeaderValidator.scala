@@ -3,12 +3,12 @@ package khipu.validators
 import java.math.BigInteger
 import khipu.Hash
 import khipu.DataWord
+import khipu.config.BlockchainConfig
 import khipu.crypto
 import khipu.domain.Block
 import khipu.domain.BlockHeader
 import khipu.domain.Blockchain
 import khipu.domain.DifficultyCalculator
-import khipu.util.BlockchainConfig
 
 object BlockHeaderValidator {
   trait I {

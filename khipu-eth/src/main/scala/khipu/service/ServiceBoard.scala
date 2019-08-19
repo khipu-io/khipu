@@ -13,6 +13,12 @@ import java.security.SecureRandom
 import khipu.NodeStatus
 import khipu.ServerStatus
 import khipu.blockchain.sync.HostService
+import khipu.config.BlockchainConfig
+import khipu.config.DbConfig
+import khipu.config.KhipuConfig
+import khipu.config.LmdbConfig
+import khipu.config.MiningConfig
+import khipu.config.TxPoolConfig
 import khipu.crypto
 import khipu.domain.Blockchain
 import khipu.ledger.Ledger
@@ -23,23 +29,12 @@ import khipu.network.rlpx.KnownNodesService.KnownNodesServiceConfig
 import khipu.network.rlpx.PeerManager
 import khipu.network.rlpx.discovery.DiscoveryConfig
 import khipu.store.Storages
-import khipu.store.datasource.LmdbBlockDataSource
-import khipu.store.datasource.LmdbDataSource
-import khipu.store.datasource.LmdbNodeDataSource
-import khipu.store.datasource.SharedLmdbDataSources
-import khipu.util
-import khipu.util.BlockchainConfig
-import khipu.util.MiningConfig
-import khipu.util.PruningConfig
-import khipu.util.TxPoolConfig
-import khipu.util.cache.CachingSettings
+import khipu.store.datasource.LmdbDataSources
 import khipu.validators.BlockHeaderValidator
 import khipu.validators.BlockValidator
 import khipu.validators.OmmersValidator
 import khipu.validators.SignedTransactionValidator
 import khipu.validators.Validators
-import org.lmdbjava.Env
-import org.lmdbjava.EnvFlags
 import org.spongycastle.crypto.AsymmetricCipherKeyPair
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 import scala.concurrent.duration._
@@ -75,12 +70,12 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
 
   implicit val materializer = ActorMaterializer()(system)
 
-  val config = util.Config.config
-  val dbConfig = util.Config.Db
+  val config = KhipuConfig.config
+  val dbConfig = new DbConfig(config.getConfig("db"))
 
   val secureRandomAlgo = if (config.hasPath("secure-random-algo")) Some(config.getString("secure-random-algo")) else None
   val secureRandom = secureRandomAlgo.map(SecureRandom.getInstance(_)).getOrElse(new SecureRandom())
-  val nodeKeyFile = util.Config.nodeKeyFile
+  val nodeKeyFile = KhipuConfig.nodeKeyFile
   val nodeKey = loadAsymmetricCipherKeyPair(nodeKeyFile, secureRandom)
   log.info(s"nodeKey at $nodeKeyFile: $nodeKey")
 
@@ -95,74 +90,22 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
   val forkResolverOpt = if (blockchainConfig.customGenesisFileOpt.isDefined) None else Some(new ForkResolver.DAOForkResolver(blockchainConfig))
 
   val storages = dbConfig.dbEngine match {
-    case dbConfig.LMDB =>
+    case DbConfig.LMDB =>
 
-      new Storages.DefaultStorages with SharedLmdbDataSources {
+      new Storages.DefaultStorages with LmdbDataSources {
         implicit protected val system = ServiceBoardExtension.this.system
 
-        val pruningMode = PruningConfig(config).mode
+        protected val config = ServiceBoardExtension.this.config
+        protected val log = ServiceBoardExtension.this.log
+        protected val lmdbConfig = new LmdbConfig(KhipuConfig.datadir, config.getConfig("db").getConfig("lmdb"))
 
-        private lazy val defaultCachingSettings = CachingSettings(system)
-        private lazy val cacheCfg = util.CacheConfig(config)
-
-        private lazy val home = {
-          val h = new File(dbConfig.LmdbConfig.path)
-          if (!h.exists) {
-            h.mkdirs()
-          }
-          h
-        }
-
-        lazy val env = Env.create()
-          .setMapSize(dbConfig.LmdbConfig.mapSize)
-          .setMaxDbs(dbConfig.LmdbConfig.maxDbs)
-          .setMaxReaders(dbConfig.LmdbConfig.maxReaders)
-          .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
-
-        lazy val accountNodeDataSource = new LmdbNodeDataSource(dbConfig.account, env, cacheCfg.cacheSize)
-        lazy val storageNodeDataSource = new LmdbNodeDataSource(dbConfig.storage, env, cacheCfg.cacheSize)
-        lazy val evmcodeDataSource = new LmdbNodeDataSource(dbConfig.evmcode, env)
-
-        lazy val blockNumberDataSource = new LmdbDataSource(dbConfig.blocknum, env)
-
-        lazy val blockHeaderDataSource = new LmdbBlockDataSource(dbConfig.header, env)
-        lazy val blockBodyDataSource = new LmdbBlockDataSource(dbConfig.body, env)
-        lazy val receiptsDataSource = new LmdbBlockDataSource(dbConfig.receipts, env)
-        lazy val totalDifficultyDataSource = new LmdbBlockDataSource(dbConfig.td, env)
-
-        lazy val unconfirmedDepth = util.Config.Sync.blockResolveDepth
-
-        def closeAll() {
-          log.info("db syncing...")
-
-          // --- Don't close resouces here, since the futures during sync may not been finished yet
-          // --- and we don't care about the resources releasing, since when closeAll() is called,
-          // --- we are shutting down this application.
-
-          //accountNodeDataSource.close()
-          //storageNodeDataSource.close()
-          //evmCodeDataSource.close()
-          //blockNumberDataSource.close()
-          //blockHeaderDataSource.close()
-          //blockBodyDataSource.close()
-          //receiptsDataSource.close()
-          //totalDifficultyDataSource.close()
-
-          //dataSource.close()
-
-          env.sync(true)
-          //env.close()
-
-          log.info("db synced")
-        }
+        val unconfirmedDepth = KhipuConfig.Sync.blockResolveDepth
       }
 
-    case dbConfig.KESQUE => null // disabled KESQUE
+    case DbConfig.KESQUE => null // disabled KESQUE
 
     //      new Storages.DefaultStorages with SharedLeveldbDataSources {
     //        implicit protected val system = ServiceBoardExtension.this.system
-    //
-    //        val pruningMode = PruningConfig(config).mode
     //
     //        private lazy val defaultCachingSettings = CachingSettings(system)
     //        private lazy val cacheCfg = util.CacheConfig(config)
@@ -172,7 +115,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     //        private lazy val kafkaConfigFile = new File(configDir, "kafka.server.properties")
     //        private lazy val kafkaProps = {
     //          val props = org.apache.kafka.common.utils.Utils.loadProps(kafkaConfigFile.getAbsolutePath)
-    //          props.put("log.dirs", util.Config.kesqueDir)
+    //          props.put("log.dirs", KhipuConfig.kesqueDir)
     //          props
     //        }
     //        lazy val kesque = new Kesque(kafkaProps)
@@ -231,7 +174,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
   val knownNodesServiceConfig = KnownNodesServiceConfig(config)
   val discoveryConfig = DiscoveryConfig(config)
 
-  val networkConfig = util.Config.Network
+  val networkConfig = KhipuConfig.Network
 
   val nodeStatus = NodeStatus(
     key = nodeKey,
@@ -239,7 +182,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     discoveryStatus = ServerStatus.Listening(discoveryConfig.listenAddress)
   )
 
-  val peerConfiguration = util.Config.Network.peer
+  val peerConfiguration = KhipuConfig.Network.peer
   // TODO knownNodesService
   val peerManage = system.actorOf(PeerManager.props(peerConfiguration), "peerManage")
 

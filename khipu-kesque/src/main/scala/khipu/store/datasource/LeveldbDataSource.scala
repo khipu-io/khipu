@@ -2,16 +2,9 @@ package khipu.store.datasource
 
 import java.io.File
 import org.iq80.leveldb.{ DB, Options, WriteOptions }
+import khipu.config.LeveldbConfig
 import khipu.util.BytesUtil
 import org.iq80.leveldb.impl.Iq80DBFactory
-
-trait LeveldbConfig {
-  val path: String
-  val createIfMissing: Boolean
-  val paranoidChecks: Boolean
-  val verifyChecksums: Boolean
-  val cacheSize: Long
-}
 
 object LeveldbDataSource {
 

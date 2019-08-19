@@ -5,9 +5,11 @@ import akka.event.Logging
 import akka.util.ByteString
 import java.io.FileNotFoundException
 import java.math.BigInteger
-import khipu.Hash
-import khipu.crypto
 import khipu.DataWord
+import khipu.Hash
+import khipu.config.BlockchainConfig
+import khipu.config.KhipuConfig
+import khipu.crypto
 import khipu.domain.{ Account, Block, BlockHeader, Blockchain }
 import khipu.network.p2p.messages.PV62.BlockBody
 import khipu.rlp
@@ -18,8 +20,6 @@ import khipu.store.datasource.DataSource
 import khipu.store.datasource.EphemNodeDataSource
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
-import khipu.util.BlockchainConfig
-import khipu.util.Config
 import org.json4s.{ CustomSerializer, DefaultFormats, JString, JValue }
 import scala.io.Source
 import scala.util.{ Failure, Success, Try }
@@ -177,7 +177,7 @@ class GenesisDataLoader(
         Failure(new RuntimeException("Genesis data present in the database does not match genesis block from file." +
           " Use different directory for running private blockchains."))
       case None =>
-        if (!Config.Sync.doFastSync) {
+        if (!KhipuConfig.Sync.doFastSync) {
           val accountNodeStorage = blockchain.storages.accountNodeStorage
           accountNodeStorage.update(Nil, ephemDataSource.toSeq)
         }

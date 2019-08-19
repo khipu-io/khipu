@@ -3,6 +3,8 @@ package khipu.crypto
 import akka.util.ByteString
 import java.math.BigInteger
 import java.util.Arrays
+import khipu.config.BlockchainConfig
+import khipu.config.KhipuConfig
 import khipu.util
 import org.spongycastle.asn1.x9.X9IntegerConverter
 import org.spongycastle.crypto.AsymmetricCipherKeyPair
@@ -112,7 +114,7 @@ import org.spongycastle.math.ec.ECPoint
  */
 object ECDSASignature {
 
-  val isEth = util.Config.chainType match {
+  val isEth = KhipuConfig.chainType match {
     case "eth" => true
     case _     => false
   }
@@ -195,7 +197,7 @@ object ECDSASignature {
   }
 
   private def extractChainIdFromV_etc(v: Int): Option[Int] = {
-    Some(util.BlockchainConfig(util.Config.config).chainId.toByte)
+    Some(BlockchainConfig(KhipuConfig.config).chainId.toByte)
   }
 
   /**

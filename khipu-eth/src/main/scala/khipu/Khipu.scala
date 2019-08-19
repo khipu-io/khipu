@@ -8,6 +8,8 @@ import akka.pattern.ask
 import java.net.URI
 import khipu.blockchain.data.GenesisDataLoader
 import khipu.blockchain.sync.SyncService
+import khipu.config.FilterConfig
+import khipu.config.KhipuConfig
 import khipu.entity.NodeEntity
 import khipu.jsonrpc.EthService
 import khipu.jsonrpc.FilterManager
@@ -28,7 +30,6 @@ import khipu.network.rlpx.auth.AuthHandshake
 import khipu.network.rlpx.discovery.NodeDiscoveryService
 import khipu.service.ServiceBoard
 import khipu.transactions.PendingTransactionsService
-import khipu.util.FilterConfig
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -164,20 +165,20 @@ object Khipu {
   }
 
   def startJsonRpcServer() {
-    val jsonRpcHttpServerConfig = util.Config.Network.Rpc
+    val jsonRpcHttpServerConfig = KhipuConfig.Network.Rpc
 
     if (jsonRpcHttpServerConfig.enabled) {
 
       val web3Service = new Web3Service()
 
-      val netServiceConfig = NetServiceConfig(util.Config.config)
+      val netServiceConfig = NetServiceConfig(KhipuConfig.config)
       val netService = new NetService(serviceBoard.nodeStatus, netServiceConfig)
 
       val blockGenerator = new BlockGenerator(serviceBoard.blockchain, serviceBoard.blockchainConfig, serviceBoard.miningConfig, serviceBoard.ledger, serviceBoard.validators)
 
-      val keyStore: KeyStore.I = new KeyStore(util.Config.keyStoreDir, serviceBoard.secureRandom)
+      val keyStore: KeyStore.I = new KeyStore(KhipuConfig.keyStoreDir, serviceBoard.secureRandom)
 
-      val filterConfig = FilterConfig(util.Config.config)
+      val filterConfig = FilterConfig(KhipuConfig.config)
       val filterManager = system.actorOf(FilterManager.props(
         serviceBoard.blockchain,
         blockGenerator,
@@ -207,7 +208,7 @@ object Khipu {
         serviceBoard.txPoolConfig
       )
 
-      val jsonRpcController = new JsonRpcController(web3Service, netService, ethService, personalService, util.Config.Network.Rpc)
+      val jsonRpcController = new JsonRpcController(web3Service, netService, ethService, personalService, KhipuConfig.Network.Rpc)
       val jsonRpcHttpServer = new JsonRpcHttpServer(jsonRpcController, jsonRpcHttpServerConfig)
 
       jsonRpcHttpServer.run()

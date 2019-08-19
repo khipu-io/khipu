@@ -1,11 +1,11 @@
 package khipu.network
 
+import khipu.config.BlockchainConfig
+import khipu.config.KhipuConfig
 import khipu.domain.BlockHeader
-import khipu.util
-import khipu.util.BlockchainConfig
 
 object ForkResolver {
-  val isEth = util.Config.chainType match {
+  val isEth = KhipuConfig.chainType match {
     case "eth" => true
     case _     => false
   }

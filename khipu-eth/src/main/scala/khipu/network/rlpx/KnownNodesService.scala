@@ -6,6 +6,7 @@ import akka.cluster.singleton.ClusterSingletonManager
 import akka.cluster.singleton.ClusterSingletonManagerSettings
 import akka.cluster.singleton.ClusterSingletonProxy
 import akka.cluster.singleton.ClusterSingletonProxySettings
+import com.typesafe.config.Config
 import java.net.URI
 import khipu.store.KnownNodesStorage
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -57,7 +58,7 @@ object KnownNodesService {
   private case object PersistChanges
 
   object KnownNodesServiceConfig {
-    def apply(etcClientConfig: com.typesafe.config.Config): KnownNodesServiceConfig = {
+    def apply(etcClientConfig: Config): KnownNodesServiceConfig = {
       val knownNodesServiceConfig = etcClientConfig.getConfig("network.known-nodes")
       KnownNodesServiceConfig(
         persistInterval = knownNodesServiceConfig.getDuration("persist-interval").toMillis.millis,

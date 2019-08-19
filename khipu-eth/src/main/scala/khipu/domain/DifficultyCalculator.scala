@@ -1,7 +1,8 @@
 package khipu.domain
 
 import khipu.DataWord
-import khipu.util.BlockchainConfig
+import khipu.config.BlockchainConfig
+import khipu.config.KhipuConfig
 
 object DifficultyCalculator {
   private val FrontierTimestampDiffLimit = -99
@@ -12,7 +13,7 @@ object DifficultyCalculator {
 final class DifficultyCalculator(blockchainConfig: BlockchainConfig) {
   import DifficultyCalculator._
 
-  val isEth = khipu.util.Config.chainType match {
+  val isEth = KhipuConfig.chainType match {
     case "eth" => true
     case _     => false
   }

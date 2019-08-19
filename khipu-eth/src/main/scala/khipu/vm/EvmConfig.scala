@@ -2,8 +2,8 @@ package khipu.vm
 
 import akka.util.ByteString
 import khipu.DataWord
-import khipu.util.BlockchainConfig
 import java.math.BigInteger
+import khipu.config.BlockchainConfig
 
 object EvmConfig {
 

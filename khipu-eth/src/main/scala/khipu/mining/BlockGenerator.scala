@@ -6,6 +6,8 @@ import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.UnaryOperator
 import khipu.Hash
+import khipu.config.BlockchainConfig
+import khipu.config.MiningConfig
 import khipu.crypto
 import khipu.domain.{ Block, BlockHeader, Receipt, SignedTransaction, _ }
 import khipu.ledger.BloomFilter
@@ -20,7 +22,6 @@ import khipu.store.datasource.EphemNodeDataSource
 import khipu.trie.ByteArraySerializable
 import khipu.trie.MerklePatriciaTrie
 import khipu.util.BytesUtil
-import khipu.util.{ BlockchainConfig, MiningConfig }
 import khipu.validators.MptListValidator
 import khipu.validators.OmmersValidator.OmmersError
 import khipu.validators.Validators

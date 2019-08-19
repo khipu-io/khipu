@@ -2,12 +2,12 @@ package khipu.validators
 
 import java.math.BigInteger
 import khipu.DataWord
+import khipu.config.BlockchainConfig
 import khipu.crypto.ECDSASignature
 import khipu.domain.Account
 import khipu.domain.BlockHeader
 import khipu.domain.SignedTransaction
 import khipu.domain.Transaction
-import khipu.util.BlockchainConfig
 import khipu.vm.EvmConfig
 
 sealed trait SignedTransactionError

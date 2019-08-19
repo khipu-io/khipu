@@ -1,13 +1,14 @@
 package khipu.util.cache
 
+import com.typesafe.config.Config
 import khipu.util.EnhancedConfig
 import khipu.util.SettingsCompanion
 import scala.concurrent.duration.Duration
 
 object CachingSettings extends SettingsCompanion[CachingSettings]("khipu.caching") {
-  implicit def enhanceConfig(config: com.typesafe.config.Config): EnhancedConfig = new EnhancedConfig(config)
+  implicit def enhanceConfig(config: Config): EnhancedConfig = new EnhancedConfig(config)
 
-  def fromSubConfig(root: com.typesafe.config.Config, c: com.typesafe.config.Config) = {
+  def fromSubConfig(root: Config, c: Config) = {
     val lfuConfig = c.getConfig("lfu-cache")
     CachingSettingsImpl(
       LfuCacheSettingsImpl(

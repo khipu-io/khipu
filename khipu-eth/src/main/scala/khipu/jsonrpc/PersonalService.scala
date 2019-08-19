@@ -5,6 +5,8 @@ import akka.pattern.ask
 import akka.util.{ ByteString, Timeout }
 import khipu.Hash
 import khipu.DataWord
+import khipu.config.BlockchainConfig
+import khipu.config.TxPoolConfig
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.domain.{ Account, Address, Blockchain }
@@ -13,8 +15,6 @@ import khipu.keystore.{ KeyStore, Wallet }
 import khipu.jsonrpc.JsonRpcErrors._
 import khipu.store.AppStateStorage
 import khipu.transactions.PendingTransactionsService
-import khipu.util.BlockchainConfig
-import khipu.util.TxPoolConfig
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global

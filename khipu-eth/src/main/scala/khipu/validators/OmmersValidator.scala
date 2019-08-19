@@ -1,10 +1,10 @@
 package khipu.validators
 
 import khipu.Hash
+import khipu.config.BlockchainConfig
 import khipu.domain.Block
 import khipu.domain.Blockchain
 import khipu.domain.BlockHeader
-import khipu.util.BlockchainConfig
 import khipu.validators.OmmersValidator.OmmersError
 import khipu.validators.OmmersValidator.OmmersError._
 
@@ -22,7 +22,6 @@ object OmmersValidator {
     case object OmmersDuplicatedError extends OmmersError
   }
 }
-
 final class OmmersValidator(blockchainConfig: BlockchainConfig) extends OmmersValidator.I {
 
   val blockHeaderValidator = new BlockHeaderValidator(blockchainConfig)

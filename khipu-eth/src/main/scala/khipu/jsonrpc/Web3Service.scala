@@ -1,8 +1,8 @@
 package khipu.jsonrpc
 
 import akka.util.ByteString
+import khipu.config.KhipuConfig
 import khipu.crypto
-import khipu.util.Config
 import scala.concurrent.Future
 
 object Web3Service {
@@ -21,7 +21,7 @@ class Web3Service {
   }
 
   def clientVersion(req: ClientVersionRequest): ServiceResponse[ClientVersionResponse] = {
-    Future.successful(Right(ClientVersionResponse(Config.clientVersion)))
+    Future.successful(Right(ClientVersionResponse(KhipuConfig.clientVersion)))
   }
 
 }

@@ -12,6 +12,7 @@ import khipu.HashWithBlockNumber
 import khipu.ReceiptsWithBlockNumber
 import khipu.blockchain.sync
 import khipu.blockchain.sync.HandshakedPeersService.BlacklistPeer
+import khipu.config.KhipuConfig
 import khipu.crypto
 import khipu.domain.BlockHeader
 import khipu.domain.Receipt
@@ -20,7 +21,6 @@ import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.CommonMessages.Status
 import khipu.network.rlpx.Peer
 import khipu.network.rlpx.RLPxStage
-import khipu.util.Config
 import khipu.util.SimpleMap
 import scala.collection.immutable
 import scala.collection.mutable
@@ -98,7 +98,7 @@ object FastSyncService {
 trait FastSyncService { _: SyncService =>
   import context.dispatcher
   import FastSyncService._
-  import Config.Sync._
+  import KhipuConfig.Sync._
 
   private implicit val fastSyncTimeout = RLPxStage.decodeTimeout.plus(20.seconds)
 

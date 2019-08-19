@@ -1,6 +1,7 @@
 package khipu.domain
 
 import khipu.Hash
+import khipu.config.KhipuConfig
 import khipu.crypto
 import khipu.crypto.ECDSASignature
 import khipu.network.p2p.messages.CommonMessages.SignedTransactions._
@@ -9,13 +10,12 @@ import khipu.rlp.RLPImplicitConversions._
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
 import khipu.trie.ByteArraySerializable
-import khipu.util
 import java.math.BigInteger
 import org.spongycastle.crypto.AsymmetricCipherKeyPair
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 
 object SignedTransaction {
-  val isEth = util.Config.chainType match {
+  val isEth = KhipuConfig.chainType match {
     case "eth" => true
     case _     => false
   }

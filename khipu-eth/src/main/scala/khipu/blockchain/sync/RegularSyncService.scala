@@ -8,6 +8,7 @@ import khipu.BroadcastNewBlocks
 import khipu.DataWord
 import khipu.blockchain.sync
 import khipu.blockchain.sync.HandshakedPeersService.BlacklistPeer
+import khipu.config.KhipuConfig
 import khipu.domain.Block
 import khipu.domain.BlockHeader
 import khipu.ledger.Ledger.BlockExecutionError
@@ -21,7 +22,6 @@ import khipu.network.rlpx.Peer
 import khipu.network.rlpx.PeerEntity
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
-import khipu.util
 import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.Future
@@ -42,7 +42,7 @@ object RegularSyncService {
 trait RegularSyncService { _: SyncService =>
   import context.dispatcher
   import RegularSyncService._
-  import util.Config.Sync._
+  import KhipuConfig.Sync._
 
   private def tf(n: Int) = "%1$4d".format(n) // tx
   private def xf(n: Double) = "%1$6.1f".format(n) // tps

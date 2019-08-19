@@ -16,6 +16,7 @@ import akka.cluster.singleton.ClusterSingletonProxySettings
 import akka.pattern.ask
 import khipu.Hash
 import khipu.Stop
+import khipu.config.KhipuConfig
 import khipu.crypto
 import khipu.domain.Block
 import khipu.domain.BlockHeader
@@ -26,7 +27,6 @@ import khipu.network.rlpx.Peer
 import khipu.ommers.OmmersPool
 import khipu.service.ServiceBoard
 import khipu.transactions.PendingTransactionsService
-import khipu.util.Config
 import scala.concurrent.duration._
 
 object SyncService {
@@ -116,12 +116,12 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
   def idle: Receive = peerUpdateBehavior orElse {
     case StartSync =>
       appStateStorage.putSyncStartingBlock(appStateStorage.getBestBlockNumber)
-      (appStateStorage.isFastSyncDone, Config.Sync.doFastSync) match {
+      (appStateStorage.isFastSyncDone, KhipuConfig.Sync.doFastSync) match {
         case (false, true) =>
           startFastSync()
 
         case (true, true) =>
-          log.debug(s"do-fast-sync is set to ${Config.Sync.doFastSync} but fast sync won't start because it already completed")
+          log.debug(s"do-fast-sync is set to ${KhipuConfig.Sync.doFastSync} but fast sync won't start because it already completed")
           startRegularSync()
 
         case (true, false) =>

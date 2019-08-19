@@ -2,7 +2,6 @@ package khipu.store
 
 import akka.actor.ActorSystem
 import khipu.store.datasource.DataSources
-import khipu.util.PruningConfig.PruningMode
 
 object Storages {
 
@@ -37,7 +36,6 @@ trait Storages extends BlockchainStorages {
   def appStateStorage: AppStateStorage
   def fastSyncStateStorage: FastSyncStateStorage
   def knownNodesStorage: KnownNodesStorage
-  def pruningMode: PruningMode
 
   def swithToWithUnconfirmed() {
     accountNodeStorage.swithToWithUnconfirmed()

@@ -4,6 +4,7 @@ import akka.util.ByteString
 import khipu.NodeStatus
 import khipu.ServerStatus
 import khipu.DataWord
+import khipu.config.KhipuConfig
 import khipu.domain.Blockchain
 import khipu.network.ForkResolver
 import khipu.network.p2p.Message
@@ -185,7 +186,7 @@ final class EtcHandshake(
     }
     Hello(
       p2pVersion = P2PVersion,
-      clientId = khipu.util.Config.clientId,
+      clientId = KhipuConfig.clientId,
       capabilities = List(
         Capability("eth", Versions.PV63.toByte)
       ),

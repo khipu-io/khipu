@@ -1,7 +1,7 @@
-package khipu.util
+package khipu.config
 
 import akka.util.ByteString
-import com.typesafe.config.{ ConfigFactory, Config => TypesafeConfig }
+import com.typesafe.config.{ ConfigFactory, Config }
 import java.math.BigInteger
 import java.net.InetSocketAddress
 import khipu.DataWord
@@ -11,12 +11,10 @@ import khipu.jsonrpc.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
 import khipu.network.rlpx.FastSyncHostConfiguration
 import khipu.network.rlpx.PeerConfiguration
 import khipu.network.rlpx.RLPxConfiguration
-import khipu.store.datasource.LeveldbConfig
-import khipu.store.datasource.LmdbConfig
 import scala.concurrent.duration._
 import scala.util.Try
 
-object Config {
+object KhipuConfig {
   val config = ConfigFactory.load().getConfig("khipu")
 
   val clientId = config.getString("client-id")
@@ -117,54 +115,10 @@ object Config {
     val syncRequestTimeout = syncConfig.getDuration("sync-request-timeout").toMillis.millis
     val reimportFromBlockNumber = syncConfig.getLong("reimport-from-block-number")
   }
-
-  trait DbConfig {
-    val batchSize: Int
-  }
-  object Db extends DbConfig {
-    trait DBEngine
-    case object LMDB extends DBEngine
-    case object KESQUE extends DBEngine
-
-    private val dbConfig = config.getConfig("db")
-    val dbEngine: DBEngine = dbConfig.getString("engine") match {
-      case "lmdb"   => LMDB
-      case "kesque" => KESQUE
-    }
-    val batchSize = dbConfig.getInt("batch-size")
-
-    val account = "account"
-    val storage = "storage"
-    val evmcode = "evmcode"
-    val blocknum = "blocknum"
-    val header = "header"
-    val body = "body"
-    val td = "td" // total difficulty
-    val receipts = "receipts"
-
-    private val lmdbConfig = dbConfig.getConfig("lmdb")
-    private val leveldbConfig = dbConfig.getConfig("leveldb")
-
-    object LmdbConfig extends LmdbConfig {
-      val path = datadir + "/" + lmdbConfig.getString("path")
-      val mapSize = lmdbConfig.getLong("map_size")
-      val maxDbs = lmdbConfig.getInt("max_dbs")
-      val maxReaders = lmdbConfig.getInt("max_readers")
-    }
-
-    object LeveldbConfig extends LeveldbConfig {
-      val path = datadir + "/" + leveldbConfig.getString("path")
-      val createIfMissing = leveldbConfig.getBoolean("create-if-missing")
-      val paranoidChecks = leveldbConfig.getBoolean("paranoid-checks")
-      val verifyChecksums = leveldbConfig.getBoolean("verify-checksums")
-      val cacheSize = leveldbConfig.getLong("cache-size")
-    }
-  }
-
 }
 
 object FilterConfig {
-  def apply(etcClientConfig: TypesafeConfig): FilterConfig = {
+  def apply(etcClientConfig: Config): FilterConfig = {
     val filterConfig = etcClientConfig.getConfig("filter")
 
     new FilterConfig {
@@ -179,7 +133,7 @@ trait FilterConfig {
 }
 
 object TxPoolConfig {
-  def apply(etcClientConfig: com.typesafe.config.Config): TxPoolConfig = {
+  def apply(etcClientConfig: Config): TxPoolConfig = {
     val txPoolConfig = etcClientConfig.getConfig("txPool")
 
     new TxPoolConfig {
@@ -194,7 +148,7 @@ trait TxPoolConfig {
 }
 
 object MiningConfig {
-  def apply(etcClientConfig: TypesafeConfig): MiningConfig = {
+  def apply(etcClientConfig: Config): MiningConfig = {
     val miningConfig = etcClientConfig.getConfig("mining")
 
     new MiningConfig {
@@ -215,7 +169,7 @@ trait MiningConfig {
 }
 
 object BlockchainConfig {
-  def apply(clientConfig: TypesafeConfig): BlockchainConfig = {
+  def apply(clientConfig: Config): BlockchainConfig = {
     val blockchainConfig = clientConfig.getConfig("blockchain")
 
     new BlockchainConfig {
@@ -299,7 +253,7 @@ trait BlockchainConfig {
 }
 
 object MonetaryPolicyConfig {
-  def apply(mpConfig: TypesafeConfig): MonetaryPolicyConfig = {
+  def apply(mpConfig: Config): MonetaryPolicyConfig = {
     MonetaryPolicyConfig(
       mpConfig.getLong("era-duration"),
       mpConfig.getDouble("reward-reduction-rate"),
@@ -344,16 +298,3 @@ trait PruningConfig {
   val mode: PruningConfig.PruningMode
 }
 
-object CacheConfig {
-  def apply(clientConfig: TypesafeConfig): CacheConfig = {
-    val cacheConfig = clientConfig.getConfig("cache")
-
-    new CacheConfig {
-      val cacheSize = cacheConfig.getInt("cache-size")
-    }
-  }
-}
-
-trait CacheConfig {
-  val cacheSize: Int
-}

@@ -1,6 +1,7 @@
 package khipu.blockchain.sync
 
 import akka.pattern.AskTimeoutException
+import khipu.config.KhipuConfig
 import khipu.domain.BlockHeader
 import khipu.network.handshake.EtcHandshake.PeerInfo
 import khipu.network.p2p.messages.WireProtocol.Disconnect
@@ -10,7 +11,6 @@ import khipu.network.rlpx.Peer
 import khipu.network.rlpx.PeerEntity
 import khipu.network.rlpx.PeerManager
 import khipu.store.AppStateStorage
-import khipu.util
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -26,7 +26,7 @@ object HandshakedPeersService {
 trait HandshakedPeersService { _: SyncService =>
   import context.dispatcher
   import HandshakedPeersService._
-  import util.Config.Sync._
+  import KhipuConfig.Sync._
 
   protected def appStateStorage: AppStateStorage
 
@@ -72,7 +72,7 @@ trait HandshakedPeersService { _: SyncService =>
             val disconnect = Disconnect(Disconnect.Reasons.UselessPeer)
             peer.entity ! PeerEntity.MessageToPeer(peerId, disconnect)
             removePeer(peerId)
-            blacklist(peerId, util.Config.Sync.blacklistDuration, disconnect.toString, always = true)
+            blacklist(peerId, KhipuConfig.Sync.blacklistDuration, disconnect.toString, always = true)
           } else {
             handshakedPeers += (peerId -> (peer, peerInfo))
             if (!headerWhitePeers.contains(peer)) {
@@ -87,7 +87,7 @@ trait HandshakedPeersService { _: SyncService =>
       }
 
     case BlacklistPeer(peerId, reason, always) =>
-      blacklist(peerId, util.Config.Sync.blacklistDuration, reason, always)
+      blacklist(peerId, KhipuConfig.Sync.blacklistDuration, reason, always)
 
     case UnblacklistPeerTick(peerId) =>
       timers.cancel(UnblacklistPeerTask(peerId))

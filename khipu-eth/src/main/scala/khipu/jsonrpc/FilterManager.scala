@@ -6,6 +6,8 @@ import akka.util.ByteString
 import akka.util.Timeout
 import khipu.Hash
 import khipu.DataWord
+import khipu.config.FilterConfig
+import khipu.config.TxPoolConfig
 import khipu.domain.Address
 import khipu.domain.Block
 import khipu.domain.Blockchain
@@ -16,8 +18,6 @@ import khipu.ledger.BloomFilter
 import khipu.mining.BlockGenerator
 import khipu.store.AppStateStorage
 import khipu.transactions.PendingTransactionsService
-import khipu.util.FilterConfig
-import khipu.util.TxPoolConfig
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
