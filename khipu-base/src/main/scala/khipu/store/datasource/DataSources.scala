@@ -1,10 +1,6 @@
 package khipu.store.datasource
 
-import khipu.util.PruningConfig.PruningMode
-
 trait DataSources {
-  val pruningMode: PruningMode
-
   val dataSource: DataSource
 
   val blockHeightsHashesDataSource: DataSource
