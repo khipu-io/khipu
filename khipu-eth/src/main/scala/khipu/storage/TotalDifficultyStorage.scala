@@ -9,7 +9,7 @@ import khipu.util.SimpleMapWithUnconfirmed
  *   Key: hash of the block
  *   Value: the total difficulty
  */
-final class TotalDifficultyStorage(val source: BlockDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, DataWord](unconfirmedDepth) {
+final class TotalDifficultyStorage(val source: BlockDataSource[Long, Array[Byte]], unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, DataWord](unconfirmedDepth) {
   type This = TotalDifficultyStorage
 
   def topic = source.topic

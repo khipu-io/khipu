@@ -3,8 +3,8 @@ package khipu.storage.datasource
 import khipu.util.Clock
 import khipu.util.SimpleMap
 
-trait BlockDataSource extends SimpleMap[Long, Array[Byte]] {
-  type This <: BlockDataSource
+trait BlockDataSource[K, V] extends SimpleMap[K, V] {
+  type This <: BlockDataSource[K, V]
 
   def topic: String
 

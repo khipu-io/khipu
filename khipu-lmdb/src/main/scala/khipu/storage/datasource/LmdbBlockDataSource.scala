@@ -18,7 +18,7 @@ final class LmdbBlockDataSource(
     val topic: String,
     val env:   Env[ByteBuffer],
     cacheSize: Int             = 10000
-)(implicit system: ActorSystem) extends BlockDataSource {
+)(implicit system: ActorSystem) extends BlockDataSource[Long, Array[Byte]] {
   type This = LmdbBlockDataSource
 
   private val log = Logging(system, this.getClass)

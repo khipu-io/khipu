@@ -223,7 +223,7 @@ object KesqueDataSource {
   }
 
 }
-final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(implicit system: ActorSystem) extends HeavyDataSource {
+final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(implicit system: ActorSystem) extends BlockDataSource[Hash, TVal] {
   type This = KesqueDataSource
 
   import KesqueDataSource._
@@ -254,6 +254,7 @@ final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(im
     this
   }
 
+  def count = table.size._1
   def cacheHitRate = table.cacheHitRate(topic)
   def cacheReadCount = table.cacheReadCount(topic)
   def resetCacheHitRate() = table.resetCacheHitRate(topic)

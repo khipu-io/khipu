@@ -25,7 +25,7 @@ final class LmdbNodeDataSource(
     val topic: String,
     env:       Env[ByteBuffer],
     cacheSize: Int             = 10000
-)(implicit system: ActorSystem) extends NodeDataSource {
+)(implicit system: ActorSystem) extends BlockDataSource[Hash, Array[Byte]] {
   type This = LmdbNodeDataSource
 
   import LmdbNodeDataSource._
