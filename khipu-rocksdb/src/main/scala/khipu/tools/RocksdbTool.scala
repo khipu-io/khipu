@@ -52,7 +52,7 @@ class RocksdbTool() {
   }
 
   def write(table: OptimisticTransactionDB, num: Int) = {
-    val keys = new java.util.ArrayList[Array[Byte]]()
+    val keysToRead = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
     var elapsed = 0L
@@ -66,7 +66,7 @@ class RocksdbTool() {
       val txn = table.beginTransaction(writeOptions)
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](averDataSize)
-        Random.nextBytes(v)
+        new Random(System.currentTimeMillis).nextBytes(v)
         val k = crypto.kec256(v)
 
         start = System.nanoTime
@@ -83,7 +83,7 @@ class RocksdbTool() {
         totalElapsed += duration
 
         if (i % keyInterval == 0) {
-          keys.add(k)
+          keysToRead.add(k)
         }
 
         j += 1
@@ -117,7 +117,7 @@ class RocksdbTool() {
     val speed = i / (totalElapsed / 1000000000.0)
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - write all in ${xf((totalElapsed / 1000000000.0))}s")
 
-    keys
+    keysToRead
   }
 
   def read(table: OptimisticTransactionDB, keys: java.util.ArrayList[Array[Byte]]) {

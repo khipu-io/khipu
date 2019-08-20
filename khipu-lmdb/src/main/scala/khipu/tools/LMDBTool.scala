@@ -69,7 +69,7 @@ class LMDBTool() {
   }
 
   def write1(table: Dbi[ByteBuffer], num: Int) = {
-    val keys = new java.util.ArrayList[Array[Byte]]()
+    val keysToRead = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
     var elapsed = 0L
@@ -85,7 +85,7 @@ class LMDBTool() {
       val wtx = env.txnWrite()
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](DATA_SIZE)
-        Random.nextBytes(v)
+        new Random(System.currentTimeMillis).nextBytes(v)
         val k = crypto.kec256(v)
 
         start = System.nanoTime
@@ -111,7 +111,7 @@ class LMDBTool() {
         totalElapsed += duration
 
         if (i % keyInterval == 0) {
-          keys.add(k)
+          keysToRead.add(k)
         }
 
         j += 1
@@ -145,7 +145,7 @@ class LMDBTool() {
     val speed = i / (totalElapsed / 1000000000.0)
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - write all in ${xf((totalElapsed / 1000000000.0))}s")
 
-    keys
+    keysToRead
   }
 
   def read1(table: Dbi[ByteBuffer], keys: java.util.ArrayList[Array[Byte]]) {

@@ -3,13 +3,12 @@ package khipu.tools
 import java.io.File
 import kesque.Kesque
 import kesque.KesqueTable
-import khipu.Hash
 import khipu.TKeyVal
 import khipu.crypto
-import scala.util.Random
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
 import scala.collection.mutable
+import scala.util.Random
 
 /**
  * Fill memory:
@@ -19,7 +18,7 @@ object KesqueTool {
   def main(args: Array[String]) {
     val dbtool = new KesqueTool()
 
-    dbtool.test(100000)
+    dbtool.test(100000000)
   }
 }
 class KesqueTool() {
@@ -48,34 +47,35 @@ class KesqueTool() {
     .setMaxDbs(6)
     .open(home, EnvFlags.MDB_NORDAHEAD)
 
-  val tableName = "ddtest"
+  val topic = "ddtest"
 
-  def test(num: Int) = {
-    val table = kesque.getKesqueTable(Array(tableName), env, fetchMaxBytes = 4096)
+  def test(total: Int) = {
+    val table = kesque.getKesqueTable(Array(topic), env, fetchMaxBytes = 4096)
 
-    val keys = write(table, num)
+    val keys = write(table, total)
     read(table, keys)
 
     System.exit(0)
   }
 
-  def write(table: KesqueTable, num: Int) = {
-    val keys = new java.util.ArrayList[Array[Byte]]()
+  def write(table: KesqueTable, total: Int) = {
+    val keysToRead = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
     var elapsed = 0L
     var totalElapsed = 0L
-    var i = 0
+    var i = 0L
     val nKeysToRead = 1000000
-    val keyInterval = math.max(num / nKeysToRead, 1)
+    val keyInterval = math.max(total / nKeysToRead, 1)
 
     val kvs = new mutable.ArrayBuffer[TKeyVal]()
-    while (i < num) {
+    while (i < total) {
 
       var j = 0
-      while (j < 4000 && i < num) {
+      while (j < 4000 && i < total) {
         val v = Array.ofDim[Byte](averDataSize)
-        Random.nextBytes(v)
+        new Random(System.currentTimeMillis).nextBytes(v)
+
         val k = crypto.kec256(v)
 
         start = System.nanoTime
@@ -87,7 +87,7 @@ class KesqueTool() {
         totalElapsed += duration
 
         if (i % keyInterval == 0) {
-          keys.add(k)
+          keysToRead.add(k)
         }
 
         j += 1
@@ -96,7 +96,8 @@ class KesqueTool() {
 
       start = System.nanoTime
 
-      table.write(kvs, tableName)
+      val n = table.write(kvs, topic)
+      kvs.clear()
 
       val duration = System.nanoTime - start
       elapsed += duration
@@ -115,7 +116,7 @@ class KesqueTool() {
     val speed = i / (totalElapsed / 1000000000.0)
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - write all in ${xf((totalElapsed / 1000000000.0))}s")
 
-    keys
+    keysToRead
   }
 
   def read(table: KesqueTable, keys: java.util.ArrayList[Array[Byte]]) {
@@ -129,17 +130,15 @@ class KesqueTool() {
       val k = itr.next
 
       // pseudo read only
-      table.read(k, tableName) match {
+      table.read(k, topic) match {
         case Some(x) =>
-        case None =>
-          println(s"===> no data for ${khipu.toHexString(k)}")
+        case None    => println(s"===> no data for ${khipu.toHexString(k)}")
       }
 
       if (i > 0 && i % 10000 == 0) {
         val elapsed = (System.nanoTime - start) / 1000000000.0 // sec
         val speed = 10000 / elapsed
-        val hashKey = Hash(k)
-        println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - 0x$hashKey")
+        println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - 0x${khipu.Hash(k)}")
         start = System.nanoTime
       }
 
@@ -150,6 +149,5 @@ class KesqueTool() {
     val speed = i / totalElapsed
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - read all in ${xf(totalElapsed)}s")
   }
-
 }
 

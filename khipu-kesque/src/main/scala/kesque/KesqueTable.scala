@@ -55,7 +55,6 @@ final class KesqueTable private[kesque] (
       val key = Hash(keyBytes)
       caches(col).get(key) match {
         case None =>
-          val hash = key.hashCode
           var offsets = indexes(col).get(keyBytes)
           var foundValue: Option[TVal] = None
           while (foundValue.isEmpty && offsets.nonEmpty) {
@@ -93,13 +92,12 @@ final class KesqueTable private[kesque] (
     }
   }
 
-  def write(kvs: Iterable[TKeyVal], topic: String, fileno: Int = 0): Vector[Iterable[Int]] = {
+  def write(kvs: Iterable[TKeyVal], topic: String, fileno: Int = 0): Iterable[Int] = {
     val col = topicToCol(topic)
 
     // prepare simple records, filter no changed ones
-    var recordBatches = Vector[(List[TKeyVal], List[SimpleRecord], Map[Hash, Int])]()
-    var tkvs = List[TKeyVal]()
-    var records = List[SimpleRecord]()
+    var tkvs = Vector[TKeyVal]()
+    var records = Vector[SimpleRecord]()
     var keyToPrevOffset = Map[Hash, Int]()
     kvs foreach {
       case tkv @ TKeyVal(keyBytes, value, offset, timestamp) =>
@@ -107,9 +105,13 @@ final class KesqueTable private[kesque] (
         caches(col).get(key) match {
           case Some(TVal(prevValue, prevOffset, _)) =>
             if (isValueChanged(value, prevValue)) {
-              val rec = if (timestamp < 0) new SimpleRecord(keyBytes, value) else new SimpleRecord(timestamp, keyBytes, value)
-              tkvs ::= tkv
-              records ::= rec
+              val rec = if (timestamp < 0) {
+                new SimpleRecord(keyBytes, value)
+              } else {
+                new SimpleRecord(timestamp, keyBytes, value)
+              }
+              tkvs :+= tkv
+              records :+= rec
               keyToPrevOffset += (key -> prevOffset)
               // TODO should only happen when value is set to empty, i.e. removed?
               // remove records of prevOffset from memory?
@@ -117,26 +119,25 @@ final class KesqueTable private[kesque] (
               debug(s"$topic: value not changed. cache: hit ${caches(col).hitRate}, miss ${caches(col).missRate}}")
             }
           case None =>
-            val rec = if (timestamp < 0) new SimpleRecord(keyBytes, value) else new SimpleRecord(timestamp, keyBytes, value)
-            tkvs ::= tkv
-            records ::= rec
+            val rec = if (timestamp < 0) {
+              new SimpleRecord(keyBytes, value)
+            } else {
+              new SimpleRecord(timestamp, keyBytes, value)
+            }
+            tkvs :+= tkv
+            records :+= rec
         }
     }
 
     if (records.nonEmpty) {
-      recordBatches :+= (tkvs, records, keyToPrevOffset)
-    }
-
-    debug(s"${recordBatches.map(x => x._1.size).mkString(",")}")
-
-    // write to log file
-    recordBatches map {
-      case (tkvs, records, keyToPrevMixedOffset) =>
-        writeRecords(tkvs, records, keyToPrevMixedOffset, col, fileno)
+      // write to log file
+      writeRecords(tkvs, records, keyToPrevOffset, col, fileno)
+    } else {
+      Vector()
     }
   }
 
-  private def writeRecords(tkvs: List[TKeyVal], records: List[SimpleRecord], keyToPrevOffset: Map[Hash, Int], col: Int, fileno: Int): Iterable[Int] = {
+  private def writeRecords(kvs: Vector[TKeyVal], records: Vector[SimpleRecord], keyToPrevOffset: Map[Hash, Int], col: Int, fileno: Int): Iterable[Int] = {
     try {
       writeLock.lock()
 
@@ -150,7 +151,7 @@ final class KesqueTable private[kesque] (
         case (indexRecords, (topicPartition, LogAppendResult(appendInfo, None))) =>
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
-            val (lastOffset, idxRecords) = tkvs.foldLeft(firstOffert, Vector[(Array[Byte], Long)]()) {
+            val (lastOffset, idxRecords) = kvs.foldLeft(firstOffert, Vector[(Array[Byte], Long)]()) {
               case ((longOffset, idxRecords), TKeyVal(keyBytes, value, _, timestamp)) =>
                 val offset = longOffset.toInt
                 val key = Hash(keyBytes)

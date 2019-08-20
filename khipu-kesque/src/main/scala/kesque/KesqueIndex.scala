@@ -20,8 +20,8 @@ final class KesqueIndex(env: Env[ByteBuffer], topic: String) extends Logging {
     topic,
     DbiFlags.MDB_CREATE,
     DbiFlags.MDB_INTEGERKEY,
-    DbiFlags.MDB_DUPSORT,
     DbiFlags.MDB_INTEGERDUP,
+    DbiFlags.MDB_DUPSORT,
     DbiFlags.MDB_DUPFIXED
   )
 
@@ -40,110 +40,143 @@ final class KesqueIndex(env: Env[ByteBuffer], topic: String) extends Logging {
 
       cursor = table.openCursor(txn)
       if (cursor.get(kBuf, GetOp.MDB_SET_KEY)) {
-        val data = Array.ofDim[Byte](cursor.`val`.remaining)
         val offset = cursor.`val`.getLong()
         offsets ::= offset
 
         while (cursor.seek(SeekOp.MDB_NEXT_DUP)) {
-          val data = Array.ofDim[Byte](cursor.`val`.remaining)
           val offset = cursor.`val`.getLong()
           offsets ::= offset
         }
       }
 
-      kBuf.clear()
-
       txn.commit()
+
+      kBuf.clear()
+      debug(s"key: ${khipu.Hash(key)}, offsets: $offsets")
       offsets
     } catch {
       case ex: Throwable =>
         error(ex.getMessage, ex)
-        if (txn ne null) txn.abort()
+        if (txn ne null) {
+          txn.abort()
+        }
         offsets
     } finally {
-      if (cursor ne null) cursor.close()
-      if (txn ne null) txn.close()
+      if (cursor ne null) {
+        cursor.close()
+      }
+      if (txn ne null) {
+        txn.close()
+      }
     }
   }
 
   def put(key: Array[Byte], offset: Long) = {
-    val kBuf = ByteBuffer.allocateDirect(KEY_SIZE)
-    val vBuf = ByteBuffer.allocateDirect(VAL_SIZE)
-
     var txn: Txn[ByteBuffer] = null
     try {
       txn = env.txnWrite()
+      val kBuf = ByteBuffer.allocateDirect(KEY_SIZE)
+      val vBuf = ByteBuffer.allocateDirect(VAL_SIZE)
+
       val sKey = toShortKey(key)
       kBuf.put(sKey).flip()
       vBuf.putLong(offset).flip()
 
       table.put(txn, kBuf, vBuf)
+
+      txn.commit()
+
       kBuf.clear()
       vBuf.clear()
-      txn.commit()
     } catch {
       case ex: Throwable =>
         error(ex.getMessage, ex)
-        if (txn ne null) txn.abort()
+        if (txn ne null) {
+          txn.abort()
+        }
     } finally {
-      if (txn ne null) txn.close()
+      if (txn ne null) {
+        txn.close()
+      }
     }
   }
 
   def put(kvs: Iterable[(Array[Byte], Long)]) {
-    val kBuf = ByteBuffer.allocateDirect(KEY_SIZE)
-    val vBuf = ByteBuffer.allocateDirect(VAL_SIZE)
-
     var txn: Txn[ByteBuffer] = null
     try {
       txn = env.txnWrite()
+      var bufs: List[ByteBuffer] = Nil
       kvs foreach {
         case (key, offset) =>
+          val kBuf = ByteBuffer.allocateDirect(KEY_SIZE)
+          val vBuf = ByteBuffer.allocateDirect(VAL_SIZE)
+          bufs ::= kBuf
+          bufs ::= vBuf
+
           val sKey = toShortKey(key)
           kBuf.put(sKey).flip()
           vBuf.putLong(offset).flip()
 
           table.put(txn, kBuf, vBuf)
-          kBuf.clear()
-          vBuf.clear()
       }
       txn.commit()
+
+      bufs foreach (_.clear)
     } catch {
       case ex: Throwable =>
         error(ex.getMessage, ex)
-        if (txn ne null) txn.abort()
+        if (txn ne null) {
+          txn.abort()
+        }
     } finally {
-      if (txn ne null) txn.close()
+      if (txn ne null) {
+        txn.close()
+      }
     }
   }
 
   def remove(key: Array[Byte], offset: Long) {
-    val kBuf = ByteBuffer.allocateDirect(KEY_SIZE)
-    val vBuf = ByteBuffer.allocateDirect(VAL_SIZE)
-
     var txn: Txn[ByteBuffer] = null
     try {
       txn = env.txnWrite()
+      val kBuf = ByteBuffer.allocateDirect(KEY_SIZE)
+      val vBuf = ByteBuffer.allocateDirect(VAL_SIZE)
+
       val sKey = toShortKey(key)
       kBuf.put(sKey).flip()
       vBuf.putLong(offset).flip()
 
       table.delete(txn, kBuf, vBuf)
+
       kBuf.clear()
       vBuf.clear()
       txn.commit()
     } catch {
       case ex: Throwable =>
         error(ex.getMessage, ex)
-        if (txn ne null) txn.abort()
+        if (txn ne null) {
+          txn.abort()
+        }
     } finally {
-      if (txn ne null) txn.close()
+      if (txn ne null) {
+        txn.close()
+      }
     }
+  }
+
+  def count = {
+    val rtx = env.txnRead()
+    val stat = table.stat(rtx)
+    val ret = stat.entries
+    rtx.commit()
+    rtx.close()
+    ret
   }
 
   private def toShortKey(bytes: Array[Byte]) = {
     val slice = Array.ofDim[Byte](KEY_SIZE)
-    System.arraycopy(bytes, 0, slice, 0, KEY_SIZE)
+    val len = math.min(bytes.length, KEY_SIZE)
+    System.arraycopy(bytes, bytes.length - len, slice, 0, len)
     slice
   }
 

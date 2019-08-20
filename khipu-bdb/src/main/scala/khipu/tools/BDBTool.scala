@@ -125,7 +125,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
   }
 
   def write(table: Database, num: Int, isBulk: Boolean, isTransactional: Boolean) = {
-    val keys = new java.util.ArrayList[Array[Byte]]()
+    val keysToRead = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
     var elapsed = 0L
@@ -153,7 +153,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
       val txn = if (isTransactional) dbenv.beginTransaction(null, null) else null
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](averDataSize)
-        Random.nextBytes(v)
+        new Random(System.currentTimeMillis).nextBytes(v)
         val k = crypto.kec256(v)
 
         start = System.nanoTime
@@ -182,7 +182,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
         totalElapsed += duration
 
         if (i % keyInterval == 0) {
-          keys.add(k)
+          keysToRead.add(k)
         }
 
         j += 1
@@ -225,7 +225,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
     val speed = i / (totalElapsed / 1000000000.0)
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - write all in ${xf((totalElapsed / 1000000000.0))}s")
 
-    keys
+    keysToRead
   }
 
   def read(table: Database, keys: java.util.ArrayList[Array[Byte]]) {
