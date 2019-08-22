@@ -4,7 +4,6 @@ import java.io.File
 import java.nio.ByteBuffer
 import khipu.Hash
 import khipu.crypto
-import scala.util.Random
 import org.rocksdb.OptimisticTransactionDB
 import org.rocksdb.Options
 import org.rocksdb.ReadOptions
@@ -66,7 +65,9 @@ class RocksdbTool() {
       val txn = table.beginTransaction(writeOptions)
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](averDataSize)
-        new Random(System.currentTimeMillis).nextBytes(v)
+                val bs = ByteBuffer.allocate(8).putLong(i).array
+        System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
+        
         val k = crypto.kec256(v)
 
         start = System.nanoTime

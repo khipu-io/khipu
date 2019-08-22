@@ -5,7 +5,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import khipu.Hash
 import khipu.crypto
-import scala.util.Random
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
 import org.lmdbjava.Dbi
@@ -23,7 +22,7 @@ object LMDBTool {
   def main(args: Array[String]) {
     val dbTool = new LMDBTool()
 
-    dbTool.test1("table1", 50000000)
+    dbTool.test2("table1", 200000000)
 
     System.exit(0)
   }
@@ -31,11 +30,11 @@ object LMDBTool {
 class LMDBTool() {
   private def xf(n: Double) = "%1$10.1f".format(n)
 
-  val mapSize = 100 * 1024 * 1024 * 1024L
+  val MAP_SIZE = 300 * 1024 * 1024 * 1024L
 
   val COMPILED_MAX_KEY_SIZE = 511
 
-  val IntIndexKey = true
+  val IntIndexKey = false
   val IntTableKey = false
 
   val INDEX_KEY_SIZE = if (IntIndexKey) 4 else 8 // decide collisons probability
@@ -53,11 +52,12 @@ class LMDBTool() {
   }
 
   val env = Env.create()
-    .setMapSize(mapSize)
+    .setMapSize(MAP_SIZE)
     .setMaxDbs(6)
     .setMaxReaders(1024)
     .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
 
+  // original key
   def test1(tableName: String, num: Int) = {
     val table = env.openDbi(tableName, DbiFlags.MDB_CREATE)
 
@@ -85,7 +85,9 @@ class LMDBTool() {
       val wtx = env.txnWrite()
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](DATA_SIZE)
-        new Random(System.currentTimeMillis).nextBytes(v)
+        val bs = ByteBuffer.allocate(8).putLong(i).array
+        System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
+
         val k = crypto.kec256(v)
 
         start = System.nanoTime
@@ -215,6 +217,7 @@ class LMDBTool() {
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - read all in ${xf(totalElapsed)}s")
   }
 
+  // compact key - index table + data table
   def test2(tableName: String, num: Int) = {
     val table = env.openDbi(
       tableName,
@@ -265,7 +268,9 @@ class LMDBTool() {
       val wtx = env.txnWrite()
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](DATA_SIZE)
-        Random.nextBytes(v)
+        val bs = ByteBuffer.allocate(8).putLong(i).array
+        System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
+
         val k = crypto.kec256(v)
 
         start = System.nanoTime
@@ -449,7 +454,9 @@ class LMDBTool() {
       val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
 
       val v = Array.ofDim[Byte](DATA_SIZE)
-      Random.nextBytes(v)
+      val bs = ByteBuffer.allocate(8).putLong(i).array
+      System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
+
       tableKey.putLong(i).flip()
       tableVal.put(v).flip()
       if (!table.put(wtx, tableKey, tableVal, PutFlags.MDB_APPEND)) {

@@ -11,19 +11,20 @@ import khipu.util.FIFOCache
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.SimpleRecord
 import org.lmdbjava.Env
+import org.rocksdb.OptimisticTransactionDB
 
 object KesqueTable {
   val fetchMaxBytesInLoadOffsets = 100 * 1024 * 1024 // 100M
-  val defaultFetchMaxBytes = 4 * 1024 // 4K the size of SSD block
+  val defaultFetchMaxBytes = 4 * 1024 // 4K - the size of SSD block
 }
 final class KesqueTable private[kesque] (
     topics:          Array[String],
     kesqueDb:        Kesque,
-    lmdbEnv:         Env[ByteBuffer],
+    lmdbOrRocksdb:   Either[Env[ByteBuffer], OptimisticTransactionDB],
     withTimeToKey:   Boolean,
-    fetchMaxBytes:   Int             = KesqueTable.defaultFetchMaxBytes,
-    compressionType: CompressionType = CompressionType.NONE,
-    cacheSize:       Int             = 10000
+    fetchMaxBytes:   Int                                              = KesqueTable.defaultFetchMaxBytes,
+    compressionType: CompressionType                                  = CompressionType.NONE,
+    cacheSize:       Int                                              = 10000
 ) extends Logging {
   private val (caches, indexes, topicToCol) = init()
 
@@ -38,7 +39,10 @@ final class KesqueTable private[kesque] (
     var i = 0
     while (i < topics.length) {
       caches(i) = new FIFOCache[Hash, TVal](cacheSize)
-      indexes(i) = new KesqueIndex(lmdbEnv, topics(i))
+      indexes(i) = lmdbOrRocksdb match {
+        case Left(lmdbEnv)       => new KesqueIndexLmdb(lmdbEnv, topics(i))
+        case Right(rocksdbTable) => new KesqueIndexRocksdb(rocksdbTable, topics(i))
+      }
       topicToCol += (topics(i) -> i)
       i += 1
     }
@@ -64,10 +68,10 @@ final class KesqueTable private[kesque] (
             val recs = result.info.records.records.iterator
             // NOTE: the records usually do not start from the fecth-offset, 
             // the expected record may be near the tail of recs
-            //debug(s"======== $offset ${result.info.fetchOffsetMetadata} ")
+            debug(s"\n======= $offset -> $result")
             while (recs.hasNext) {
               val rec = recs.next
-              //debug(s"${rec.offset}")
+              debug(s"${rec.offset},")
               if (rec.offset == offset && java.util.Arrays.equals(kesque.getBytes(rec.key), keyBytes)) {
                 foundValue = if (rec.hasValue) {
                   Some(TVal(kesque.getBytes(rec.value), offset.toInt, rec.timestamp))
@@ -92,7 +96,7 @@ final class KesqueTable private[kesque] (
     }
   }
 
-  def write(kvs: Iterable[TKeyVal], topic: String, fileno: Int = 0): Iterable[Int] = {
+  def write(kvs: Iterable[TKeyVal], topic: String, fileno: Int = 0): Int = {
     val col = topicToCol(topic)
 
     // prepare simple records, filter no changed ones
@@ -133,11 +137,11 @@ final class KesqueTable private[kesque] (
       // write to log file
       writeRecords(tkvs, records, keyToPrevOffset, col, fileno)
     } else {
-      Vector()
+      0
     }
   }
 
-  private def writeRecords(kvs: Vector[TKeyVal], records: Vector[SimpleRecord], keyToPrevOffset: Map[Hash, Int], col: Int, fileno: Int): Iterable[Int] = {
+  private def writeRecords(kvs: Vector[TKeyVal], records: Vector[SimpleRecord], keyToPrevOffset: Map[Hash, Int], col: Int, fileno: Int): Int = {
     try {
       writeLock.lock()
 
@@ -177,7 +181,7 @@ final class KesqueTable private[kesque] (
       // write index records
       indexes(col).put(indexRecords.flatten)
 
-      indexRecords.map(_.size)
+      indexRecords.map(_.size).sum
     } finally {
       writeLock.unlock()
     }

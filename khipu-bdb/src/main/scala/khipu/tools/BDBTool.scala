@@ -14,7 +14,6 @@ import java.io.File
 import java.nio.ByteBuffer
 import khipu.Hash
 import khipu.crypto
-import scala.util.Random
 import scala.collection.mutable
 
 /**
@@ -153,7 +152,9 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
       val txn = if (isTransactional) dbenv.beginTransaction(null, null) else null
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](averDataSize)
-        new Random(System.currentTimeMillis).nextBytes(v)
+        val bs = ByteBuffer.allocate(8).putLong(i).array
+        System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
+        
         val k = crypto.kec256(v)
 
         start = System.nanoTime

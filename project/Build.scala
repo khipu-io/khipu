@@ -35,7 +35,7 @@ object Build extends sbt.Build {
     .dependsOn(khipu_storage)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.kafka ++ Dependencies.spongycastle ++ Dependencies.caffeine ++ Dependencies.lmdb)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.kafka ++ Dependencies.spongycastle ++ Dependencies.caffeine ++ Dependencies.lmdb ++ Dependencies.rocksdb)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
 

@@ -10,6 +10,7 @@ import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.SimpleRecord
 import org.apache.kafka.common.requests.FetchRequest.PartitionData
 import org.lmdbjava.Env
+import org.rocksdb.OptimisticTransactionDB
 import scala.collection.mutable
 
 /**
@@ -77,12 +78,12 @@ final class Kesque(props: Properties) {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes, compressionType, cacheSize))
   }
 
-  def getKesqueTable(topics: Array[String], lmdbEnv: Env[ByteBuffer], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
-    topicToKesqueTable.getOrElseUpdate(topics.mkString(","), new KesqueTable(topics, this, lmdbEnv, false, fetchMaxBytes, compressionType, cacheSize))
+  def getKesqueTable(topics: Array[String], lmdbOrRocksdb: Either[Env[ByteBuffer], OptimisticTransactionDB], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
+    topicToKesqueTable.getOrElseUpdate(topics.mkString(","), new KesqueTable(topics, this, lmdbOrRocksdb, false, fetchMaxBytes, compressionType, cacheSize))
   }
 
-  def getTimedKesqueTable(topics: Array[String], lmdbEnv: Env[ByteBuffer], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
-    topicToKesqueTable.getOrElseUpdate(topics.mkString(","), new KesqueTable(topics, this, lmdbEnv, true, fetchMaxBytes, compressionType, cacheSize))
+  def getTimedKesqueTable(topics: Array[String], lmdbOrRocksdb: Either[Env[ByteBuffer], OptimisticTransactionDB], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
+    topicToKesqueTable.getOrElseUpdate(topics.mkString(","), new KesqueTable(topics, this, lmdbOrRocksdb, true, fetchMaxBytes, compressionType, cacheSize))
   }
 
   private[kesque] def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {

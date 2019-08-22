@@ -1,14 +1,16 @@
 package khipu.tools
 
 import java.io.File
+import java.nio.ByteBuffer
 import kesque.Kesque
 import kesque.KesqueTable
 import khipu.TKeyVal
 import khipu.crypto
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
+import org.rocksdb.OptimisticTransactionDB
+import org.rocksdb.Options
 import scala.collection.mutable
-import scala.util.Random
 
 /**
  * Fill memory:
@@ -18,7 +20,7 @@ object KesqueTool {
   def main(args: Array[String]) {
     val dbtool = new KesqueTool()
 
-    dbtool.test(100000000)
+    dbtool.test(200000000)
   }
 }
 class KesqueTool() {
@@ -42,15 +44,19 @@ class KesqueTool() {
     h
   }
 
-  val env = Env.create()
+  val lmdbEnv = Env.create()
     .setMapSize(mapSize)
     .setMaxDbs(6)
-    .open(home, EnvFlags.MDB_NORDAHEAD)
+    .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
 
   val topic = "ddtest"
 
+  val rocksdbPath = new File(home, topic)
+  val rocksdbOptions = new Options().setCreateIfMissing(true).setMaxOpenFiles(-1)
+  val rocksDbTable = OptimisticTransactionDB.open(rocksdbOptions, rocksdbPath.getAbsolutePath)
+
   def test(total: Int) = {
-    val table = kesque.getKesqueTable(Array(topic), env, fetchMaxBytes = 4096)
+    val table = kesque.getKesqueTable(Array(topic), Right(rocksDbTable), fetchMaxBytes = 4096)
 
     val keys = write(table, total)
     read(table, keys)
@@ -59,6 +65,11 @@ class KesqueTool() {
   }
 
   def write(table: KesqueTable, total: Int) = {
+    // big batch size may cause read upon a record with big batch size
+    // small batch size may reduce the write throughput
+    // So, this parameter could adjust/balance write/read performance
+    val batchSize = 1
+
     val keysToRead = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
     var start = System.nanoTime
@@ -72,9 +83,10 @@ class KesqueTool() {
     while (i < total) {
 
       var j = 0
-      while (j < 4000 && i < total) {
+      while (j < batchSize && i < total) {
         val v = Array.ofDim[Byte](averDataSize)
-        new Random(System.currentTimeMillis).nextBytes(v)
+        val bs = ByteBuffer.allocate(8).putLong(i).array
+        System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
 
         val k = crypto.kec256(v)
 
@@ -97,6 +109,7 @@ class KesqueTool() {
       start = System.nanoTime
 
       val n = table.write(kvs, topic)
+
       kvs.clear()
 
       val duration = System.nanoTime - start
@@ -129,7 +142,6 @@ class KesqueTool() {
     while (itr.hasNext) {
       val k = itr.next
 
-      // pseudo read only
       table.read(k, topic) match {
         case Some(x) =>
         case None    => println(s"===> no data for ${khipu.toHexString(k)}")
