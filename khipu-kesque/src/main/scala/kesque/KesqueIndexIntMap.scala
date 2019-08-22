@@ -3,13 +3,13 @@ package kesque
 import java.util.Arrays
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-object HashOffsets {
+object KesqueIndexIntMap {
   type V = Int // unsigned int could be 2^32 = 4,294,967,296
 
   // --- simple test
   def main(args: Array[String]) {
     val max = 1000000
-    val map = new HashOffsets(200, 3)
+    val map = new KesqueIndexIntMap(200, 3)
 
     var col = 0
     while (col < 3) {
@@ -79,8 +79,8 @@ object HashOffsets {
  * It's actually an int -> ints hashmap by combining
  * an int -> int map and an int -> ints map.
  */
-final class HashOffsets(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.75f) {
-  import HashOffsets._
+final class KesqueIndexIntMap(initSize: Int, nValues: Int = 1, fillFactor: Float = 0.75f) {
+  import KesqueIndexIntMap._
 
   private val singleValueMap = new IntIntMap(initSize, nValues, fillFactor)
   private val multipleValuesMap = new IntIntsMap(initSize, nValues, fillFactor)

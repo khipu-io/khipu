@@ -6,8 +6,8 @@ import java.io.File
 import java.util.Arrays
 import java.util.Properties
 import kesque.HashKeyValueTable
-import kesque.HashOffsets
 import kesque.Kesque
+import kesque.KesqueIndexIntMap
 import khipu.Hash
 import khipu.TKeyVal
 import khipu.TVal
@@ -127,7 +127,7 @@ object KesqueDataSource {
     val tableSrc = db.getTable(Array(src), fetchMaxBytes = 102400, CompressionType.NONE)
     val tableTgt = db.getTable(Array(tgt), fetchMaxBytes = 102400, CompressionType.NONE)
 
-    val hashOffsets = new HashOffsets(200)
+    val hashOffsets = new KesqueIndexIntMap(200)
 
     var offset = fetchOffset
     var nRead = 0

@@ -56,7 +56,7 @@ final class HashKeyValueTable private[kesque] (
 ) extends Logging {
   import HashKeyValueTable._
 
-  private val hashOffsets = new HashOffsets(200, topics.length)
+  private val hashOffsets = new KesqueIndexIntMap(200, topics.length)
 
   /* time to key table, should be the first topic to initially create it */
   private var timeIndex = Array.ofDim[Array[Byte]](200)
