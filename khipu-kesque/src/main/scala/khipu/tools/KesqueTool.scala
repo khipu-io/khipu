@@ -40,20 +40,20 @@ class KesqueTool() {
     if (!h.exists) {
       h.mkdirs()
     }
-    println(s"lmdb home: $h")
+    println(s"index db home: $h")
     h
   }
 
-  val lmdbEnv = Env.create()
+  val topic = "ddtest"
+
+  lazy val lmdbEnv = Env.create()
     .setMapSize(mapSize)
     .setMaxDbs(6)
     .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
 
-  val topic = "ddtest"
-
-  val rocksdbPath = new File(home, topic)
-  val rocksdbOptions = new Options().setCreateIfMissing(true).setMaxOpenFiles(-1)
-  val rocksDbTable = OptimisticTransactionDB.open(rocksdbOptions, rocksdbPath.getAbsolutePath)
+  lazy val rocksdbPath = new File(home, topic)
+  lazy val rocksdbOptions = new Options().setCreateIfMissing(true).setMaxOpenFiles(-1)
+  lazy val rocksDbTable = OptimisticTransactionDB.open(rocksdbOptions, rocksdbPath.getAbsolutePath)
 
   def test(total: Int) = {
     val table = kesque.getKesqueTable(Array(topic), Right(rocksDbTable), fetchMaxBytes = 4096)

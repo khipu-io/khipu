@@ -18,7 +18,7 @@ object RocksdbTool {
   def main(args: Array[String]) {
     val dbTool = new RocksdbTool()
 
-    dbTool.test("table1", 5000000)
+    dbTool.test("table1", 200000000)
     System.exit(0)
   }
 }
