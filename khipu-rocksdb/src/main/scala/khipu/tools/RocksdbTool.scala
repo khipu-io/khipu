@@ -65,9 +65,9 @@ class RocksdbTool() {
       val txn = table.beginTransaction(writeOptions)
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](averDataSize)
-                val bs = ByteBuffer.allocate(8).putLong(i).array
+        val bs = ByteBuffer.allocate(8).putLong(i).array
         System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
-        
+
         val k = crypto.kec256(v)
 
         start = System.nanoTime

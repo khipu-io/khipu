@@ -154,7 +154,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
         val v = Array.ofDim[Byte](averDataSize)
         val bs = ByteBuffer.allocate(8).putLong(i).array
         System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
-        
+
         val k = crypto.kec256(v)
 
         start = System.nanoTime

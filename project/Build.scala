@@ -137,7 +137,7 @@ object Dependencies {
 
   val lmdb = Seq("org.lmdbjava" % "lmdbjava" % "0.7.0") // akka-distributed-data also includes this lib
 
-  val rocksdb = Seq("org.rocksdb" % "rocksdbjni" % "6.0.1")
+  val rocksdb = Seq("org.rocksdb" % "rocksdbjni" % "6.2.2")
 
   val circe = Seq(
     "io.circe" %% "circe-core" % CIRCE_VERSION,
