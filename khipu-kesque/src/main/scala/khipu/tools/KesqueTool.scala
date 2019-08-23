@@ -1,7 +1,6 @@
 package khipu.tools
 
 import java.io.File
-import java.nio.ByteBuffer
 import kesque.Kesque
 import kesque.KesqueTable
 import khipu.TKeyVal
@@ -65,10 +64,7 @@ class KesqueTool() {
   }
 
   def write(table: KesqueTable, total: Int) = {
-    // big batch size may cause read upon a record with big batch size
-    // small batch size may reduce the write throughput
-    // So, this parameter could adjust/balance write/read performance
-    val batchSize = 1
+    val batchSize = 4000
 
     val keysToRead = new java.util.ArrayList[Array[Byte]]()
     val start0 = System.nanoTime
@@ -85,14 +81,15 @@ class KesqueTool() {
       var j = 0
       while (j < batchSize && i < total) {
         val v = Array.ofDim[Byte](averDataSize)
-        val bs = ByteBuffer.allocate(8).putLong(i).array
-        System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
+        new scala.util.Random(System.currentTimeMillis).nextBytes(v)
+        //val bs = ByteBuffer.allocate(8).putLong(i).array
+        //System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
 
         val k = crypto.kec256(v)
 
         start = System.nanoTime
 
-        kvs += TKeyVal(k, v, -1, -1)
+        kvs += TKeyVal(k, v, -1, 0)
 
         val duration = System.nanoTime - start
         elapsed += duration

@@ -62,6 +62,7 @@ object Kesque {
       println(value) // Some(value_1), Some(value_2), Some(value_3)
     }
   }
+
 }
 final class Kesque(props: Properties) {
   private val kafkaServer = KafkaServer.start(props)

@@ -48,9 +48,9 @@ final class KesqueIndexLmdb(env: Env[ByteBuffer], topic: String) extends KesqueI
 
       kBuf.clear()
 
-      if (offsets.size > 1) {
-        println(s"key: ${khipu.Hash(key)}, offsets: $offsets")
-      }
+      //if (offsets.size > 1) {
+      //  println(s"key: ${khipu.Hash(key)}, offsets: $offsets")
+      //}
 
       offsets
     } catch {

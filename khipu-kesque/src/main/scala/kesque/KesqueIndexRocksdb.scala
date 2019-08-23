@@ -28,9 +28,9 @@ final class KesqueIndexRocksdb(table: OptimisticTransactionDB, topic: String) ex
           data
       }
 
-      if (offsets.size > 1) {
-        println(s"key: ${khipu.Hash(key)}, offsets: $offsets")
-      }
+      //if (offsets.size > 1) {
+      //  println(s"key: ${khipu.Hash(key)}, offsets: $offsets")
+      //}
 
       offsets
     } catch {
@@ -45,7 +45,7 @@ final class KesqueIndexRocksdb(table: OptimisticTransactionDB, topic: String) ex
     val data = table.get(readOptions, sKey) match {
       case null => ByteBuffer.allocate(8).putLong(offset).array
       case x =>
-        val buf = ByteBuffer.allocate(x.length + 8).putLong(offset).put(x)
+        val buf = ByteBuffer.allocate(x.length + 8).put(x).putLong(offset)
         buf.flip()
         buf.array
     }
@@ -82,7 +82,7 @@ final class KesqueIndexRocksdb(table: OptimisticTransactionDB, topic: String) ex
             case null =>
               ByteBuffer.allocate(8).putLong(offset).array
             case x =>
-              val buf = ByteBuffer.allocate(x.length + 8).putLong(offset).put(x)
+              val buf = ByteBuffer.allocate(x.length + 8).put(x).putLong(offset)
               buf.flip()
               buf.array
           }
