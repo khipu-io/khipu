@@ -43,7 +43,7 @@ final class KesqueTable private[kesque] (
       caches(i) = new FIFOCache[Hash, TVal](cacheSize)
       indexes(i) = lmdbOrRocksdb match {
         case Left(lmdbEnv)       => new KesqueIndexLmdb(lmdbEnv, topics(i))
-        case Right(rocksdbTable) => new KesqueIndexRocksdb(rocksdbTable, topics(i))
+        case Right(rocksdbTable) => new KesqueIndexRocksdb(rocksdbTable, topics(i), useShortKey = true)
       }
       topicToCol += (topics(i) -> i)
       i += 1
@@ -102,7 +102,7 @@ final class KesqueTable private[kesque] (
     val col = topicToCol(topic)
 
     // we'll keep the batch size not exceeding fetchMaxBytes to get better random read performance
-    var bacthedRecords = Vector[(Seq[TKeyVal], Seq[SimpleRecord])]()
+    var batchedRecords = Vector[(Seq[TKeyVal], Seq[SimpleRecord])]()
 
     var size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
     var offsetDelta = 0
@@ -112,7 +112,6 @@ final class KesqueTable private[kesque] (
     var tkvs = Vector[TKeyVal]()
     var records = Vector[SimpleRecord]()
     var keyToPrevOffset = Map[Hash, Int]()
-    var lastRecordsAdded = false
     kvs foreach {
       case kv @ TKeyVal(keyBytes, value, offset, timestamp) =>
         val key = Hash(keyBytes)
@@ -132,10 +131,9 @@ final class KesqueTable private[kesque] (
                 size = newSize
                 offsetDelta += 1
               } else {
-                bacthedRecords :+= (tkvs, records)
+                batchedRecords :+= (tkvs, records)
                 tkvs = Vector[TKeyVal]()
                 records = Vector[SimpleRecord]()
-                lastRecordsAdded = false
 
                 tkvs :+= kv
                 records :+= record
@@ -167,10 +165,9 @@ final class KesqueTable private[kesque] (
               size = newSize
               offsetDelta += 1
             } else {
-              bacthedRecords :+= (tkvs, records)
+              batchedRecords :+= (tkvs, records)
               tkvs = Vector[TKeyVal]()
               records = Vector[SimpleRecord]()
-              lastRecordsAdded = false
 
               tkvs :+= kv
               records :+= record
@@ -184,12 +181,12 @@ final class KesqueTable private[kesque] (
         }
     }
 
-    if (!lastRecordsAdded) {
-      bacthedRecords :+= (tkvs, records)
+    if (records.nonEmpty) {
+      batchedRecords :+= (tkvs, records)
     }
 
     // write to log file
-    bacthedRecords map {
+    batchedRecords map {
       case (tkvs, recs) =>
         if (recs.nonEmpty) {
           writeRecords(tkvs, recs, keyToPrevOffset, col, fileno)

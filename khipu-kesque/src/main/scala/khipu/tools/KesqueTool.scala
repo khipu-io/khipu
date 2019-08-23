@@ -1,6 +1,7 @@
 package khipu.tools
 
 import java.io.File
+import java.nio.ByteBuffer
 import kesque.Kesque
 import kesque.KesqueTable
 import khipu.TKeyVal
@@ -81,9 +82,8 @@ class KesqueTool() {
       var j = 0
       while (j < batchSize && i < total) {
         val v = Array.ofDim[Byte](averDataSize)
-        new scala.util.Random(System.currentTimeMillis).nextBytes(v)
-        //val bs = ByteBuffer.allocate(8).putLong(i).array
-        //System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
+        val bs = ByteBuffer.allocate(8).putLong(i).array
+        System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
 
         val k = crypto.kec256(v)
 

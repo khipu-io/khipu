@@ -40,7 +40,7 @@ class LMDBTool() {
   val INDEX_KEY_SIZE = if (IntIndexKey) 4 else 8 // decide collisons probability
   val TABLE_KEY_SIZE = if (IntTableKey) 4 else 8 // decide max number of records
 
-  val DATA_SIZE = 1024
+  val averDataSize = 1024
 
   val home = {
     val h = new File("/home/dcaoyuan/tmp")
@@ -84,8 +84,9 @@ class LMDBTool() {
       var j = 0
       val wtx = env.txnWrite()
       while (j < 4000 && i < num) {
-        val v = Array.ofDim[Byte](DATA_SIZE)
-        new scala.util.Random(System.currentTimeMillis).nextBytes(v)
+        val v = Array.ofDim[Byte](averDataSize)
+        val bs = ByteBuffer.allocate(8).putLong(i).array
+        System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
 
         val k = crypto.kec256(v)
 
@@ -261,12 +262,12 @@ class LMDBTool() {
       val indexKey = ByteBuffer.allocateDirect(INDEX_KEY_SIZE)
       val indexVal = ByteBuffer.allocateDirect(TABLE_KEY_SIZE).order(ByteOrder.nativeOrder)
       val tableKey = ByteBuffer.allocateDirect(TABLE_KEY_SIZE).order(ByteOrder.nativeOrder)
-      val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
+      val tableVal = ByteBuffer.allocateDirect(averDataSize)
 
       var j = 0
       val wtx = env.txnWrite()
       while (j < 4000 && i < num) {
-        val v = Array.ofDim[Byte](DATA_SIZE)
+        val v = Array.ofDim[Byte](averDataSize)
         val bs = ByteBuffer.allocate(8).putLong(i).array
         System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
 
@@ -450,9 +451,9 @@ class LMDBTool() {
     var i = 0
     while (i < 1010) {
       val tableKey = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder)
-      val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
+      val tableVal = ByteBuffer.allocateDirect(averDataSize)
 
-      val v = Array.ofDim[Byte](DATA_SIZE)
+      val v = Array.ofDim[Byte](averDataSize)
       val bs = ByteBuffer.allocate(8).putLong(i).array
       System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
 
@@ -486,7 +487,7 @@ class LMDBTool() {
     i = 1000
     while (i < 1010) {
       val tableKey = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder)
-      val tableVal = ByteBuffer.allocateDirect(DATA_SIZE)
+      val tableVal = ByteBuffer.allocateDirect(averDataSize)
 
       tableKey.putLong(i).flip()
       tableVal.put(i.toString.getBytes).flip()
