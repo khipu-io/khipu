@@ -9,6 +9,8 @@ import khipu.TKeyVal
 import khipu.TVal
 import khipu.util.FIFOCache
 import org.apache.kafka.common.record.CompressionType
+import org.apache.kafka.common.record.DefaultRecord
+import org.apache.kafka.common.record.DefaultRecordBatch
 import org.apache.kafka.common.record.SimpleRecord
 import org.lmdbjava.Env
 import org.rocksdb.OptimisticTransactionDB
@@ -68,10 +70,10 @@ final class KesqueTable private[kesque] (
             val recs = result.info.records.records.iterator
             // NOTE: the records usually do not start from the fecth-offset, 
             // the expected record may be near the tail of recs
-            debug(s"\n======= $offset -> $result")
+            //println(s"\n======= $offset -> $result")
             while (recs.hasNext) {
               val rec = recs.next
-              debug(s"${rec.offset},")
+              //print(s"${rec.offset},")
               if (rec.offset == offset && java.util.Arrays.equals(kesque.getBytes(rec.key), keyBytes)) {
                 foundValue = if (rec.hasValue) {
                   Some(TVal(kesque.getBytes(rec.value), offset.toInt, rec.timestamp))
@@ -99,49 +101,120 @@ final class KesqueTable private[kesque] (
   def write(kvs: Iterable[TKeyVal], topic: String, fileno: Int = 0): Int = {
     val col = topicToCol(topic)
 
+    // we'll keep the batch size not exceeding fetchMaxBytes to get better random read performance
+    var bacthedRecords = Vector[(Seq[TKeyVal], Seq[SimpleRecord])]()
+
+    var size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
+    var offsetDelta = 0
+    var firstTimestamp = Long.MinValue
+
     // prepare simple records, filter no changed ones
     var tkvs = Vector[TKeyVal]()
     var records = Vector[SimpleRecord]()
     var keyToPrevOffset = Map[Hash, Int]()
+    var lastRecordsAdded = false
     kvs foreach {
-      case tkv @ TKeyVal(keyBytes, value, offset, timestamp) =>
+      case kv @ TKeyVal(keyBytes, value, offset, timestamp) =>
         val key = Hash(keyBytes)
         caches(col).get(key) match {
           case Some(TVal(prevValue, prevOffset, _)) =>
             if (isValueChanged(value, prevValue)) {
-              val rec = if (timestamp < 0) {
-                new SimpleRecord(keyBytes, value)
-              } else {
-                new SimpleRecord(timestamp, keyBytes, value)
+              val record = new SimpleRecord(timestamp, keyBytes, value)
+              if (firstTimestamp == Long.MinValue) {
+                firstTimestamp = timestamp
               }
-              tkvs :+= tkv
-              records :+= rec
-              keyToPrevOffset += (key -> prevOffset)
+              val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
+              if (estimatedSize < fetchMaxBytes) {
+                tkvs :+= kv
+                records :+= record
+                keyToPrevOffset += (key -> prevOffset)
+
+                size = newSize
+                offsetDelta += 1
+              } else {
+                bacthedRecords :+= (tkvs, records)
+                tkvs = Vector[TKeyVal]()
+                records = Vector[SimpleRecord]()
+                lastRecordsAdded = false
+
+                tkvs :+= kv
+                records :+= record
+                keyToPrevOffset += (key -> prevOffset)
+
+                size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
+                offsetDelta = 0
+                val (firstSize, _) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
+                size = firstSize
+                offsetDelta += 1
+              }
+
               // TODO should only happen when value is set to empty, i.e. removed?
               // remove records of prevOffset from memory?
             } else {
               debug(s"$topic: value not changed. cache: hit ${caches(col).hitRate}, miss ${caches(col).missRate}}")
             }
           case None =>
-            val rec = if (timestamp < 0) {
-              new SimpleRecord(keyBytes, value)
-            } else {
-              new SimpleRecord(timestamp, keyBytes, value)
+            val record = new SimpleRecord(timestamp, keyBytes, value)
+            if (firstTimestamp == Long.MinValue) {
+              firstTimestamp = timestamp
             }
-            tkvs :+= tkv
-            records :+= rec
+            val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
+            //println(s"$newSize, $estimatedSize")
+            if (estimatedSize < fetchMaxBytes) {
+              tkvs :+= kv
+              records :+= record
+
+              size = newSize
+              offsetDelta += 1
+            } else {
+              bacthedRecords :+= (tkvs, records)
+              tkvs = Vector[TKeyVal]()
+              records = Vector[SimpleRecord]()
+              lastRecordsAdded = false
+
+              tkvs :+= kv
+              records :+= record
+
+              size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
+              offsetDelta = 0
+              val (firstSize, _) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
+              size = firstSize
+              offsetDelta += 1
+            }
         }
     }
 
-    if (records.nonEmpty) {
-      // write to log file
-      writeRecords(tkvs, records, keyToPrevOffset, col, fileno)
-    } else {
-      0
+    if (!lastRecordsAdded) {
+      bacthedRecords :+= (tkvs, records)
     }
+
+    // write to log file
+    bacthedRecords map {
+      case (tkvs, recs) =>
+        if (recs.nonEmpty) {
+          writeRecords(tkvs, recs, keyToPrevOffset, col, fileno)
+        } else {
+          0
+        }
+    } sum
   }
 
-  private def writeRecords(kvs: Vector[TKeyVal], records: Vector[SimpleRecord], keyToPrevOffset: Map[Hash, Int], col: Int, fileno: Int): Int = {
+  /**
+   * @see org.apache.kafka.common.record.AbstractRecords#estimateSizeInBytes
+   */
+  private def estimateSizeInBytes(prevSize: Int, firstTimestamp: Long, offsetDelta: Int, record: SimpleRecord): (Int, Int) = {
+    val timestampDelta = record.timestamp - firstTimestamp
+    val size = prevSize + DefaultRecord.sizeInBytes(offsetDelta, timestampDelta, record.key, record.value, record.headers)
+
+    val estimateSize = if (compressionType == CompressionType.NONE) {
+      size
+    } else {
+      math.min(math.max(size / 2, 1024), 1 << 16)
+    }
+    (size, estimateSize)
+  }
+
+  private def writeRecords(kvs: Seq[TKeyVal], records: Seq[SimpleRecord], keyToPrevOffset: Map[Hash, Int], col: Int, fileno: Int): Int = {
     try {
       writeLock.lock()
 
