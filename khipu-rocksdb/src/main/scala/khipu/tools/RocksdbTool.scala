@@ -4,9 +4,12 @@ import java.io.File
 import java.nio.ByteBuffer
 import khipu.Hash
 import khipu.crypto
+import org.rocksdb.BlockBasedTableConfig
+import org.rocksdb.BloomFilter
 import org.rocksdb.OptimisticTransactionDB
 import org.rocksdb.Options
 import org.rocksdb.ReadOptions
+import org.rocksdb.WriteBatch
 import org.rocksdb.WriteOptions
 import scala.collection.mutable
 
@@ -36,9 +39,13 @@ class RocksdbTool() {
     h
   }
 
-  val options = new Options().setCreateIfMissing(true).setMaxOpenFiles(-1)
-  val writeOptions = new WriteOptions()
-  val readOptions = new ReadOptions()
+  val tableOptions = new BlockBasedTableConfig()
+      .setFilterPolicy(new BloomFilter(10))
+    val options = new Options()
+      .setCreateIfMissing(true)
+      .setMaxOpenFiles(-1)
+      .setTableFormatConfig(tableOptions)
+      .setAllowMmapWrites(false)
 
   def test(tableName: String, num: Int) = {
     val path = new File(home, tableName)
@@ -62,6 +69,8 @@ class RocksdbTool() {
     while (i < num) {
 
       var j = 0
+      val writeOptions = new WriteOptions()
+      val batch = new WriteBatch()
       val txn = table.beginTransaction(writeOptions)
       while (j < 4000 && i < num) {
         val v = Array.ofDim[Byte](averDataSize)
@@ -73,7 +82,7 @@ class RocksdbTool() {
         start = System.nanoTime
 
         try {
-          txn.put(k, v)
+          batch.put(k, v)
         } catch {
           case ex: Throwable => println(ex)
         } finally {
@@ -89,11 +98,12 @@ class RocksdbTool() {
 
         j += 1
         i += 1
-      }
+      } // end j
 
       start = System.nanoTime
 
       try {
+        table.write(writeOptions, batch)
         txn.commit()
       } catch {
         case ex: Throwable =>
@@ -101,6 +111,8 @@ class RocksdbTool() {
           println(ex)
       } finally {
         txn.close()
+        batch.close()
+        writeOptions.close()
       }
 
       val duration = System.nanoTime - start
@@ -113,7 +125,7 @@ class RocksdbTool() {
         start = System.nanoTime
         elapsed = 0L
       }
-    }
+    } // end i
 
     val speed = i / (totalElapsed / 1000000000.0)
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - write all in ${xf((totalElapsed / 1000000000.0))}s")
@@ -130,17 +142,19 @@ class RocksdbTool() {
     var i = 0
     while (itr.hasNext) {
       val k = itr.next
-      val sKey = sliceBytes(k)
 
+      val readOptions = new ReadOptions()
       try {
         val gotData = Option(table.get(readOptions, k))
         if (gotData.isEmpty) {
-          println(s"===> no data for ${khipu.toHexString(sKey)} of ${khipu.toHexString(k)}")
+          println(s"===> no data for ${khipu.toHexString(k)}")
         }
       } catch {
         case ex: Throwable =>
           println(ex)
           null
+      } finally {
+        readOptions.close()
       }
 
       if (i > 0 && i % 10000 == 0) {
@@ -159,7 +173,7 @@ class RocksdbTool() {
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - read all in ${xf(totalElapsed)}s")
   }
 
-  final def sliceBytes(bytes: Array[Byte]) = {
+  final def toShortKey(bytes: Array[Byte]) = {
     val slice = Array.ofDim[Byte](4)
     System.arraycopy(bytes, 0, slice, 0, 4)
     slice

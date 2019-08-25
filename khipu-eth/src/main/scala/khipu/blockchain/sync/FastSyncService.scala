@@ -292,6 +292,8 @@ trait FastSyncService { _: SyncService =>
   protected def saveNodesData() = syncState foreach fastSyncStateStorage.putNodesData
 
   private class SyncingHandler(syncState: SyncState) {
+    updateBestBlockNumber()
+
     blockHeaderForChecking = Some(syncState.targetBlockHeader)
 
     private var workingPeers = Set[Peer]()
@@ -299,8 +301,7 @@ trait FastSyncService { _: SyncService =>
 
     private var blockchainOnlyPeers = Map[String, Peer]()
 
-    private var currSyncedBlockNumber = appStateStorage.getBestBlockNumber
-    private var prevSyncedBlockNumber = currSyncedBlockNumber
+    private var prevSyncedBlockNumber = appStateStorage.getBestBlockNumber
     private var prevDownloadeNodes = syncState.downloadedNodesCount
     private var prevReportTime = System.nanoTime
 
@@ -348,9 +349,12 @@ trait FastSyncService { _: SyncService =>
             }
 
             if (toSave.nonEmpty) {
-              saveBodies(toSave, nextNumber - 1)
-              syncState.bestBodyNumber = nextNumber - 1
+              val bestBodyNumber = nextNumber - 1
+              saveBodies(toSave, bestBodyNumber)
+              syncState.bestBodyNumber = bestBodyNumber
               receivedBodies --= toRemove
+
+              updateBestBlockNumber()
             }
 
             val enqueueHashes = remainingHashes.map { hash =>
@@ -361,7 +365,6 @@ trait FastSyncService { _: SyncService =>
 
             syncState.pendingBodies ++= enqueueHashes
             syncState.workingBodies --= workHashes
-            currSyncedBlockNumber = appStateStorage.getBestBlockNumber
 
             log.debug(s"bodies: best ${syncState.bestBodyNumber}, received ${receivedBodies.map(_.number)}, working: ${syncState.workingBodies.map(_._2).toList.sorted} pending: ${syncState.pendingBodies.map(_.number).toList.sorted}")
 
@@ -397,6 +400,8 @@ trait FastSyncService { _: SyncService =>
               saveReceipts(toSave)
               syncState.bestReceiptsNumber = nextNumber - 1
               receivedReceipts --= toRemove
+
+              updateBestBlockNumber()
             }
 
             val enqueueHashes = remainingHashes.map { hash =>
@@ -470,7 +475,7 @@ trait FastSyncService { _: SyncService =>
 
     def processSyncing() {
       if (isFullySynced) {
-        // TODO check isFullySynced is not enough, since saving blockbodies and appStateStorage are async 
+        updateBestBlockNumber()
         reportStatus()
         val bestBlockNumber = appStateStorage.getBestBlockNumber
         if (bestBlockNumber == syncState.targetBlockNumber) {
@@ -629,6 +634,14 @@ trait FastSyncService { _: SyncService =>
         bodyWorks foreach { case (peer, requestingHashes) => requestBlockBodies(peer, requestingHashes) }
         headerWork foreach { peer => requestBlockHeaders(peer) }
         nodeWorks foreach { case (peer, requestingNodes) => requestNodes(peer, requestingNodes) }
+      }
+    }
+
+    private def updateBestBlockNumber() {
+      val bestBlockNumber = math.min(syncState.bestBodyNumber, syncState.bestReceiptsNumber)
+      log.debug(s"bestBlockNumber: $bestBlockNumber, prevSyncedBlockNumber: ${appStateStorage.getBestBlockNumber}. Saved")
+      if (bestBlockNumber > appStateStorage.getBestBlockNumber) {
+        appStateStorage.putBestBlockNumber(bestBlockNumber)
       }
     }
 
@@ -808,16 +821,6 @@ trait FastSyncService { _: SyncService =>
       HeadersWork(orderedHeaders, tds, lastNumber)
     }
 
-    private def updateBestBlockIfNeeded(bestSavedBlockNumber: Long): Option[Long] = {
-      log.debug(s"bestSavedBlockNumber: ${bestSavedBlockNumber}, prevSyncedBlockNumber: ${appStateStorage.getBestBlockNumber}. Saved")
-      if (bestSavedBlockNumber > appStateStorage.getBestBlockNumber) {
-        appStateStorage.putBestBlockNumber(bestSavedBlockNumber)
-        Some(bestSavedBlockNumber)
-      } else {
-        None
-      }
-    }
-
     // --- saving methods
 
     private def saveHeaders(kvs: Iterable[BlockHeader]) {
@@ -837,7 +840,6 @@ trait FastSyncService { _: SyncService =>
       } catch {
         case ex: Throwable => log.error(ex, s"$kvs \n${ex.getMessage}")
       }
-      updateBestBlockIfNeeded(bestSavedBlockNumber)
       log.debug(s"SaveBodies ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
@@ -888,21 +890,22 @@ trait FastSyncService { _: SyncService =>
       val nPendingNodes = syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size
       val nWorkingNodes = syncState.workingMptNodes.size + syncState.workingNonMptNodes.size
       val nTotalNodes = syncState.downloadedNodesCount + nPendingNodes + nWorkingNodes
-      val blockRate = ((currSyncedBlockNumber - prevSyncedBlockNumber) / duration).toInt
+      val syncedBlockNumber = appStateStorage.getBestBlockNumber
+      val blockRate = ((syncedBlockNumber - prevSyncedBlockNumber) / duration).toInt
       val stateRate = ((syncState.downloadedNodesCount - prevDownloadeNodes) / duration).toInt
       val goodPeers = peersToDownloadFrom
       val nodeOkPeers = goodPeers -- blockchainOnlyPeers.values.toSet
       val nHeaderPeers = headerWhitePeers.size
       val nBlackPeers = handshakedPeers.size - goodPeers.size
       log.info(
-        s"""|[fast] Block: ${currSyncedBlockNumber}/${syncState.targetBlockNumber}, $blockRate/s.
+        s"""|[fast] Block: ${appStateStorage.getBestBlockNumber}/${syncState.targetBlockNumber}, $blockRate/s.
             |State: ${syncState.downloadedNodesCount}/$nTotalNodes, $stateRate/s.
             |Peers: (in/out) (${incomingPeers.size}/${outgoingPeers.size}), (working/good/header/node/black) (${workingPeers.size}/${goodPeers.size}/${nHeaderPeers}/${nodeOkPeers.size}/${nBlackPeers})
             |""".stripMargin.replace("\n", " ")
       )
 
       prevReportTime = System.nanoTime
-      prevSyncedBlockNumber = currSyncedBlockNumber
+      prevSyncedBlockNumber = syncedBlockNumber
       prevDownloadeNodes = syncState.downloadedNodesCount
 
       timers.startSingleTimer(ReportStatusTask, ReportStatusTick, reportStatusInterval)
