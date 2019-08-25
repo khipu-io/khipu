@@ -53,7 +53,7 @@ trait LmdbDataSources extends SharedLmdbDataSources {
 
     //accountNodeDataSource.close()
     //storageNodeDataSource.close()
-    //evmCodeDataSource.close()
+    //evmcodeDataSource.close()
     //blockNumberDataSource.close()
     //blockHeaderDataSource.close()
     //blockBodyDataSource.close()

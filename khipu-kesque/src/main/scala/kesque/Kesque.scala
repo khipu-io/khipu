@@ -5,12 +5,12 @@ import java.nio.ByteBuffer
 import java.util.Properties
 import kafka.server.QuotaFactory.UnboundedQuota
 import khipu.TKeyVal
+import khipu.storage.datasource.KesqueNodeDataSource
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.SimpleRecord
 import org.apache.kafka.common.requests.FetchRequest.PartitionData
 import org.lmdbjava.Env
-import org.rocksdb.OptimisticTransactionDB
 import scala.collection.mutable
 
 /**
@@ -69,7 +69,7 @@ final class Kesque(props: Properties) {
   private val replicaManager = kafkaServer.replicaManager
 
   private val topicToTable = mutable.Map[String, HashKeyValueTable]()
-  private val topicToKesqueTable = mutable.Map[String, KesqueTable]()
+  private val topicToKesqueTable = mutable.Map[String, KesqueNodeDataSource]()
 
   def getTable(topics: Array[String], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, fetchMaxBytes, compressionType, cacheSize))
@@ -79,15 +79,11 @@ final class Kesque(props: Properties) {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes, compressionType, cacheSize))
   }
 
-  def getKesqueTable(topics: Array[String], lmdbOrRocksdb: Either[Env[ByteBuffer], OptimisticTransactionDB], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
-    topicToKesqueTable.getOrElseUpdate(topics.mkString(","), new KesqueTable(topics, this, lmdbOrRocksdb, false, fetchMaxBytes, compressionType, cacheSize))
+  def getKesqueTable(topic: String, lmdbOrRocksdb: Either[Env[ByteBuffer], File], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
+    topicToKesqueTable.getOrElseUpdate(topic, new KesqueNodeDataSource(topic, this, lmdbOrRocksdb, fetchMaxBytes, compressionType, cacheSize))
   }
 
-  def getTimedKesqueTable(topics: Array[String], lmdbOrRocksdb: Either[Env[ByteBuffer], OptimisticTransactionDB], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
-    topicToKesqueTable.getOrElseUpdate(topics.mkString(","), new KesqueTable(topics, this, lmdbOrRocksdb, true, fetchMaxBytes, compressionType, cacheSize))
-  }
-
-  private[kesque] def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {
+  def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {
     val partition = new TopicPartition(topic, 0)
     val partitionData = new PartitionData(fetchOffset, 0L, fetchMaxBytes)
 
@@ -106,7 +102,7 @@ final class Kesque(props: Properties) {
   /**
    * Should make sure the size in bytes of batched records is not exceeds the maximum configure value
    */
-  private[kesque] def write(topic: String, records: Seq[SimpleRecord], compressionType: CompressionType) = {
+  def write(topic: String, records: Seq[SimpleRecord], compressionType: CompressionType) = {
     val partition = new TopicPartition(topic, 0)
     //val initialOffset = readerWriter.getLogEndOffset(partition) + 1 // TODO check -1L
     val initialOffset = 0L // TODO is this useful?

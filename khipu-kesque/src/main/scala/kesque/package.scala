@@ -10,12 +10,14 @@ import org.apache.kafka.common.record.TimestampType
 import org.apache.kafka.common.utils.ByteBufferOutputStream
 
 package object kesque {
+  val fetchMaxBytesInLoadOffsets = 100 * 1024 * 1024 // 100M
+  val DEFAULT_FETCH_MAX_BYTES = 4 * 1024 // 4K - the size of SSD block
 
   /**
    * Special function to extract bytes from kafka's DefaultRecord key or value ByteBuffer
    * @see org.apache.kafka.common.utils.Utils.writeTo
    */
-  private[kesque] def getBytes(buffer: ByteBuffer): Array[Byte] = {
+  def getBytes(buffer: ByteBuffer): Array[Byte] = {
     val length = buffer.remaining
     val value = Array.ofDim[Byte](length)
     if (buffer.hasArray) {

@@ -10,6 +10,7 @@ import akka.stream.ActorMaterializer
 import java.io.File
 import java.io.PrintWriter
 import java.security.SecureRandom
+import khipu.Khipu
 import khipu.NodeStatus
 import khipu.ServerStatus
 import khipu.blockchain.sync.HostService
@@ -29,6 +30,7 @@ import khipu.network.rlpx.KnownNodesService.KnownNodesServiceConfig
 import khipu.network.rlpx.PeerManager
 import khipu.network.rlpx.discovery.DiscoveryConfig
 import khipu.storage.Storages
+import khipu.storage.datasource.KesqueDataSources
 import khipu.storage.datasource.LmdbDataSources
 import khipu.validators.BlockHeaderValidator
 import khipu.validators.BlockValidator
@@ -100,17 +102,19 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
         val unconfirmedDepth = KhipuConfig.Sync.blockResolveDepth
       }
 
-    case DbConfig.KESQUE => null
-    //      new Storages.DefaultStorages with KesqueDataSources {
-    //        implicit protected val system = ServiceBoardExtension.this.system
-    //
-    //        protected val config = ServiceBoardExtension.this.config
-    //        protected val log = ServiceBoardExtension.this.log
-    //        protected val khipuPath = new File(classOf[Khipu].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
-    //        protected val datadir = KhipuConfig.datadir
-    //
-    //        val unconfirmedDepth = KhipuConfig.Sync.blockResolveDepth
-    //      }
+    case DbConfig.KESQUE =>
+      new Storages.DefaultStorages with KesqueDataSources {
+        implicit protected val system = ServiceBoardExtension.this.system
+
+        protected val config = ServiceBoardExtension.this.config
+        protected val log = ServiceBoardExtension.this.log
+        protected val khipuPath = new File(classOf[Khipu].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
+        protected val datadir = KhipuConfig.datadir
+
+        val unconfirmedDepth = KhipuConfig.Sync.blockResolveDepth
+
+        log.info(s"Kesque started using config file: $kafkaConfigFile")
+      }
   }
 
   // There should be only one instance, instant it here or a standalone singleton service

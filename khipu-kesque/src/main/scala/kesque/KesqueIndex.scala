@@ -18,4 +18,8 @@ trait KesqueIndex {
   def put(key: Array[Byte], offset: Long): Unit
   def put(kvs: Iterable[(Array[Byte], Long)]): Unit
   def remove(key: Array[Byte], offset: Long): Unit
+
+  def count: Long
+
+  def close()
 }

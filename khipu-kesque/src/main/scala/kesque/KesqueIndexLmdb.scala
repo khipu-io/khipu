@@ -171,4 +171,8 @@ final class KesqueIndexLmdb(env: Env[ByteBuffer], topic: String) extends KesqueI
     rtx.close()
     ret
   }
+
+  def close() {
+    table.close()
+  }
 }

@@ -257,10 +257,10 @@ final class HashKeyValueTable private[kesque] (
     val col = topicToCol(topic)
 
     // prepare simple records, filter no changed ones
-    var recordBatches = Vector[(List[TKeyVal], List[SimpleRecord], Map[Hash, Int])]()
+    var recordBatches = Vector[(List[TKeyVal], List[SimpleRecord], Map[Hash, Long])]()
     var tkvs = List[TKeyVal]()
     var records = List[SimpleRecord]()
-    var keyToPrevMixedOffset = Map[Hash, Int]()
+    var keyToPrevMixedOffset = Map[Hash, Long]()
     val itr = kvs.iterator
     while (itr.hasNext) {
       val tkv @ TKeyVal(keyBytes, value, offset, timestamp) = itr.next()
@@ -294,7 +294,7 @@ final class HashKeyValueTable private[kesque] (
     recordBatches map { case (tkvs, records, keyToPrevMixedOffset) => writeRecords(tkvs, records, keyToPrevMixedOffset, col, fileno) }
   }
 
-  private def writeRecords(tkvs: List[TKeyVal], records: List[SimpleRecord], keyToPrevMixedOffset: Map[Hash, Int], col: Int, fileno: Int): Iterable[Int] = {
+  private def writeRecords(tkvs: List[TKeyVal], records: List[SimpleRecord], keyToPrevMixedOffset: Map[Hash, Long], col: Int, fileno: Int): Iterable[Int] = {
     try {
       writeLock.lock()
 
@@ -318,7 +318,7 @@ final class HashKeyValueTable private[kesque] (
                 val mixedOffset = toMixedOffset(fileno, offset)
                 keyToPrevMixedOffset.get(key) match {
                   case Some(prevMixedOffset) => // there is prevOffset, will also remove it (replace it with current one)
-                    hashOffsets.replace(hash, prevMixedOffset, mixedOffset, col)
+                    hashOffsets.replace(hash, prevMixedOffset.toInt, mixedOffset, col)
                   case None => // there is none prevOffset
                     hashOffsets.put(hash, mixedOffset, col)
                 }

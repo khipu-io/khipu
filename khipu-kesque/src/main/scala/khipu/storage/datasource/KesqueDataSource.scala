@@ -11,6 +11,7 @@ import kesque.KesqueIndexIntMap
 import khipu.Hash
 import khipu.TKeyVal
 import khipu.TVal
+import khipu.config.DbConfig
 import khipu.util.Clock
 import org.apache.kafka.common.record.CompressionType
 import scala.collection.JavaConverters._
@@ -87,14 +88,6 @@ final case class NodeRecord(flag: Byte, key: Array[Byte], value: Array[Byte]) {
  * during block execution, and are a bit too many.
  */
 object KesqueDataSource {
-  private val account = "account"
-  private val storage = "storage"
-  private val evmcode = "evmcode"
-  private val header = "header"
-  private val body = "body"
-  private val td = "td" // total difficulty
-  private val receipts = "receipts"
-
   def kafkaProps(system: ActorSystem) = {
     val props = new Properties()
     system.settings.config.getConfig("khipu.kafka").entrySet().asScala.foreach { entry =>
@@ -115,7 +108,7 @@ object KesqueDataSource {
 
     //findData(db, "storage_500", "a6b291fa802416bace4e79f635cedbd1a1a333f5b664153844c3035b60e0bf6b")
     //dump(db, 0L)
-    testRead(db, evmcode, 102400)
+    testRead(db, DbConfig.evmcode, 102400)
 
     System.exit(0)
   }
@@ -132,12 +125,12 @@ object KesqueDataSource {
     var offset = fetchOffset
     var nRead = 0
     do {
-      val records = mutable.ArrayBuffer[(Array[Byte], Array[Byte], Int, Long)]()
+      val records = mutable.ArrayBuffer[(Array[Byte], Array[Byte], Long, Long)]()
       tableSrc.readOnce(offset, src) {
         case TKeyVal(k, v, offset, t) =>
           val NodeRecord(flag, key, value) = NodeRecord.fromBytes(v)
           val hash = Hash(key)
-          hashOffsets.put(hash.hashCode, offset, 0) // TODO
+          hashOffsets.put(hash.hashCode, offset.toInt, 0) // TODO
 
           records += ((key, value, offset, t))
       } match {
@@ -223,7 +216,10 @@ object KesqueDataSource {
   }
 
 }
-final class KesqueDataSource(val table: HashKeyValueTable, val topic: String)(implicit system: ActorSystem) extends BlockDataSource[Hash, TVal] {
+final class KesqueDataSource(
+    val table: HashKeyValueTable,
+    val topic: String
+)(implicit system: ActorSystem) extends BlockDataSource[Hash, TVal] {
   type This = KesqueDataSource
 
   import KesqueDataSource._

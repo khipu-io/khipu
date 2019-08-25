@@ -3,13 +3,11 @@ package khipu.tools
 import java.io.File
 import java.nio.ByteBuffer
 import kesque.Kesque
-import kesque.KesqueTable
-import khipu.TKeyVal
+import khipu.Hash
 import khipu.crypto
+import khipu.storage.datasource.KesqueNodeDataSource
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
-import org.rocksdb.OptimisticTransactionDB
-import org.rocksdb.Options
 import scala.collection.mutable
 
 /**
@@ -51,12 +49,10 @@ class KesqueTool() {
     .setMaxDbs(6)
     .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
 
-  lazy val rocksdbPath = new File(home, topic)
-  lazy val rocksdbOptions = new Options().setCreateIfMissing(true).setMaxOpenFiles(-1)
-  lazy val rocksDbTable = OptimisticTransactionDB.open(rocksdbOptions, rocksdbPath.getAbsolutePath)
+  lazy val rocksdbHome = home
 
   def test(total: Int) = {
-    val table = kesque.getKesqueTable(Array(topic), Right(rocksDbTable), fetchMaxBytes = 4096)
+    val table = kesque.getKesqueTable(topic, Right(rocksdbHome), fetchMaxBytes = 4096)
 
     val keys = write(table, total)
     read(table, keys)
@@ -64,10 +60,10 @@ class KesqueTool() {
     System.exit(0)
   }
 
-  def write(table: KesqueTable, total: Int) = {
+  def write(table: KesqueNodeDataSource, total: Int) = {
     val batchSize = 4000
 
-    val keysToRead = new java.util.ArrayList[Array[Byte]]()
+    val keysToRead = new java.util.ArrayList[Hash]()
     val start0 = System.nanoTime
     var start = System.nanoTime
     var elapsed = 0L
@@ -76,7 +72,7 @@ class KesqueTool() {
     val nKeysToRead = 1000000
     val keyInterval = math.max(total / nKeysToRead, 1)
 
-    val kvs = new mutable.ArrayBuffer[TKeyVal]()
+    val kvs = new mutable.ArrayBuffer[(Hash, Array[Byte])]()
     while (i < total) {
 
       var j = 0
@@ -85,11 +81,11 @@ class KesqueTool() {
         val bs = ByteBuffer.allocate(8).putLong(i).array
         System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
 
-        val k = crypto.kec256(v)
+        val k = Hash(crypto.kec256(v))
 
         start = System.nanoTime
 
-        kvs += TKeyVal(k, v, -1, 0)
+        kvs += ((k -> v))
 
         val duration = System.nanoTime - start
         elapsed += duration
@@ -105,7 +101,7 @@ class KesqueTool() {
 
       start = System.nanoTime
 
-      val n = table.write(kvs, topic)
+      val n = table.update(Nil, kvs)
 
       kvs.clear()
 
@@ -129,7 +125,7 @@ class KesqueTool() {
     keysToRead
   }
 
-  def read(table: KesqueTable, keys: java.util.ArrayList[Array[Byte]]) {
+  def read(table: KesqueNodeDataSource, keys: java.util.ArrayList[Hash]) {
     java.util.Collections.shuffle(keys)
 
     val start0 = System.nanoTime
@@ -139,15 +135,15 @@ class KesqueTool() {
     while (itr.hasNext) {
       val k = itr.next
 
-      table.read(k, topic) match {
+      table.get(k) match {
         case Some(x) =>
-        case None    => println(s"===> no data for ${khipu.toHexString(k)}")
+        case None    => println(s"===> no data for $k")
       }
 
       if (i > 0 && i % 10000 == 0) {
         val elapsed = (System.nanoTime - start) / 1000000000.0 // sec
         val speed = 10000 / elapsed
-        println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - 0x${khipu.Hash(k)}")
+        println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - 0x$k")
         start = System.nanoTime
       }
 

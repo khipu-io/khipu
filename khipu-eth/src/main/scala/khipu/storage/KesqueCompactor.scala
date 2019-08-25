@@ -137,12 +137,12 @@ object KesqueCompactor {
     def flush() {
       buf foreach {
         case TKeyVal(key, _, mixedOffset, _) =>
-          nodeTable.removeIndexEntry(key, mixedOffset, topic)
+          nodeTable.removeIndexEntry(key, mixedOffset.toInt, topic)
       }
 
       val kvs = buf map {
         case TKeyVal(key, value, mixedOffset, timestamp) =>
-          val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
+          val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset.toInt)
           _maxOffset = math.max(_maxOffset, offset)
           TKeyVal(key, value, offset, timestamp)
       }
@@ -222,7 +222,7 @@ final class KesqueCompactor(
 
   private val storageReader = new NodeReader[DataWord](DbConfig.storage, storageTable)(trie.rlpDataWordSerializer) {
     override def nodeGot(kv: TKeyVal) {
-      val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset)
+      val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset.toInt)
       if (fileno == fromFileNo) {
         storageWriter.write(kv)
       }
@@ -238,7 +238,7 @@ final class KesqueCompactor(
     }
 
     override def nodeGot(kv: TKeyVal) {
-      val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset)
+      val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset.toInt)
       if (fileno == fromFileNo) {
         accountWriter.write(kv)
       }
