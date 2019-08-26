@@ -83,6 +83,8 @@ trait KesqueDataSources extends SharedRocksdbDataSources {
   //  lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, DbConfig.td)
 
   def closeAll() {
+    log.info("db syncing...")
+
     accountNodeDataSource.close()
     storageNodeDataSource.close()
     evmcodeDataSource.close()
@@ -95,5 +97,7 @@ trait KesqueDataSources extends SharedRocksdbDataSources {
     dataSource.close()
 
     kesque.shutdown()
+
+    log.info("db synced")
   }
 }

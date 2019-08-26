@@ -260,7 +260,7 @@ final class KesqueNodeDataSource(
     }
   }
 
-  def count = index.count
+  def count = kesqueDb.getLogEndOffset(topic).getOrElse(0L) + 1
 
   def cacheHitRate = cache.hitRate
   def cacheReadCount = cache.readCount

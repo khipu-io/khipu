@@ -199,6 +199,11 @@ final class Kesque(props: Properties) {
     (lastOffset, batch.toArray)
   }
 
+  def getLogEndOffset(topic: String): Option[Long] = {
+    val topicPartition = new TopicPartition(topic, 0)
+    replicaManager.getLogEndOffset(topicPartition)
+  }
+
   def shutdown() {
     kafkaServer.shutdown()
   }

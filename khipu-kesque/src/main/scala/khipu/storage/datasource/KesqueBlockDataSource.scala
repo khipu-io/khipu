@@ -54,7 +54,7 @@ final class KesqueBlockDataSource(
                 val data = kesque.getBytes(rec.value)
                 val theKey = kesque.getBytes(rec.key)
                 if (!java.util.Arrays.equals(theKey, keyBytes)) {
-                  warn(s"key $theKey does not equals offset $key")
+                  warn(s"key ${ByteBuffer.wrap(theKey).getLong()} does not equals offset $key during get")
                 }
                 foundValue = Some(data)
               }
@@ -162,8 +162,10 @@ final class KesqueBlockDataSource(
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
             val lastOffset = kvs.foldLeft(firstOffert) {
-              case ((longOffset), (key, value)) =>
-                val offset = longOffset.toInt
+              case ((offset), (key, value)) =>
+                if (offset != key) {
+                  warn(s"key $key does not equals offset $offset during put")
+                }
                 val keyBytes = ByteBuffer.allocate(8).putLong(key).array
 
                 cache.put(key, value)
@@ -185,8 +187,7 @@ final class KesqueBlockDataSource(
     }
   }
 
-  // TODO
-  def count = 0 //index.count
+  def count = kesqueDb.getLogEndOffset(topic).getOrElse(0L) + 1
 
   def cacheHitRate = cache.hitRate
   def cacheReadCount = cache.readCount

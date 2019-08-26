@@ -40,12 +40,12 @@ class RocksdbTool() {
   }
 
   val tableOptions = new BlockBasedTableConfig()
-      .setFilterPolicy(new BloomFilter(10))
-    val options = new Options()
-      .setCreateIfMissing(true)
-      .setMaxOpenFiles(-1)
-      .setTableFormatConfig(tableOptions)
-      .setAllowMmapWrites(false)
+    .setFilterPolicy(new BloomFilter(10))
+  val options = new Options()
+    .setCreateIfMissing(true)
+    .setMaxOpenFiles(-1)
+    .setTableFormatConfig(tableOptions)
+    .setAllowMmapWrites(false)
 
   def test(tableName: String, num: Int) = {
     val path = new File(home, tableName)
