@@ -9,7 +9,7 @@ trait SharedLmdbDataSources extends DataSources {
 
   val env: Env[ByteBuffer]
 
-  lazy val dataSource = LmdbDataSource("shared", env)
+  lazy val dataSource = new LmdbDataSource("shared", env, cacheSize = 1000)
 
   lazy val transactionDataSource = dataSource
 

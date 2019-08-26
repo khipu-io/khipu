@@ -50,9 +50,9 @@ final class HashKeyValueTable private[kesque] (
     topics:          Array[String],
     db:              Kesque,
     withTimeToKey:   Boolean,
+    cacheSize:       Int,
     fetchMaxBytes:   Int             = HashKeyValueTable.defaultFetchMaxBytes,
-    compressionType: CompressionType = CompressionType.NONE,
-    cacheSize:       Int             = 10000
+    compressionType: CompressionType = CompressionType.NONE
 ) extends Logging {
   import HashKeyValueTable._
 

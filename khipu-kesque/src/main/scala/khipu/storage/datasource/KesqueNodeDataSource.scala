@@ -23,9 +23,9 @@ final class KesqueNodeDataSource(
     val topic:       String,
     kesqueDb:        Kesque,
     lmdbOrRocksdb:   Either[Env[ByteBuffer], File],
+    cacheSize:       Int,
     fetchMaxBytes:   Int                           = kesque.DEFAULT_FETCH_MAX_BYTES,
-    compressionType: CompressionType               = CompressionType.NONE,
-    cacheSize:       Int                           = 10000
+    compressionType: CompressionType               = CompressionType.NONE
 ) extends BlockDataSource[Hash, Array[Byte]] with Logging {
   type This = KesqueNodeDataSource
 

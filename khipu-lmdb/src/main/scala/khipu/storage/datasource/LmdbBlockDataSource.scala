@@ -17,7 +17,7 @@ import scala.collection.mutable
 final class LmdbBlockDataSource(
     val topic: String,
     val env:   Env[ByteBuffer],
-    cacheSize: Int             = 10000
+    cacheSize: Int
 )(implicit system: ActorSystem) extends BlockDataSource[Long, Array[Byte]] {
   type This = LmdbBlockDataSource
 

@@ -17,10 +17,10 @@ import org.rocksdb.Transaction
 import org.rocksdb.WriteBatch
 import org.rocksdb.WriteOptions
 
-final case class RocksdbDataSource(
+final class RocksdbDataSource(
     val topic: String,
     home:      File,
-    cacheSize: Int    = 10000
+    cacheSize: Int
 )(implicit system: ActorSystem) extends DataSource {
   RocksDB.loadLibrary()
 

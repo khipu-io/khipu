@@ -39,7 +39,7 @@ object Kesque {
     val props = org.apache.kafka.common.utils.Utils.loadProps(configFile.getAbsolutePath)
     val kesque = new Kesque(props)
     val topic = "kesque-test"
-    val table = kesque.getTable(Array(topic), fetchMaxBytes = 4096, CompressionType.SNAPPY)
+    val table = kesque.getTable(Array(topic), cacheSize = 10000, fetchMaxBytes = 4096, CompressionType.SNAPPY)
 
     kesque.deleteTable(topic)
     (1 to 2) foreach { i => testWrite(table, topic, i) }
@@ -71,16 +71,16 @@ final class Kesque(props: Properties) {
   private val topicToTable = mutable.Map[String, HashKeyValueTable]()
   private val topicToKesqueTable = mutable.Map[String, KesqueNodeDataSource]()
 
-  def getTable(topics: Array[String], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
-    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, fetchMaxBytes, compressionType, cacheSize))
+  def getTable(topics: Array[String], cacheSize: Int, fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE) = {
+    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, false, cacheSize, fetchMaxBytes, compressionType))
   }
 
-  def getTimedTable(topics: Array[String], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
-    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, fetchMaxBytes, compressionType, cacheSize))
+  def getTimedTable(topics: Array[String], cacheSize: Int, fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE) = {
+    topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, cacheSize, fetchMaxBytes, compressionType))
   }
 
-  def getKesqueTable(topic: String, lmdbOrRocksdb: Either[Env[ByteBuffer], File], fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE, cacheSize: Int = 10000) = {
-    topicToKesqueTable.getOrElseUpdate(topic, new KesqueNodeDataSource(topic, this, lmdbOrRocksdb, fetchMaxBytes, compressionType, cacheSize))
+  def getKesqueTable(topic: String, lmdbOrRocksdb: Either[Env[ByteBuffer], File], cacheSize: Int, fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE) = {
+    topicToKesqueTable.getOrElseUpdate(topic, new KesqueNodeDataSource(topic, this, lmdbOrRocksdb, cacheSize, fetchMaxBytes, compressionType))
   }
 
   def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {

@@ -117,8 +117,8 @@ object KesqueDataSource {
     val src = "evmcode"
     val tgt = "evmcode_new"
     db.deleteTable(tgt)
-    val tableSrc = db.getTable(Array(src), fetchMaxBytes = 102400, CompressionType.NONE)
-    val tableTgt = db.getTable(Array(tgt), fetchMaxBytes = 102400, CompressionType.NONE)
+    val tableSrc = db.getTable(Array(src), cacheSize = 10000, fetchMaxBytes = 102400, CompressionType.NONE)
+    val tableTgt = db.getTable(Array(tgt), cacheSize = 10000, fetchMaxBytes = 102400, CompressionType.NONE)
 
     val hashOffsets = new KesqueIndexIntMap(200)
 
@@ -154,7 +154,7 @@ object KesqueDataSource {
    * # while true;  do echo 1 > /proc/sys/vm/drop_caches;echo clean cache ok; sleep 1; done
    */
   private def testRead(db: Kesque, topic: String, fetchMaxBytes: Int = 1024000) = {
-    val table = db.getTable(Array(topic), fetchMaxBytes, CompressionType.NONE)
+    val table = db.getTable(Array(topic), cacheSize = 10000, fetchMaxBytes, CompressionType.NONE)
 
     val records = new mutable.HashMap[Hash, ByteString]()
     table.iterateOver(0, topic) {
@@ -193,7 +193,7 @@ object KesqueDataSource {
     val lostKey = khipu.hexDecode(keyInHex)
 
     var prevValue: Option[Array[Byte]] = None
-    val table = db.getTable(Array(topic))
+    val table = db.getTable(Array(topic), cacheSize = 10000)
     table.iterateOver(0, topic) {
       case TKeyVal(key, value, offset, timestamp) =>
         if (Arrays.equals(key, lostKey)) {

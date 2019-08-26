@@ -15,9 +15,9 @@ import org.apache.kafka.common.record.SimpleRecord
 final class KesqueBlockDataSource(
     val topic:       String,
     kesqueDb:        Kesque,
+    cacheSize:       Int,
     fetchMaxBytes:   Int             = kesque.DEFAULT_FETCH_MAX_BYTES,
-    compressionType: CompressionType = CompressionType.NONE,
-    cacheSize:       Int             = 10000
+    compressionType: CompressionType = CompressionType.NONE
 ) extends BlockDataSource[Long, Array[Byte]] with Logging {
   type This = KesqueBlockDataSource
 

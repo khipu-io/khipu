@@ -52,7 +52,7 @@ class KesqueTool() {
   lazy val rocksdbHome = home
 
   def test(total: Int) = {
-    val table = kesque.getKesqueTable(topic, Right(rocksdbHome), fetchMaxBytes = 4096)
+    val table = kesque.getKesqueTable(topic, Right(rocksdbHome), cacheSize = 10000, fetchMaxBytes = 4096)
 
     val keys = write(table, total)
     read(table, keys)

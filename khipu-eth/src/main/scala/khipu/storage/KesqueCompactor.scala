@@ -168,9 +168,9 @@ object KesqueCompactor {
 
     val kesque = new Kesque(kafkaProps)
     val futureTables = Future.sequence(List(
-      Future(kesque.getTable(Array(DbConfig.account), 4096, CompressionType.NONE, 1024)),
-      Future(kesque.getTable(Array(DbConfig.storage), 4096, CompressionType.NONE, 1024)),
-      Future(kesque.getTable(Array(DbConfig.evmcode), 24576)),
+      Future(kesque.getTable(Array(DbConfig.account), 1000, 4096, CompressionType.NONE)),
+      Future(kesque.getTable(Array(DbConfig.storage), 1000, 4096, CompressionType.NONE)),
+      Future(kesque.getTable(Array(DbConfig.evmcode), 1000, 24576)),
       Future(kesque.getTimedTable(Array(
         DbConfig.header,
         DbConfig.body,
@@ -214,8 +214,8 @@ final class KesqueCompactor(
 
   val log = Logging(system, this)
 
-  private val targetStorageTable = kesque.getTable(Array(DbConfig.storage), 4096, CompressionType.NONE, 1024)
-  private val targetAccountTable = kesque.getTable(Array(DbConfig.account), 4096, CompressionType.NONE, 1024)
+  private val targetStorageTable = kesque.getTable(Array(DbConfig.storage), 1000, 4096, CompressionType.NONE)
+  private val targetAccountTable = kesque.getTable(Array(DbConfig.account), 1000, 4096, CompressionType.NONE)
 
   private val storageWriter = new NodeWriter(DbConfig.storage, targetStorageTable, toFileNo)
   private val accountWriter = new NodeWriter(DbConfig.account, targetAccountTable, toFileNo)

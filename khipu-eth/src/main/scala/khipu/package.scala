@@ -37,8 +37,11 @@ case object Stop
 
 sealed trait WithBlockNumber[T <: WithBlockNumber[T]] extends Ordered[T] {
   def number: Long
+  def hash: Hash
 
-  def compare(that: T) = {
+  override def hashCode = hash.hashCode
+
+  override def compare(that: T) = {
     if (number < that.number) {
       -1
     } else if (number == that.number) {
@@ -50,4 +53,16 @@ sealed trait WithBlockNumber[T <: WithBlockNumber[T]] extends Ordered[T] {
 }
 final case class HashWithBlockNumber(number: Long, hash: Hash) extends WithBlockNumber[HashWithBlockNumber]
 final case class BodyWithBlockNumber(number: Long, hash: Hash, body: PV62.BlockBody) extends WithBlockNumber[BodyWithBlockNumber]
-final case class ReceiptsWithBlockNumber(number: Long, hash: Hash, receipts: Seq[Receipt]) extends WithBlockNumber[ReceiptsWithBlockNumber]
+final case class ReceiptsWithBlockNumber(number: Long, hash: Hash, receipts: Seq[Receipt]) extends WithBlockNumber[ReceiptsWithBlockNumber] {
+  override def equals(that: Any) = {
+    that match {
+      case ReceiptsWithBlockNumber(number, hash, receitps) =>
+        if (number == this.number && hash == this.hash && receipts.size == this.receipts.size) {
+          receipts.zip(this.receipts).filter(x => x._1 != x._2).isEmpty
+        } else {
+          false
+        }
+      case _ => false
+    }
+  }
+}

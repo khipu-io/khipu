@@ -11,7 +11,11 @@ import org.lmdbjava.Dbi
 import org.lmdbjava.DbiFlags
 import org.lmdbjava.Txn
 
-final case class LmdbDataSource(topic: String, env: Env[ByteBuffer], cacheSize: Int = 10000)(implicit system: ActorSystem) extends DataSource {
+final class LmdbDataSource(
+    val topic: String,
+    env:       Env[ByteBuffer],
+    cacheSize: Int
+)(implicit system: ActorSystem) extends DataSource {
   private val log = Logging(system, this.getClass)
 
   private val cache = new FIFOCache[Hash, Array[Byte]](cacheSize)

@@ -47,14 +47,14 @@ trait KesqueDataSources extends SharedRocksdbDataSources {
 
   lazy val accountNodeDataSource = new KesqueNodeDataSource(DbConfig.account, kesque, Right(rocksdbHome), cacheSize = cacheCfg.cacheSize)
   lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, Right(rocksdbHome), cacheSize = cacheCfg.cacheSize)
-  lazy val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Right(rocksdbHome))
+  lazy val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Right(rocksdbHome), cacheSize = 10000)
 
-  lazy val blockNumberDataSource = new RocksdbDataSource(DbConfig.blocknum, rocksdbHome)
+  lazy val blockNumberDataSource = new RocksdbDataSource(DbConfig.blocknum, rocksdbHome, cacheSize = 1000)
 
-  lazy val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque)
-  lazy val blockBodyDataSource = new KesqueBlockDataSource(DbConfig.body, kesque)
-  lazy val receiptsDataSource = new KesqueBlockDataSource(DbConfig.receipts, kesque)
-  lazy val totalDifficultyDataSource = new KesqueBlockDataSource(DbConfig.td, kesque)
+  lazy val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque, cacheSize = 1000)
+  lazy val blockBodyDataSource = new KesqueBlockDataSource(DbConfig.body, kesque, cacheSize = 1000)
+  lazy val receiptsDataSource = new KesqueBlockDataSource(DbConfig.receipts, kesque, cacheSize = 1000)
+  lazy val totalDifficultyDataSource = new KesqueBlockDataSource(DbConfig.td, kesque, cacheSize = 1000)
 
   //  private val futureTables = Future.sequence(List(
   //    Future(kesque.getTable(Array(DbConfig.account), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
