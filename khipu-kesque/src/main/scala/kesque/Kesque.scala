@@ -84,7 +84,7 @@ final class Kesque(props: Properties) {
   }
 
   def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {
-    val partition = new TopicPartition(topic, 0)
+    val topicPartition = new TopicPartition(topic, 0)
     val partitionData = new PartitionData(fetchOffset, 0L, fetchMaxBytes)
 
     replicaManager.readFromLocalLog(
@@ -93,7 +93,7 @@ final class Kesque(props: Properties) {
       readOnlyCommitted = false,
       fetchMaxBytes = fetchMaxBytes,
       hardMaxBytesLimit = false, // read at lease one message even exceeds the fetchMaxBytes
-      readPartitionInfo = List((partition, partitionData)),
+      readPartitionInfo = List((topicPartition, partitionData)),
       quota = UnboundedQuota,
       isolationLevel = org.apache.kafka.common.requests.IsolationLevel.READ_COMMITTED
     )
@@ -103,12 +103,12 @@ final class Kesque(props: Properties) {
    * Should make sure the size in bytes of batched records is not exceeds the maximum configure value
    */
   def write(topic: String, records: Seq[SimpleRecord], compressionType: CompressionType) = {
-    val partition = new TopicPartition(topic, 0)
+    val topicPartition = new TopicPartition(topic, 0)
     //val initialOffset = readerWriter.getLogEndOffset(partition) + 1 // TODO check -1L
     val initialOffset = 0L // TODO is this useful?
 
     val memoryRecords = kesque.buildRecords(compressionType, initialOffset, records: _*)
-    val entriesPerPartition = Map(partition -> memoryRecords)
+    val entriesPerPartition = Map(topicPartition -> memoryRecords)
 
     replicaManager.appendToLocalLog(
       internalTopicsAllowed = false,
@@ -119,8 +119,8 @@ final class Kesque(props: Properties) {
   }
 
   def deleteTable(topic: String) = {
-    val partition = new TopicPartition(topic, 0)
-    replicaManager.stopReplica(partition, deletePartition = true)
+    val topicPartition = new TopicPartition(topic, 0)
+    replicaManager.stopReplica(topicPartition, deletePartition = true)
     topicToTable -= topic
   }
 
@@ -199,7 +199,7 @@ final class Kesque(props: Properties) {
     (lastOffset, batch.toArray)
   }
 
-  def getLogEndOffset(topic: String): Option[Long] = {
+  def getLogEndOffset(topic: String): Long = {
     val topicPartition = new TopicPartition(topic, 0)
     replicaManager.getLogEndOffset(topicPartition)
   }

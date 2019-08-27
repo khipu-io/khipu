@@ -27,9 +27,9 @@ final class KesqueBlockDataSource(
   private val readLock = lock.readLock
   private val writeLock = lock.writeLock
 
-  private def indexTopic(topic: String) = topic + "_idx"
-
   val clock = new Clock()
+
+  info(s"Table $topic $count")
 
   def get(key: Long): Option[Array[Byte]] = {
     try {
@@ -187,7 +187,7 @@ final class KesqueBlockDataSource(
     }
   }
 
-  def count = kesqueDb.getLogEndOffset(topic).getOrElse(0L) + 1
+  def count = kesqueDb.getLogEndOffset(topic)
 
   def cacheHitRate = cache.hitRate
   def cacheReadCount = cache.readCount

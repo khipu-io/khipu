@@ -286,10 +286,10 @@ trait FastSyncService { _: SyncService =>
     }
   }
 
-  protected def saveBestHeaderNumber() = syncState foreach fastSyncStateStorage.putBestHeaderNumber
-  protected def saveBestBodyNumber() = syncState foreach fastSyncStateStorage.putBestBodyNumber
-  protected def saveBestReceiptsNumber() = syncState foreach fastSyncStateStorage.putBestReceiptsNumber
-  protected def saveNodesData() = syncState foreach fastSyncStateStorage.putNodesData
+  protected def saveSyncStateBestHeaderNumber() = syncState foreach fastSyncStateStorage.putBestHeaderNumber
+  protected def saveSyncStateBestBodyNumber() = syncState foreach fastSyncStateStorage.putBestBodyNumber
+  protected def saveSyncStateBestReceiptsNumber() = syncState foreach fastSyncStateStorage.putBestReceiptsNumber
+  protected def saveSyncStateNodesData() = syncState foreach fastSyncStateStorage.putNodesData
 
   private class SyncingHandler(syncState: SyncState) {
     updateBestBlockNumber()
@@ -313,6 +313,7 @@ trait FastSyncService { _: SyncService =>
     timers.startPeriodicTimer(ProcessSyncingTask, ProcessSyncingTick, syncRetryInterval)
     timers.startPeriodicTimer(ReportSyncStateTask, ReportSyncStateTick, persistStateSnapshotInterval)
 
+    reportState
     reportStatus()
 
     def receive: Receive = peerUpdateBehavior orElse ommersBehavior orElse {
@@ -320,145 +321,161 @@ trait FastSyncService { _: SyncService =>
       case ProcessSyncingTick =>
         processSyncing()
 
-      case PeerWorkDone(peerId, work) =>
-        work match {
-          case BodiesWork(workHashes, remainingHashes, bodies, receivedHashes) =>
-            val received = bodies.map {
-              case (hash, body) =>
-                syncState.workingBodies.get(hash).map {
-                  blockNumber => BodyWithBlockNumber(blockNumber, hash, body)
-                }
-            }.flatten
-
-            receivedBodies ++= received
-
-            val toSave = mutable.ListBuffer[(Hash, PV62.BlockBody)]()
-            val toRemove = mutable.Set[BodyWithBlockNumber]()
-            var nextNumber = syncState.bestBodyNumber + 1
-            var break = false
-            val itr = receivedBodies.iterator
-            while (itr.hasNext && !break) {
-              val body = itr.next()
-              if (body.number == nextNumber) {
-                toSave += (body.hash -> body.body)
-                toRemove += body
-                nextNumber += 1
-              } else {
-                break = true
-              }
+      case PeerWorkDone(peerId, BodiesWork(workHashes, remainingHashes, bodies, receivedHashes)) =>
+        val received = bodies.map {
+          case (hash, body) =>
+            syncState.workingBodies.get(hash).map {
+              blockNumber => BodyWithBlockNumber(blockNumber, hash, body)
             }
+        }.flatten
 
-            if (toSave.nonEmpty) {
-              val bestBodyNumber = nextNumber - 1
-              saveBodies(toSave, bestBodyNumber)
-              syncState.bestBodyNumber = bestBodyNumber
-              receivedBodies --= toRemove
+        receivedBodies ++= received
 
-              updateBestBlockNumber()
-            }
-
-            val enqueueHashes = remainingHashes.map { hash =>
-              syncState.workingBodies.get(hash).map {
-                blockNumber => HashWithBlockNumber(blockNumber, hash)
-              }
-            }.flatten
-
-            syncState.pendingBodies ++= enqueueHashes
-            syncState.workingBodies --= workHashes
-
-            log.debug(s"bodies: best ${syncState.bestBodyNumber}, received ${receivedBodies.map(_.number)}, working: ${syncState.workingBodies.map(_._2).toList.sorted} pending: ${syncState.pendingBodies.map(_.number).toList.sorted}")
-
-            saveBestBodyNumber()
-
-          case ReceiptsWork(workHashes, remainingHashes, receipts) =>
-            val received = receipts.map {
-              case (hash, recps) =>
-                syncState.workingReceipts.get(hash).map {
-                  blockNumber => ReceiptsWithBlockNumber(blockNumber, hash, recps)
-                }
-            }.flatten
-
-            receivedReceipts ++= received
-
-            val toSave = mutable.ListBuffer[(Hash, Seq[Receipt])]()
-            val toRemove = mutable.Set[ReceiptsWithBlockNumber]()
-            var nextNumber = syncState.bestReceiptsNumber + 1
-            var break = false
-            val itr = receivedReceipts.iterator
-            while (itr.hasNext && !break) {
-              val recps = itr.next()
-              if (recps.number == nextNumber) {
-                toSave += (recps.hash -> recps.receipts)
-                toRemove += recps
-                nextNumber += 1
-              } else {
-                break = true
-              }
-            }
-
-            if (toSave.nonEmpty) {
-              saveReceipts(toSave)
-              syncState.bestReceiptsNumber = nextNumber - 1
-              receivedReceipts --= toRemove
-
-              updateBestBlockNumber()
-            }
-
-            val enqueueHashes = remainingHashes.map { hash =>
-              syncState.workingReceipts.get(hash).map {
-                blockNumber => HashWithBlockNumber(blockNumber, hash)
-              }
-            }.flatten
-
-            syncState.pendingReceipts ++= enqueueHashes
-            syncState.workingReceipts --= workHashes
-
-            log.debug(s"recps: best ${syncState.bestReceiptsNumber}, received ${receivedReceipts.map(_.number)}, working: ${syncState.workingReceipts.map(_._2).toList.sorted} pending: ${syncState.pendingReceipts.map(_.number).toList.sorted}")
-
-            saveBestReceiptsNumber()
-
-          case NodesWork(workHashes, enqueueHashs, downloadedCount, accountNodes, storageNodes, evmcodes) =>
-            saveAccountNodes(accountNodes)
-            saveStorageNodes(storageNodes)
-            saveEvmcodes(evmcodes)
-
-            log.debug(s"Saved acccount: ${accountNodes.size}, storage: ${storageNodes.size}, evmcode: ${evmcodes.size}. Total ${accountNodes.size + storageNodes.size + evmcodes.size} - downloaded: ${downloadedCount}")
-
-            workHashes foreach {
-              case h: EvmcodeHash                => syncState.workingNonMptNodes -= h
-              case h: StorageRootHash            => syncState.workingNonMptNodes -= h
-              case h: StateMptNodeHash           => syncState.workingMptNodes -= h
-              case h: ContractStorageMptNodeHash => syncState.workingMptNodes -= h
-            }
-
-            // always enqueue hashes in the front, this will get shorter pending queue !!!
-            enqueueHashs foreach {
-              case h: EvmcodeHash                => syncState.pendingNonMptNodes = h :: syncState.pendingNonMptNodes
-              case h: StorageRootHash            => syncState.pendingNonMptNodes = h :: syncState.pendingNonMptNodes
-              case h: StateMptNodeHash           => syncState.pendingMptNodes = h :: syncState.pendingMptNodes
-              case h: ContractStorageMptNodeHash => syncState.pendingMptNodes = h :: syncState.pendingMptNodes
-            }
-
-            syncState.downloadedNodesCount += downloadedCount
-
-            saveNodesData()
-
-          case HeadersWork(headers, tds, lastNumber) =>
-            saveHeaders(headers)
-            saveTotalDifficulties(tds)
-
-            lastNumber match {
-              case Some(n) if (n > syncState.bestHeaderNumber) => syncState.bestHeaderNumber = n
-              case None                                        =>
-            }
-
-            headerWorkingPeer = None
-
-            saveBestHeaderNumber()
+        val toSave = mutable.ListBuffer[(Hash, PV62.BlockBody)]()
+        val toRemove = mutable.Set[BodyWithBlockNumber]()
+        var nextNumber = syncState.bestBodyNumber + 1
+        var break = false
+        val itr = receivedBodies.iterator
+        while (itr.hasNext && !break) {
+          val body = itr.next()
+          if (body.number == nextNumber) {
+            toSave += (body.hash -> body.body)
+            toRemove += body
+            nextNumber += 1
+          } else {
+            break = true
+          }
         }
 
-        workingPeers -= peerId
+        if (toSave.nonEmpty) {
+          val bestBodyNumber = nextNumber - 1
+          saveBodies(toSave)
+          syncState.bestBodyNumber = bestBodyNumber
+          receivedBodies --= toRemove
 
+          updateBestBlockNumber()
+        }
+
+        val enqueueHashes = remainingHashes.map { hash =>
+          syncState.workingBodies.get(hash).map {
+            blockNumber => HashWithBlockNumber(blockNumber, hash)
+          }
+        }.flatten
+
+        syncState.pendingBodies ++= enqueueHashes
+        syncState.workingBodies --= workHashes
+
+        log.debug(s"bodies: best ${syncState.bestBodyNumber}, received ${receivedBodies.map(_.number)}, working: ${syncState.workingBodies.map(_._2).toList.sorted} pending: ${syncState.pendingBodies.map(_.number).toList.sorted}")
+
+        saveSyncStateBestBodyNumber()
+
+        workingPeers -= peerId
+        processSyncing()
+
+      case PeerWorkDone(peerId, ReceiptsWork(workHashes, remainingHashes, receipts)) =>
+        val received = receipts.map {
+          case (hash, recps) =>
+            syncState.workingReceipts.get(hash).map {
+              blockNumber => ReceiptsWithBlockNumber(blockNumber, hash, recps)
+            }
+        }.flatten
+
+        receivedReceipts ++= received
+
+        val toSave = mutable.ListBuffer[(Hash, Seq[Receipt])]()
+        val toRemove = mutable.Set[ReceiptsWithBlockNumber]()
+        var nextNumber = syncState.bestReceiptsNumber + 1
+        var break = false
+        val itr = receivedReceipts.iterator
+        while (itr.hasNext && !break) {
+          val recps = itr.next()
+          if (recps.number == nextNumber) {
+            toSave += (recps.hash -> recps.receipts)
+            toRemove += recps
+            nextNumber += 1
+          } else {
+            break = true
+          }
+        }
+
+        if (toSave.nonEmpty) {
+          val bestReceiptsNumber = nextNumber - 1
+          saveReceipts(toSave)
+          syncState.bestReceiptsNumber = bestReceiptsNumber
+          receivedReceipts --= toRemove
+
+          updateBestBlockNumber()
+        }
+
+        val enqueueHashes = remainingHashes.map { hash =>
+          syncState.workingReceipts.get(hash).map {
+            blockNumber => HashWithBlockNumber(blockNumber, hash)
+          }
+        }.flatten
+
+        syncState.pendingReceipts ++= enqueueHashes
+        syncState.workingReceipts --= workHashes
+
+        log.debug(s"recps: best ${syncState.bestReceiptsNumber}, received ${receivedReceipts.map(_.number)}, working: ${syncState.workingReceipts.map(_._2).toList.sorted} pending: ${syncState.pendingReceipts.map(_.number).toList.sorted}")
+
+        saveSyncStateBestReceiptsNumber()
+
+        workingPeers -= peerId
+        processSyncing()
+
+      case PeerWorkDone(peerId, NodesWork(workHashes, enqueueHashs, downloadedCount, accountNodes, storageNodes, evmcodes)) =>
+        if (accountNodes.nonEmpty) {
+          saveAccountNodes(accountNodes)
+        }
+        if (storageNodes.nonEmpty) {
+          saveStorageNodes(storageNodes)
+        }
+        if (evmcodes.nonEmpty) {
+          saveEvmcodes(evmcodes)
+        }
+
+        log.debug(s"Saved acccount: ${accountNodes.size}, storage: ${storageNodes.size}, evmcode: ${evmcodes.size}. Total ${accountNodes.size + storageNodes.size + evmcodes.size} - downloaded: ${downloadedCount}")
+
+        workHashes foreach {
+          case h: EvmcodeHash                => syncState.workingNonMptNodes -= h
+          case h: StorageRootHash            => syncState.workingNonMptNodes -= h
+          case h: StateMptNodeHash           => syncState.workingMptNodes -= h
+          case h: ContractStorageMptNodeHash => syncState.workingMptNodes -= h
+        }
+
+        // always enqueue hashes in the front, this will get shorter pending queue !!!
+        enqueueHashs foreach {
+          case h: EvmcodeHash                => syncState.pendingNonMptNodes = h :: syncState.pendingNonMptNodes
+          case h: StorageRootHash            => syncState.pendingNonMptNodes = h :: syncState.pendingNonMptNodes
+          case h: StateMptNodeHash           => syncState.pendingMptNodes = h :: syncState.pendingMptNodes
+          case h: ContractStorageMptNodeHash => syncState.pendingMptNodes = h :: syncState.pendingMptNodes
+        }
+
+        syncState.downloadedNodesCount += downloadedCount
+
+        saveSyncStateNodesData()
+
+        workingPeers -= peerId
+        processSyncing()
+
+      case PeerWorkDone(peerId, HeadersWork(headers, tds, lastNumber)) =>
+        if (headers.nonEmpty) {
+          saveHeaders(headers)
+        }
+        if (tds.nonEmpty) {
+          saveTotalDifficulties(tds)
+        }
+
+        lastNumber match {
+          case Some(n) if (n > syncState.bestHeaderNumber) => syncState.bestHeaderNumber = n
+          case None                                        =>
+        }
+
+        headerWorkingPeer = None
+
+        saveSyncStateBestHeaderNumber()
+
+        workingPeers -= peerId
         processSyncing()
 
       case MarkPeerBlockchainOnly(peer) =>
@@ -470,7 +487,7 @@ trait FastSyncService { _: SyncService =>
         reportStatus()
 
       case ReportSyncStateTick =>
-        log.info(s"[fast] Downloaded - header/body/receipts/node: ${syncState.bestHeaderNumber}/${syncState.bestBodyNumber}~${syncState.enqueuedBodyNumber}/${syncState.bestReceiptsNumber}~${syncState.enqueuedReceiptsNumber}/${syncState.downloadedNodesCount}. Pending - body/receipts/node: ${syncState.pendingBodies.size + syncState.workingBodies.size}/${syncState.pendingReceipts.size + syncState.workingReceipts.size}/${syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size + syncState.workingMptNodes.size + syncState.workingNonMptNodes.size}")
+        reportState
     }
 
     def processSyncing() {
@@ -634,14 +651,6 @@ trait FastSyncService { _: SyncService =>
         bodyWorks foreach { case (peer, requestingHashes) => requestBlockBodies(peer, requestingHashes) }
         headerWork foreach { peer => requestBlockHeaders(peer) }
         nodeWorks foreach { case (peer, requestingNodes) => requestNodes(peer, requestingNodes) }
-      }
-    }
-
-    private def updateBestBlockNumber() {
-      val bestBlockNumber = math.min(syncState.bestBodyNumber, syncState.bestReceiptsNumber)
-      log.debug(s"bestBlockNumber: $bestBlockNumber, prevSyncedBlockNumber: ${appStateStorage.getBestBlockNumber}. Saved")
-      if (bestBlockNumber > appStateStorage.getBestBlockNumber) {
-        appStateStorage.putBestBlockNumber(bestBlockNumber)
       }
     }
 
@@ -822,6 +831,14 @@ trait FastSyncService { _: SyncService =>
     }
 
     // --- saving methods
+    private def updateBestBlockNumber() {
+      val bestBlockNumber = math.min(syncState.bestBodyNumber, syncState.bestReceiptsNumber)
+      log.debug(s"bestBlockNumber: $bestBlockNumber, prevBestBlockNumber: ${appStateStorage.getBestBlockNumber}, bestBodyNumber: ${syncState.bestBodyNumber}, bestReceiptsNumber: ${syncState.bestReceiptsNumber}.")
+      if (bestBlockNumber > appStateStorage.getBestBlockNumber) {
+        appStateStorage.putBestBlockNumber(bestBlockNumber)
+      }
+      log.debug(s"bestBlockNumber: ${appStateStorage.getBestBlockNumber} - after.")
+    }
 
     private def saveHeaders(kvs: Iterable[BlockHeader]) {
       val start = System.nanoTime
@@ -833,7 +850,7 @@ trait FastSyncService { _: SyncService =>
       log.debug(s"SaveHeaders ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
-    private def saveBodies(kvs: Iterable[(Hash, PV62.BlockBody)], bestSavedBlockNumber: Long) {
+    private def saveBodies(kvs: Iterable[(Hash, PV62.BlockBody)]) {
       val start = System.nanoTime
       try {
         blockchain.saveBlockBody_batched(kvs)
@@ -894,7 +911,7 @@ trait FastSyncService { _: SyncService =>
       val blockRate = ((syncedBlockNumber - prevSyncedBlockNumber) / duration).toInt
       val stateRate = ((syncState.downloadedNodesCount - prevDownloadeNodes) / duration).toInt
       val goodPeers = peersToDownloadFrom
-      val nodeOkPeers = goodPeers -- blockchainOnlyPeers.values.toSet
+      val nodeOkPeers = goodPeers -- blockchainOnlyPeers.values
       val nHeaderPeers = headerWhitePeers.size
       val nBlackPeers = handshakedPeers.size - goodPeers.size
       log.info(
@@ -911,5 +928,9 @@ trait FastSyncService { _: SyncService =>
       timers.startSingleTimer(ReportStatusTask, ReportStatusTick, reportStatusInterval)
     }
 
+    private def reportState {
+      log.info(s"[fast] Downloaded - header/body/receipts/node: ${syncState.bestHeaderNumber}/${syncState.bestBodyNumber}~${syncState.enqueuedBodyNumber}/${syncState.bestReceiptsNumber}~${syncState.enqueuedReceiptsNumber}/${syncState.downloadedNodesCount}. Pending - body/receipts/node: ${syncState.pendingBodies.size + syncState.workingBodies.size}/${syncState.pendingReceipts.size + syncState.workingReceipts.size}/${syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size + syncState.workingMptNodes.size + syncState.workingNonMptNodes.size}")
+    }
   }
+
 }

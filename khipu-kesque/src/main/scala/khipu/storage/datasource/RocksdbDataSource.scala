@@ -98,7 +98,6 @@ final class RocksdbDataSource(
    * @return the new DataSource after the removals and insertions were done.
    */
   override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
-
     var writeOptions: WriteOptions = null
     var batch: WriteBatch = null
     var txn: Transaction = null
@@ -108,8 +107,8 @@ final class RocksdbDataSource(
       batch = new WriteBatch()
 
       val remove = toRemove map { key => BytesUtil.concat(namespace, key) }
-      remove foreach { combKey =>
-        batch.delete(combKey)
+      remove foreach {
+        combKey => batch.delete(combKey)
       }
 
       val upsert = toUpsert map { case (key, value) => (BytesUtil.concat(namespace, key) -> value) }
@@ -124,8 +123,8 @@ final class RocksdbDataSource(
         key => cache.remove(Hash(key))
       }
 
-      toUpsert foreach {
-        case (key, value) => cache.put(Hash(key), value)
+      upsert foreach {
+        case (combKey, value) => cache.put(Hash(combKey), value)
       }
     } catch {
       case ex: Throwable =>

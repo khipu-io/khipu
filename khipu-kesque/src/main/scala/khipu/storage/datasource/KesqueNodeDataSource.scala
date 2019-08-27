@@ -41,6 +41,8 @@ final class KesqueNodeDataSource(
 
   val clock = new Clock()
 
+  info(s"Table $topic nodes $count")
+
   def get(key: Hash): Option[Array[Byte]] = {
     try {
       readLock.lock
@@ -177,6 +179,8 @@ final class KesqueNodeDataSource(
       batchedRecords :+= (tkvs, records)
     }
 
+    info(s"batchedRecords: ${batchedRecords.map(_._2.size).sum}, toUpsert: ${toUpsert.size}")
+
     // write to log file
     batchedRecords map {
       case (tkvs, recs) =>
@@ -260,7 +264,7 @@ final class KesqueNodeDataSource(
     }
   }
 
-  def count = kesqueDb.getLogEndOffset(topic).getOrElse(0L) + 1
+  def count = kesqueDb.getLogEndOffset(topic)
 
   def cacheHitRate = cache.hitRate
   def cacheReadCount = cache.readCount

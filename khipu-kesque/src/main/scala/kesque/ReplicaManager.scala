@@ -557,7 +557,9 @@ class ReplicaManager(
     }
   }
 
-  def getLogEndOffset(topicPartition: TopicPartition): Option[Long] =
-    nonOfflinePartition(topicPartition).flatMap(_.leaderReplicaIfLocal.map(_.logEndOffset.messageOffset))
-
+  def getLogEndOffset(topicPartition: TopicPartition): Long = {
+    getOrCreatePartition(topicPartition) // force to maybePut partition
+    val (_, replica) = getPartitionAndLeaderReplicaIfLocal(topicPartition)
+    replica.logEndOffset.messageOffset
+  }
 }
