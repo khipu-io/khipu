@@ -94,7 +94,6 @@ final class KesqueNodeDataSource(
   }
 
   def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): KesqueNodeDataSource = {
-
     // we'll keep the batch size not exceeding fetchMaxBytes to get better random read performance
     var batchedRecords = Vector[(Seq[(Hash, Array[Byte])], Seq[SimpleRecord])]()
 
@@ -102,76 +101,37 @@ final class KesqueNodeDataSource(
     var offsetDelta = 0
     var firstTimestamp = Long.MinValue
 
-    // prepare simple records, filter no changed ones
+    // prepare simple records
     var tkvs = Vector[(Hash, Array[Byte])]()
     var records = Vector[SimpleRecord]()
-    var keyToPrevOffset = Map[Hash, Long]()
     toUpsert foreach {
       case kv @ (key, value) =>
         val keyBytes = key.bytes
-        cache.get(key) match {
-          case Some(TVal(prevValue, prevOffset, _)) =>
-            if (isValueChanged(value, prevValue)) {
-              val record = new SimpleRecord(null, value)
-              if (firstTimestamp == Long.MinValue) {
-                firstTimestamp = 0
-              }
-              val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
-              if (estimatedSize < fetchMaxBytes) {
-                tkvs :+= kv
-                records :+= record
-                keyToPrevOffset += (key -> prevOffset)
+        val record = new SimpleRecord(null, value)
+        if (firstTimestamp == Long.MinValue) {
+          firstTimestamp = 0
+        }
+        val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
+        //println(s"$newSize, $estimatedSize")
+        if (estimatedSize < fetchMaxBytes) {
+          tkvs :+= kv
+          records :+= record
 
-                size = newSize
-                offsetDelta += 1
-              } else {
-                batchedRecords :+= (tkvs, records)
-                tkvs = Vector[(Hash, Array[Byte])]()
-                records = Vector[SimpleRecord]()
+          size = newSize
+          offsetDelta += 1
+        } else {
+          batchedRecords :+= (tkvs, records)
+          tkvs = Vector[(Hash, Array[Byte])]()
+          records = Vector[SimpleRecord]()
 
-                tkvs :+= kv
-                records :+= record
-                keyToPrevOffset += (key -> prevOffset)
+          tkvs :+= kv
+          records :+= record
 
-                size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
-                offsetDelta = 0
-                val (firstSize, _) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
-                size = firstSize
-                offsetDelta += 1
-              }
-
-              // TODO should only happen when value is set to empty, i.e. removed?
-              // remove records of prevOffset from memory?
-            } else {
-              debug(s"$topic: value not changed. cache: hit ${cache.hitRate}, miss ${cache.missRate}}")
-            }
-          case None =>
-            val record = new SimpleRecord(null, value)
-            if (firstTimestamp == Long.MinValue) {
-              firstTimestamp = 0
-            }
-            val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
-            //println(s"$newSize, $estimatedSize")
-            if (estimatedSize < fetchMaxBytes) {
-              tkvs :+= kv
-              records :+= record
-
-              size = newSize
-              offsetDelta += 1
-            } else {
-              batchedRecords :+= (tkvs, records)
-              tkvs = Vector[(Hash, Array[Byte])]()
-              records = Vector[SimpleRecord]()
-
-              tkvs :+= kv
-              records :+= record
-
-              size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
-              offsetDelta = 0
-              val (firstSize, _) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
-              size = firstSize
-              offsetDelta += 1
-            }
+          size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
+          offsetDelta = 0
+          val (firstSize, _) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
+          size = firstSize
+          offsetDelta += 1
         }
     }
 
@@ -179,13 +139,13 @@ final class KesqueNodeDataSource(
       batchedRecords :+= (tkvs, records)
     }
 
-    info(s"batchedRecords: ${batchedRecords.map(_._2.size).sum}, toUpsert: ${toUpsert.size}")
+    debug(s"toUpsert: ${toUpsert.size}, batchedRecords: ${batchedRecords.map(_._2.size).sum}")
 
     // write to log file
     batchedRecords map {
       case (tkvs, recs) =>
         if (recs.nonEmpty) {
-          writeRecords(tkvs, recs, keyToPrevOffset)
+          writeRecords(tkvs, recs)
         } else {
           0
         }
@@ -209,7 +169,7 @@ final class KesqueNodeDataSource(
     (size, estimateSize)
   }
 
-  private def writeRecords(kvs: Seq[(Hash, Array[Byte])], records: Seq[SimpleRecord], keyToPrevOffset: Map[Hash, Long]): Int = {
+  private def writeRecords(kvs: Seq[(Hash, Array[Byte])], records: Seq[SimpleRecord]): Int = {
     try {
       writeLock.lock()
 
@@ -228,11 +188,6 @@ final class KesqueNodeDataSource(
                 val keyBytes = key.bytes
                 val indexRecord = (keyBytes -> longOffset)
 
-                // check if there is prevOffset, will remove it (replace it with current one)
-                keyToPrevOffset.get(key) match {
-                  case Some(prevOffset) => index.remove(keyBytes, prevOffset)
-                  case None             =>
-                }
                 cache.put(key, TVal(value, offset, 0L))
                 (offset + 1, idxRecords :+ indexRecord)
             }
