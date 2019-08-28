@@ -292,6 +292,8 @@ trait FastSyncService { _: SyncService =>
   protected def saveSyncStateNodesData() = syncState foreach fastSyncStateStorage.putNodesData
 
   private class SyncingHandler(syncState: SyncState) {
+    private val MAX_SIZE_RECEIVED_QUEUE = 10000 // limit the memory usage
+
     updateBestBlockNumber()
 
     blockHeaderForChecking = Some(syncState.targetBlockHeader)
@@ -305,8 +307,8 @@ trait FastSyncService { _: SyncService =>
     private var prevDownloadeNodes = syncState.downloadedNodesCount
     private var prevReportTime = System.nanoTime
 
-    private val receivedBodies = mutable.TreeSet[BodyWithBlockNumber]()
-    private val receivedReceipts = mutable.TreeSet[ReceiptsWithBlockNumber]()
+    private var receivedBodies = mutable.TreeSet[BodyWithBlockNumber]()
+    private var receivedReceipts = mutable.TreeSet[ReceiptsWithBlockNumber]()
 
     log.info(s"[fast] sync to target block header: \n${syncState.targetBlockHeader}")
 
@@ -356,13 +358,19 @@ trait FastSyncService { _: SyncService =>
           updateBestBlockNumber()
         }
 
-        val enqueueHashes = remainingHashes.map { hash =>
+        if (receivedBodies.size > MAX_SIZE_RECEIVED_QUEUE) {
+          val (left, right) = receivedBodies.splitAt(MAX_SIZE_RECEIVED_QUEUE)
+          receivedBodies = left
+          syncState.pendingBodies ++= right.map(x => HashWithBlockNumber(x.number, x.hash))
+        }
+
+        val enqueueBodies = remainingHashes.map { hash =>
           syncState.workingBodies.get(hash).map {
             blockNumber => HashWithBlockNumber(blockNumber, hash)
           }
         }.flatten
 
-        syncState.pendingBodies ++= enqueueHashes
+        syncState.pendingBodies ++= enqueueBodies
         syncState.workingBodies --= workHashes
 
         log.debug(s"bodies: best ${syncState.bestBodyNumber}, received ${receivedBodies.map(_.number)}, working: ${syncState.workingBodies.map(_._2).toList.sorted} pending: ${syncState.pendingBodies.map(_.number).toList.sorted}")
@@ -407,13 +415,19 @@ trait FastSyncService { _: SyncService =>
           updateBestBlockNumber()
         }
 
-        val enqueueHashes = remainingHashes.map { hash =>
+        if (receivedReceipts.size > MAX_SIZE_RECEIVED_QUEUE) {
+          val (left, right) = receivedReceipts.splitAt(MAX_SIZE_RECEIVED_QUEUE)
+          receivedReceipts = left
+          syncState.pendingReceipts ++= right.map(x => HashWithBlockNumber(x.number, x.hash))
+        }
+
+        val enqueueReceipts = remainingHashes.map { hash =>
           syncState.workingReceipts.get(hash).map {
             blockNumber => HashWithBlockNumber(blockNumber, hash)
           }
         }.flatten
 
-        syncState.pendingReceipts ++= enqueueHashes
+        syncState.pendingReceipts ++= enqueueReceipts
         syncState.workingReceipts --= workHashes
 
         log.debug(s"recps: best ${syncState.bestReceiptsNumber}, received ${receivedReceipts.map(_.number)}, working: ${syncState.workingReceipts.map(_._2).toList.sorted} pending: ${syncState.pendingReceipts.map(_.number).toList.sorted}")

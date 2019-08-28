@@ -56,12 +56,7 @@ final case class BodyWithBlockNumber(number: Long, hash: Hash, body: PV62.BlockB
 final case class ReceiptsWithBlockNumber(number: Long, hash: Hash, receipts: Seq[Receipt]) extends WithBlockNumber[ReceiptsWithBlockNumber] {
   override def equals(that: Any) = {
     that match {
-      case ReceiptsWithBlockNumber(number, hash, receitps) =>
-        if (number == this.number && hash == this.hash && receipts.size == this.receipts.size) {
-          receipts.zip(this.receipts).filter(x => x._1 != x._2).isEmpty
-        } else {
-          false
-        }
+      case ReceiptsWithBlockNumber(number, hash, receitps) => number == this.number && hash == this.hash && receipts.sameElements(this.receipts)
       case _ => false
     }
   }
