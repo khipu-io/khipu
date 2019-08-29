@@ -1,6 +1,7 @@
 package khipu.blockchain.sync
 
 import akka.pattern.AskTimeoutException
+import khipu.blockchain.sync.SyncService.SuspendPeerTick
 import khipu.config.KhipuConfig
 import khipu.domain.BlockHeader
 import khipu.network.handshake.EtcHandshake.PeerInfo
@@ -11,6 +12,7 @@ import khipu.network.rlpx.Peer
 import khipu.network.rlpx.PeerEntity
 import khipu.network.rlpx.PeerManager
 import khipu.storage.AppStateStorage
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -19,9 +21,6 @@ import scala.util.Success
 
 object HandshakedPeersService {
   final case class BlacklistPeer(peerId: String, reason: String, always: Boolean = false)
-
-  private case class UnblacklistPeerTask(peerId: String)
-  private case class UnblacklistPeerTick(peerId: String)
 }
 trait HandshakedPeersService { _: SyncService =>
   import context.dispatcher
@@ -33,12 +32,14 @@ trait HandshakedPeersService { _: SyncService =>
   protected var handshakedPeers = Map[String, (Peer, PeerInfo)]()
   protected def incomingPeers = handshakedPeers.filter(_._2._1.isInstanceOf[IncomingPeer])
   protected def outgoingPeers = handshakedPeers.filter(_._2._1.isInstanceOf[OutgoingPeer])
-  protected var blacklistPeers = Set[String]()
-  protected var blacklistCounts = Map[String, Int]()
+  protected val suspendedPeers = new mutable.HashMap[String, Long]()
+  protected val blacklistCounts = new mutable.HashMap[String, Int]()
 
   protected var blockHeaderForChecking: Option[BlockHeader] = None
   protected var headerWhitePeers = Set[Peer]()
   protected var headerBlackPeers = Set[Peer]()
+
+  private val blacklistDuration = KhipuConfig.Sync.blacklistDuration.toMillis
 
   def peerUpdateBehavior: Receive = {
     case PeerEntity.PeerHandshaked(peer, peerInfo) =>
@@ -89,9 +90,12 @@ trait HandshakedPeersService { _: SyncService =>
     case BlacklistPeer(peerId, reason, always) =>
       blacklist(peerId, KhipuConfig.Sync.blacklistDuration, reason, always)
 
-    case UnblacklistPeerTick(peerId) =>
-      timers.cancel(UnblacklistPeerTask(peerId))
-      blacklistPeers -= peerId
+    case SuspendPeerTick =>
+      val now = System.currentTimeMillis
+      val toRelease = suspendedPeers.collect {
+        case (peerId, startTime) if (now - startTime) > blacklistDuration => peerId
+      }
+      suspendedPeers --= toRelease
 
     case PeerEntity.PeerEntityStopped(peerId) =>
       log.debug(s"[sync] peer $peerId stopped")
@@ -100,21 +104,24 @@ trait HandshakedPeersService { _: SyncService =>
 
   def removePeer(peerId: String) {
     log.debug(s"[sync] removing peer $peerId")
-    timers.cancel(UnblacklistPeerTask(peerId))
+    suspendedPeers -= peerId
     handshakedPeers -= peerId
     headerWhitePeers = headerWhitePeers.filterNot(_.id == peerId)
   }
 
-  def peersToDownloadFrom: Map[Peer, PeerInfo] =
+  def peersToDownloadFrom: Map[Peer, PeerInfo] = {
     handshakedPeers.collect {
       case (peerId, (peer, info)) if !isBlacklisted(peerId) => (peer, info)
     }
+  }
+  
+  private def isBlacklisted(peerId: String): Boolean = suspendedPeers.contains(peerId) || blacklistCounts.getOrElse(peerId, 0) >= 3
 
   private def blacklist(peerId: String, duration: FiniteDuration, reason: String, always: Boolean = false) {
-    log.debug(s"[sync] blacklisting peer $peerId for $duration, $reason")
-    timers.cancel(UnblacklistPeerTask(peerId))
-
     val blacklistCount = blacklistCounts.getOrElse(peerId, 0)
+    log.debug(s"[sync] blacklisting peer $peerId (blacklisted $blacklistCount) for $duration, $reason")
+
+    blacklistCounts(peerId) = blacklistCount + 1
     if (always || blacklistCount >= 3) {
       val peerToDisconnect = handshakedPeers.get(peerId) flatMap {
         case (peer: OutgoingPeer, _) => Some(peer)
@@ -127,18 +134,11 @@ trait HandshakedPeersService { _: SyncService =>
         peer.entity ! PeerEntity.MessageToPeer(peerId, disconnect)
         peerManager ! PeerManager.DropNode(peerId)
         removePeer(peerId)
-        blacklistPeers -= peerId
-        blacklistCounts -= peerId
       }
-
     } else {
-      timers.startSingleTimer(UnblacklistPeerTask(peerId), UnblacklistPeerTick(peerId), duration)
-      blacklistPeers += peerId
-      blacklistCounts += (peerId -> (blacklistCount + 1))
+      suspendedPeers(peerId) = System.currentTimeMillis
     }
   }
-
-  def isBlacklisted(peerId: String): Boolean = blacklistPeers.contains(peerId) || blacklistCounts.getOrElse(peerId, 0) >= 4
 
   private def checkPeerByBlockHeader(peer: Peer)(targetBlockHeader: BlockHeader): Future[Boolean] = {
     requestingHeaders(peer, None, Left(targetBlockHeader.number), 1, 0, reverse = false)(20.seconds) transform {

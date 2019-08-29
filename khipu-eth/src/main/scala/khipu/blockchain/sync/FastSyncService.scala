@@ -48,17 +48,17 @@ import scala.util.Success
 object FastSyncService {
   case object RetryStart
 
-  case object BlockHeadersTimeout
-  case object TargetBlockTimeout
+  private case object BlockHeadersTimeout
+  private case object TargetBlockTimeout
 
-  case object ProcessSyncingTask
-  case object ProcessSyncingTick
+  private case object ProcessSyncingTask
+  private case object ProcessSyncingTick
 
-  case object ReportSyncStateTask
-  case object ReportSyncStateTick
+  private case object ReportSyncStateTask
+  private case object ReportSyncStateTick
 
-  case object ReportStatusTask
-  case object ReportStatusTick
+  private case object ReportStatusTask
+  private case object ReportStatusTick
 
   final case class SyncState(
       targetBlockHeader:          BlockHeader,
@@ -301,7 +301,7 @@ trait FastSyncService { _: SyncService =>
     private var workingPeers = Set[Peer]()
     private var headerWorkingPeer: Option[String] = None
 
-    private var blockchainOnlyPeers = Map[String, Peer]()
+    private var blockchainOnlyPeers = Set[String]()
 
     private var prevSyncedBlockNumber = appStateStorage.getBestBlockNumber
     private var prevDownloadeNodes = syncState.downloadedNodesCount
@@ -373,7 +373,7 @@ trait FastSyncService { _: SyncService =>
         syncState.pendingBodies ++= enqueueBodies
         syncState.workingBodies --= workHashes
 
-        log.debug(s"bodies: best ${syncState.bestBodyNumber}, received ${receivedBodies.map(_.number)}, working: ${syncState.workingBodies.map(_._2).toList.sorted} pending: ${syncState.pendingBodies.map(_.number).toList.sorted}")
+        log.debug(s"bodies: best ${syncState.bestBodyNumber}, received ${receivedBodies.take(5).map(_.number)}, working: ${syncState.workingBodies.map(_._2).toList.sorted.take(5)} pending: ${syncState.pendingBodies.take(5).map(_.number)}")
 
         saveSyncStateBestBodyNumber()
 
@@ -430,7 +430,7 @@ trait FastSyncService { _: SyncService =>
         syncState.pendingReceipts ++= enqueueReceipts
         syncState.workingReceipts --= workHashes
 
-        log.debug(s"recps: best ${syncState.bestReceiptsNumber}, received ${receivedReceipts.map(_.number)}, working: ${syncState.workingReceipts.map(_._2).toList.sorted} pending: ${syncState.pendingReceipts.map(_.number).toList.sorted}")
+        log.debug(s"recps: best ${syncState.bestReceiptsNumber}, received ${receivedReceipts.take(5).map(_.number)}, working: ${syncState.workingReceipts.map(_._2).toList.sorted.take(5)} pending: ${syncState.pendingReceipts.take(5).map(_.number)}")
 
         saveSyncStateBestReceiptsNumber()
 
@@ -494,7 +494,7 @@ trait FastSyncService { _: SyncService =>
 
       case MarkPeerBlockchainOnly(peer) =>
         if (!blockchainOnlyPeers.contains(peer.id)) {
-          blockchainOnlyPeers = blockchainOnlyPeers.take(blockchainOnlyPeersPoolSize) + (peer.id -> peer)
+          blockchainOnlyPeers = blockchainOnlyPeers.take(blockchainOnlyPeersPoolSize) + peer.id
         }
 
       case ReportStatusTick =>
@@ -526,7 +526,7 @@ trait FastSyncService { _: SyncService =>
 
     private def finishFastSync() {
       blockHeaderForChecking = None
-      blockchainOnlyPeers = Map()
+      blockchainOnlyPeers = Set()
       timers.cancel(ReportStatusTask)
       timers.cancel(ProcessSyncingTask)
       timers.cancel(ReportSyncStateTask)
@@ -557,8 +557,7 @@ trait FastSyncService { _: SyncService =>
         }
 
         val nodeWorks = if (syncState.pendingNonMptNodes.nonEmpty || syncState.pendingMptNodes.nonEmpty) {
-          val blockchainOnlys = blockchainOnlyPeers.values.toSet
-          unassignedPeers.filterNot(blockchainOnlys.contains)
+          unassignedPeers.filterNot(x => blockchainOnlyPeers.contains(x.id))
             .take(maxConcurrentRequests - workingPeers.size)
             .foldLeft(Vector[(Peer, List[NodeHash])]()) {
               case (acc, peer) =>
@@ -741,7 +740,7 @@ trait FastSyncService { _: SyncService =>
     def requestBlockBodies(peer: Peer, requestingHashes: List[Hash]) {
       val start = System.nanoTime
 
-      log.debug(s"Request block bodies ${requestingHashes.size} from ${peer.id}")
+      log.debug(s"Request block bodies ${requestingHashes.take(5)} from ${peer.id}")
       requestingBodies(peer, requestingHashes) andThen {
         case Success(Some(BlockBodiesResponse(peerId, remainingHashes, receivedHashes, bodies))) =>
           log.debug(s"Got block bodies ${bodies.size} from ${peer.id} in ${(System.nanoTime - start) / 1000000}ms")
@@ -777,7 +776,7 @@ trait FastSyncService { _: SyncService =>
     def requestReceipts(peer: Peer, requestingHashes: List[Hash]) {
       val start = System.nanoTime
 
-      log.debug(s"Request receipts from ${peer.id}")
+      log.debug(s"Request receipts ${requestingHashes.take(5)} from ${peer.id}")
       requestingReceipts(peer, requestingHashes) andThen {
         case Success(Some(ReceiptsResponse(peerId, remainingHashes, receivedHashes, receipts))) =>
           log.debug(s"Got receipts ${receipts.size} from ${peer.id} in ${(System.nanoTime - start) / 1000000}ms")
@@ -925,13 +924,13 @@ trait FastSyncService { _: SyncService =>
       val blockRate = ((syncedBlockNumber - prevSyncedBlockNumber) / duration).toInt
       val stateRate = ((syncState.downloadedNodesCount - prevDownloadeNodes) / duration).toInt
       val goodPeers = peersToDownloadFrom
-      val nodeOkPeers = goodPeers -- blockchainOnlyPeers.values
+      val nNodeOkPeers = goodPeers.filterNot(x => blockchainOnlyPeers.contains(x._1.id)).size
       val nHeaderPeers = headerWhitePeers.size
       val nBlackPeers = handshakedPeers.size - goodPeers.size
       log.info(
         s"""|[fast] Block: ${appStateStorage.getBestBlockNumber}/${syncState.targetBlockNumber}, $blockRate/s.
             |State: ${syncState.downloadedNodesCount}/$nTotalNodes, $stateRate/s.
-            |Peers: (in/out) (${incomingPeers.size}/${outgoingPeers.size}), (working/good/header/node/black) (${workingPeers.size}/${goodPeers.size}/${nHeaderPeers}/${nodeOkPeers.size}/${nBlackPeers})
+            |Peers: (in/out) (${incomingPeers.size}/${outgoingPeers.size}), (working/good/header/node/black) (${workingPeers.size}/${goodPeers.size}/${nHeaderPeers}/${nNodeOkPeers}/${nBlackPeers})
             |""".stripMargin.replace("\n", " ")
       )
 

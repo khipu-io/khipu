@@ -70,8 +70,11 @@ object SyncService {
 
   case object StartSync
   case object FastSyncDone
+
+  case object SuspendPeerTask
+  case object SuspendPeerTick
 }
-class SyncService() extends FastSyncService with RegularSyncService with HandshakedPeersService with Actor with Timers with ActorLogging {
+final class SyncService() extends FastSyncService with RegularSyncService with HandshakedPeersService with Actor with Timers with ActorLogging {
   import SyncService._
   import context.dispatcher
 
@@ -101,8 +104,12 @@ class SyncService() extends FastSyncService with RegularSyncService with Handsha
   protected def peerManager = serviceBoard.peerManage
   protected def pendingTransactionsService = PendingTransactionsService.proxy(context.system)
 
+  timers.startPeriodicTimer(SuspendPeerTask, SuspendPeerTick, 1.seconds)
+
   override def postStop() {
     super.postStop()
+
+    timers.cancel(SuspendPeerTask)
 
     if (!appStateStorage.isFastSyncDone) {
       saveSyncState()
