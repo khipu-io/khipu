@@ -21,6 +21,7 @@ import scala.util.Success
 
 object HandshakedPeersService {
   final case class BlacklistPeer(peerId: String, reason: String, always: Boolean = false)
+  final case class ResetBlacklistCount(peerId: String)
 }
 trait HandshakedPeersService { _: SyncService =>
   import context.dispatcher
@@ -43,7 +44,7 @@ trait HandshakedPeersService { _: SyncService =>
 
   def peerUpdateBehavior: Receive = {
     case PeerEntity.PeerHandshaked(peer, peerInfo) =>
-      if (peerInfo.forkAccepted) {
+      if (!blacklistCounts.contains(peer.id) && peerInfo.forkAccepted) {
         log.debug(s"[sync] added handshaked peer: $peer")
         handshakedPeers += (peer.id -> (peer, peerInfo))
         log.debug(s"[sync] handshaked peers: ${handshakedPeers.size}")
@@ -73,7 +74,7 @@ trait HandshakedPeersService { _: SyncService =>
             val disconnect = Disconnect(Disconnect.Reasons.UselessPeer)
             peer.entity ! PeerEntity.MessageToPeer(peerId, disconnect)
             removePeer(peerId)
-            blacklist(peerId, KhipuConfig.Sync.blacklistDuration, disconnect.toString, always = true)
+            blacklist(peerId, blacklistDuration.millisecond, disconnect.toString, always = true)
           } else {
             handshakedPeers += (peerId -> (peer, peerInfo))
             if (!headerWhitePeers.contains(peer)) {
@@ -87,15 +88,22 @@ trait HandshakedPeersService { _: SyncService =>
           }
       }
 
+    case ResetBlacklistCount(peerId) =>
+      blacklistCounts(peerId) = 0
+
     case BlacklistPeer(peerId, reason, always) =>
-      blacklist(peerId, KhipuConfig.Sync.blacklistDuration, reason, always)
+      blacklist(peerId, blacklistDuration.millisecond, reason, always)
 
     case SuspendPeerTick =>
       val now = System.currentTimeMillis
       val toRelease = suspendedPeers.collect {
         case (peerId, startTime) if (now - startTime) > blacklistDuration => peerId
       }
-      suspendedPeers --= toRelease
+      
+      if (toRelease.nonEmpty) {
+        suspendedPeers --= toRelease
+        log.debug(s"Released $toRelease, suspended ${suspendedPeers.map(_._1)}")
+      }
 
     case PeerEntity.PeerEntityStopped(peerId) =>
       log.debug(s"[sync] peer $peerId stopped")
@@ -109,20 +117,21 @@ trait HandshakedPeersService { _: SyncService =>
     headerWhitePeers = headerWhitePeers.filterNot(_.id == peerId)
   }
 
-  def peersToDownloadFrom: Map[Peer, PeerInfo] = {
+  def goodPeers: Map[Peer, PeerInfo] = {
     handshakedPeers.collect {
-      case (peerId, (peer, info)) if !isBlacklisted(peerId) => (peer, info)
+      case (peerId, (peer, info)) if !isBlacklisted(peerId) && !isSuspended(peerId) => (peer, info)
     }
   }
-  
-  private def isBlacklisted(peerId: String): Boolean = suspendedPeers.contains(peerId) || blacklistCounts.getOrElse(peerId, 0) >= 3
+
+  private def isSuspended(peerId: String) = suspendedPeers.contains(peerId)
+  private def isBlacklisted(peerId: String): Boolean = blacklistCounts.getOrElse(peerId, 0) >= 3
 
   private def blacklist(peerId: String, duration: FiniteDuration, reason: String, always: Boolean = false) {
     val blacklistCount = blacklistCounts.getOrElse(peerId, 0)
     log.debug(s"[sync] blacklisting peer $peerId (blacklisted $blacklistCount) for $duration, $reason")
 
     blacklistCounts(peerId) = blacklistCount + 1
-    if (always || blacklistCount >= 3) {
+    if (always || isBlacklisted(peerId)) {
       val peerToDisconnect = handshakedPeers.get(peerId) flatMap {
         case (peer: OutgoingPeer, _) => Some(peer)
         case (peer: IncomingPeer, _) => if (always) Some(peer) else None
@@ -130,14 +139,21 @@ trait HandshakedPeersService { _: SyncService =>
 
       peerToDisconnect map { peer =>
         log.debug(s"[sync] drop peer $peerId, $reason")
+        removePeer(peerId)
         val disconnect = Disconnect(Disconnect.Reasons.UselessPeer)
         peer.entity ! PeerEntity.MessageToPeer(peerId, disconnect)
         peerManager ! PeerManager.DropNode(peerId)
-        removePeer(peerId)
       }
     } else {
       suspendedPeers(peerId) = System.currentTimeMillis
     }
+
+    log.debug(s"[sync] suspended: ${suspendedPeers.map(_._1)}, blacklisted: ${blacklistCounts.filter(_._2 >= 3).map(_._1)}, handshaked: ${handshakedPeers.map(_._2._1)}")
+  }
+
+  protected def setCurrBlockHeaderForChecking() {
+    val bestBlockNumber = appStateStorage.getBestBlockNumber
+    blockHeaderForChecking = blockchain.getBlockHeaderByNumber(bestBlockNumber - blockResolveDepth)
   }
 
   private def checkPeerByBlockHeader(peer: Peer)(targetBlockHeader: BlockHeader): Future[Boolean] = {
@@ -162,10 +178,5 @@ trait HandshakedPeersService { _: SyncService =>
       case Failure(e) =>
         Success(false)
     }
-  }
-
-  protected def setCurrBlockHeaderForChecking() {
-    val bestBlockNumber = appStateStorage.getBestBlockNumber
-    blockHeaderForChecking = blockchain.getBlockHeaderByNumber(bestBlockNumber - blockResolveDepth)
   }
 }

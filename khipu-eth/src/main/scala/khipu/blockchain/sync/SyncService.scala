@@ -104,7 +104,7 @@ final class SyncService() extends FastSyncService with RegularSyncService with H
   protected def peerManager = serviceBoard.peerManage
   protected def pendingTransactionsService = PendingTransactionsService.proxy(context.system)
 
-  timers.startPeriodicTimer(SuspendPeerTask, SuspendPeerTick, 1.seconds)
+  timers.startPeriodicTimer(SuspendPeerTask, SuspendPeerTick, 5.seconds)
 
   override def postStop() {
     super.postStop()

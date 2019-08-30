@@ -8,6 +8,7 @@ import khipu.BroadcastNewBlocks
 import khipu.DataWord
 import khipu.blockchain.sync
 import khipu.blockchain.sync.HandshakedPeersService.BlacklistPeer
+import khipu.blockchain.sync.HandshakedPeersService.ResetBlacklistCount
 import khipu.config.KhipuConfig
 import khipu.domain.Block
 import khipu.domain.BlockHeader
@@ -202,6 +203,7 @@ trait RegularSyncService { _: SyncService =>
               requestingBodies(peer, hashes)(syncRequestTimeout.plus((hashes.size * 100).millis)) andThen {
                 case Success(Some(BlockBodiesResponse(peerId, remainingHashes, receivedHashes, bodies))) =>
                   log.debug(s"Got block bodies from $peer")
+                  self ! ResetBlacklistCount(peer.id)
                   self ! ProcessBlockBodies(peer, bodies)
 
                 case Success(None) =>
@@ -230,6 +232,7 @@ trait RegularSyncService { _: SyncService =>
 
             requestingHeaders(peer, None, Right(firstHeader.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) andThen {
               case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
+                self ! ResetBlacklistCount(peer.id)
                 self ! ProcessBlockHeaders(peer, headers)
 
               case Success(Some(BlockHeadersResponse(peerId, List(), false))) =>
@@ -305,6 +308,7 @@ trait RegularSyncService { _: SyncService =>
                     requestingBodies(peer, hashes)(syncRequestTimeout.plus((hashes.size * 100).millis)) andThen {
                       case Success(Some(BlockBodiesResponse(peerId, remainingHashes, receivedHashes, bodies))) =>
                         log.debug(s"Got block bodies from $peer")
+                        self ! ResetBlacklistCount(peer.id)
                         self ! ProcessBlockBodies(peer, bodies)
 
                       case Success(None) =>
@@ -437,7 +441,7 @@ trait RegularSyncService { _: SyncService =>
   }
 
   private def bestPeer: Option[Peer] = {
-    val peersToUse = peersToDownloadFrom.collect {
+    val peersToUse = goodPeers.collect {
       case (peer, PeerInfo(_, totalDifficulty, true, _)) => (peer, totalDifficulty)
     }
 
@@ -451,7 +455,7 @@ trait RegularSyncService { _: SyncService =>
 
   private var nodeErrorPeers = Set[Peer]()
   private def nodeOkPeer: Option[Peer] = {
-    val peersToUse = peersToDownloadFrom.collect {
+    val peersToUse = goodPeers.collect {
       case (peer, PeerInfo(_, totalDifficulty, true, _)) => (peer, totalDifficulty)
     } -- nodeErrorPeers
 
