@@ -237,7 +237,7 @@ trait FastSyncService { _: SyncService =>
             headerWhitePeers ++= goodPeers
             headerBlackPeers = peers -- headerWhitePeers
             headerBlackPeers foreach { peer =>
-              self ! BlacklistPeer(peer.id, s"Got uncertain block header", always = true)
+              self ! BlacklistPeer(peer.id, s"Got uncertain block header", force = true)
             }
 
             val targetBlockHeader = blockHeaders.head
@@ -941,7 +941,7 @@ trait FastSyncService { _: SyncService =>
     }
 
     private def reportState {
-      log.info(s"[fast] Downloaded - header/body/receipts/node: ${syncState.bestHeaderNumber}/${syncState.bestBodyNumber}~${syncState.enqueuedBodyNumber}/${syncState.bestReceiptsNumber}~${syncState.enqueuedReceiptsNumber}/${syncState.downloadedNodesCount}. Pending - body/receipts/node: ${syncState.pendingBodies.size + syncState.workingBodies.size}/${syncState.pendingReceipts.size + syncState.workingReceipts.size}/${syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size + syncState.workingMptNodes.size + syncState.workingNonMptNodes.size}")
+      log.info(s"[fast] Downloaded - header/body/receipts/node: ${syncState.bestHeaderNumber}/${syncState.bestBodyNumber}~${syncState.enqueuedBodyNumber}/${syncState.bestReceiptsNumber}~${syncState.enqueuedReceiptsNumber}/${syncState.downloadedNodesCount}. Queued - body/receipts/node: ${syncState.pendingBodies.size + syncState.workingBodies.size}/${syncState.pendingReceipts.size + syncState.workingReceipts.size}/${syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size + syncState.workingMptNodes.size + syncState.workingNonMptNodes.size}")
     }
   }
 

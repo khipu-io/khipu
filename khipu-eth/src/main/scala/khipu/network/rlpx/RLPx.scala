@@ -71,11 +71,13 @@ object RLPx {
     tcpFlow.join(outgoingLayer).run
   }
 
-  private def tcpBind(interface: String, port: Int,
-                      backlog:       Int                                 = 100,
-                      socketOptions: immutable.Traversable[SocketOption],
-                      halfClose:     Boolean,
-                      idleTimeout:   Duration)(implicit system: ActorSystem): Source[Tcp.IncomingConnection, Future[Tcp.ServerBinding]] = {
+  private def tcpBind(
+    interface: String, port: Int,
+    backlog:       Int                                 = 100,
+    socketOptions: immutable.Traversable[SocketOption],
+    halfClose:     Boolean,
+    idleTimeout:   Duration
+  )(implicit system: ActorSystem): Source[Tcp.IncomingConnection, Future[Tcp.ServerBinding]] = {
     Tcp().bind(
       interface,
       port,

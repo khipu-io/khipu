@@ -32,7 +32,7 @@ object PeerManager {
 
   final case class SendMessage(peerId: String, message: MessageSerializable)
 }
-class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with ActorLogging {
+class PeerManager(peerCfg: PeerConfiguration) extends Actor with ActorLogging {
   import context.dispatcher
   import PeerManager._
 
@@ -42,15 +42,15 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
   private var droppedNodes = Set[String]()
   private var triedNodes = mutable.LinkedHashMap[String, URI]()
 
-  private def incomingPeers = peersHandshaked.collect { case (id, p: IncomingPeer) => (id -> p) }
-  private def outgoingPeers = peersHandshaked.collect { case (id, p: OutgoingPeer) => (id -> p) }
+  private def incomingPeers = peersHandshaked.filter(_._2.isInstanceOf[IncomingPeer])
+  private def outgoingPeers = peersHandshaked.filter(_._2.isInstanceOf[OutgoingPeer])
 
   private val serviceBoard = ServiceBoard(context.system)
   private def nodeDiscovery = NodeDiscoveryService.proxy(context.system)
 
   private def scheduler = context.system.scheduler
 
-  private def reportIntervalThreshold = if (peersHandshaked.size >= 5 || peersHandshaked.size == peerConfiguration.maxPeers) 16 else 1
+  private def reportIntervalThreshold = if (peersHandshaked.size >= 5 || peersHandshaked.size == peerCfg.maxPeers) 16 else 1
   private var reportIntervalCount = 0
 
   override val supervisorStrategy = OneForOneStrategy() {
@@ -58,7 +58,7 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
   }
 
   val schedulers = List(
-    scheduler.schedule(peerConfiguration.updateNodesInitialDelay, peerConfiguration.updateNodesInterval) {
+    scheduler.schedule(peerCfg.updateNodesInitialDelay, peerCfg.updateNodesInterval) {
       if (nodeDiscovery ne null) { // we are not sure whether nodeDiscovery started
         nodeDiscovery ! NodeDiscoveryService.GetDiscoveredNodes
       }
@@ -80,7 +80,9 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
         case (peerId, uri) => isInConnecting(peerId)
       }
 
-      val urisToConnect = idToNode.take(peerConfiguration.maxPeers)
+      val nOutgoing = (peersHandshaked -- droppedNodes).filter(_._2.isInstanceOf[OutgoingPeer]).size
+      val nToConnect = peerCfg.maxPeers - peerCfg.maxIncomingPeers - nOutgoing
+      val urisToConnect = idToNode.take(nToConnect)
 
       if (urisToConnect.nonEmpty) {
         log.debug("[peer] Trying to connect to {} known nodes", urisToConnect.size)
@@ -98,8 +100,9 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
         case (peerId, uri) => isInConnecting(peerId) || droppedNodes.contains(peerId) || triedNodes.contains(peerId)
       }
 
-      val nToConnect = peerConfiguration.maxPeers - peersHandshaked.size
-      var urisToConnect = idToNode.toSeq.sortBy(_._2.addTimestamp).takeRight(nToConnect).map(x => (x._1, x._2.uri))
+      val nOutgoing = (peersHandshaked -- droppedNodes).filter(_._2.isInstanceOf[OutgoingPeer]).size
+      val nToConnect = peerCfg.maxPeers - peerCfg.maxIncomingPeers - nOutgoing
+      var urisToConnect = idToNode.toList.sortBy(-_._2.addTimestamp).take(nToConnect).map(x => (x._1, x._2.uri))
 
       if (urisToConnect.size < nToConnect) {
         val (older, newer) = triedNodes.splitAt(nToConnect - urisToConnect.size)
@@ -110,7 +113,7 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
       reportIntervalCount += 1
       if (reportIntervalCount >= reportIntervalThreshold) {
         log.info(
-          s"""|[peer] Discovered ${nodes.size} nodes (${droppedNodes.size} dropped), handshaked ${peersHandshaked.size}/${peerConfiguration.maxPeers} 
+          s"""|[peer] Discovered ${nodes.size} nodes (${droppedNodes.size} dropped), handshaked ${peersHandshaked.size}/${peerCfg.maxPeers} 
             |(in/out): (${incomingPeers.size}/${outgoingPeers.size}). Connecting to ${urisToConnect.size} more nodes.""".stripMargin.replace("\n", " ")
         )
         reportIntervalCount = 0
@@ -160,7 +163,8 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
   }
 
   private def connectTo(peerId: String, uri: URI) {
-    if (outgoingPeers.size < peerConfiguration.maxPeers) {
+    val nOutgoing = (peersHandshaked -- droppedNodes).filter(_._2.isInstanceOf[OutgoingPeer]).size
+    if (nOutgoing < (peerCfg.maxPeers - peerCfg.maxIncomingPeers)) {
       log.debug(s"[peer] Connecting to $peerId - $uri")
 
       val peer = new OutgoingPeer(peerId, uri)
@@ -169,7 +173,7 @@ class PeerManager(peerConfiguration: PeerConfiguration) extends Actor with Actor
       import serviceBoard.materializer
 
       val authHandshake = AuthHandshake(serviceBoard.nodeKey, serviceBoard.secureRandom)
-      val handshake = new EtcHandshake(serviceBoard.nodeStatus, serviceBoard.blockchain, serviceBoard.storages.appStateStorage, peerConfiguration, serviceBoard.forkResolverOpt)
+      val handshake = new EtcHandshake(serviceBoard.nodeStatus, serviceBoard.blockchain, serviceBoard.storages.appStateStorage, peerCfg, serviceBoard.forkResolverOpt)
       try {
         RLPx.startOutgoing(peer, serviceBoard.messageDecoder, serviceBoard.protocolVersion, authHandshake, handshake)(context.system)
       } catch {

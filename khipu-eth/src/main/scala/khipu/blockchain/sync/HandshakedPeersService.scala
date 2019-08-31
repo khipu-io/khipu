@@ -15,12 +15,11 @@ import khipu.storage.AppStateStorage
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
 import scala.util.Failure
 import scala.util.Success
 
 object HandshakedPeersService {
-  final case class BlacklistPeer(peerId: String, reason: String, always: Boolean = false)
+  final case class BlacklistPeer(peerId: String, reason: String, force: Boolean = false)
   final case class ResetBlacklistCount(peerId: String)
 }
 trait HandshakedPeersService { _: SyncService =>
@@ -44,7 +43,7 @@ trait HandshakedPeersService { _: SyncService =>
 
   def peerUpdateBehavior: Receive = {
     case PeerEntity.PeerHandshaked(peer, peerInfo) =>
-      if (!blacklistCounts.contains(peer.id) && peerInfo.forkAccepted) {
+      if (peerInfo.forkAccepted) {
         log.debug(s"[sync] added handshaked peer: $peer")
         handshakedPeers += (peer.id -> (peer, peerInfo))
         log.debug(s"[sync] handshaked peers: ${handshakedPeers.size}")
@@ -55,6 +54,8 @@ trait HandshakedPeersService { _: SyncService =>
             case false =>
           }
         }
+      } else {
+        blacklist(peer, "blacklisted or not running the accepted fork", force = true)
       }
 
     case PeerEntity.PeerDisconnected(peerId) if handshakedPeers.contains(peerId) =>
@@ -71,10 +72,7 @@ trait HandshakedPeersService { _: SyncService =>
 
           if (!peerInfo.forkAccepted) {
             log.debug(s"[sync] peer $peerId is not running the accepted fork, disconnecting")
-            val disconnect = Disconnect(Disconnect.Reasons.UselessPeer)
-            peer.entity ! PeerEntity.MessageToPeer(peerId, disconnect)
-            removePeer(peerId)
-            blacklist(peerId, blacklistDuration.millisecond, disconnect.toString, always = true)
+            blacklist(peer, "not running the accepted fork", force = true)
           } else {
             handshakedPeers += (peerId -> (peer, peerInfo))
             if (!headerWhitePeers.contains(peer)) {
@@ -92,14 +90,14 @@ trait HandshakedPeersService { _: SyncService =>
       blacklistCounts(peerId) = 0
 
     case BlacklistPeer(peerId, reason, always) =>
-      blacklist(peerId, blacklistDuration.millisecond, reason, always)
+      handshakedPeers.get(peerId) map { case (peer, _) => blacklist(peer, reason, always) }
 
     case SuspendPeerTick =>
       val now = System.currentTimeMillis
       val toRelease = suspendedPeers.collect {
         case (peerId, startTime) if (now - startTime) > blacklistDuration => peerId
       }
-      
+
       if (toRelease.nonEmpty) {
         suspendedPeers --= toRelease
         log.debug(s"Released $toRelease, suspended ${suspendedPeers.map(_._1)}")
@@ -110,42 +108,53 @@ trait HandshakedPeersService { _: SyncService =>
       removePeer(peerId)
   }
 
-  def removePeer(peerId: String) {
-    log.debug(s"[sync] removing peer $peerId")
-    suspendedPeers -= peerId
-    handshakedPeers -= peerId
-    headerWhitePeers = headerWhitePeers.filterNot(_.id == peerId)
-  }
-
   def goodPeers: Map[Peer, PeerInfo] = {
     handshakedPeers.collect {
       case (peerId, (peer, info)) if !isBlacklisted(peerId) && !isSuspended(peerId) => (peer, info)
     }
   }
 
+  private def toDropOneBlacklisted() = {
+    val nHandshakedPeers = handshakedPeers.size
+    if (nHandshakedPeers > peerConfiguration.maxPeers * 0.8) {
+      val nGoodPeers = handshakedPeers.filterNot(x => isBlacklisted(x._1)).size
+      if (nGoodPeers < nHandshakedPeers * 0.5) {
+        blacklistCounts.toList.filter(x => x._2 >= 3 && handshakedPeers.contains(x._1)).sortBy(-_._2).headOption foreach {
+          case (peerId, count) =>
+            handshakedPeers.get(peerId) foreach { x => dropPeer(x._1, s"blacklist count $count") }
+        }
+      }
+    }
+  }
+
+  private def dropPeer(peer: Peer, reason: String) {
+    log.debug(s"[sync] drop peer ${peer.id}, $reason")
+    val disconnect = Disconnect(Disconnect.Reasons.UselessPeer)
+    peer.entity ! PeerEntity.MessageToPeer(peer.id, disconnect)
+    peerManager ! PeerManager.DropNode(peer.id)
+    removePeer(peer.id)
+  }
+
+  private def removePeer(peerId: String) {
+    log.debug(s"[sync] removing peer $peerId")
+    suspendedPeers -= peerId
+    handshakedPeers -= peerId
+    headerWhitePeers = headerWhitePeers.filterNot(_.id == peerId)
+  }
+
   private def isSuspended(peerId: String) = suspendedPeers.contains(peerId)
-  private def isBlacklisted(peerId: String): Boolean = blacklistCounts.getOrElse(peerId, 0) >= 3
+  private def isBlacklisted(peerId: String) = blacklistCounts.getOrElse(peerId, 0) >= 3
 
-  private def blacklist(peerId: String, duration: FiniteDuration, reason: String, always: Boolean = false) {
-    val blacklistCount = blacklistCounts.getOrElse(peerId, 0)
-    log.debug(s"[sync] blacklisting peer $peerId (blacklisted $blacklistCount) for $duration, $reason")
+  private def blacklist(peer: Peer, reason: String, force: Boolean = false) {
+    val blacklistCount = blacklistCounts.getOrElse(peer.id, 0)
+    log.debug(s"[sync] blacklisting peer ${peer.id} (blacklisted $blacklistCount) ${if (force) "force" else blacklistDuration.millisecond}, $reason")
 
-    blacklistCounts(peerId) = blacklistCount + 1
-    if (always || isBlacklisted(peerId)) {
-      val peerToDisconnect = handshakedPeers.get(peerId) flatMap {
-        case (peer: OutgoingPeer, _) => Some(peer)
-        case (peer: IncomingPeer, _) => if (always) Some(peer) else None
-      }
-
-      peerToDisconnect map { peer =>
-        log.debug(s"[sync] drop peer $peerId, $reason")
-        removePeer(peerId)
-        val disconnect = Disconnect(Disconnect.Reasons.UselessPeer)
-        peer.entity ! PeerEntity.MessageToPeer(peerId, disconnect)
-        peerManager ! PeerManager.DropNode(peerId)
-      }
+    blacklistCounts(peer.id) = blacklistCount + 1
+    if (force) {
+      dropPeer(peer, reason)
     } else {
-      suspendedPeers(peerId) = System.currentTimeMillis
+      suspendedPeers(peer.id) = System.currentTimeMillis
+      toDropOneBlacklisted()
     }
 
     log.debug(s"[sync] suspended: ${suspendedPeers.map(_._1)}, blacklisted: ${blacklistCounts.filter(_._2 >= 3).map(_._1)}, handshaked: ${handshakedPeers.map(_._2._1)}")
