@@ -3,6 +3,7 @@ package kesque
 import java.io.File
 import java.nio.ByteBuffer
 import kafka.utils.Logging
+import khipu.config.RocksdbConfig
 import org.rocksdb.BlockBasedTableConfig
 import org.rocksdb.BloomFilter
 import org.rocksdb.OptimisticTransactionDB
@@ -14,23 +15,40 @@ import org.rocksdb.Transaction
 import org.rocksdb.WriteBatch
 import org.rocksdb.WriteOptions
 
-final class KesqueIndexRocksdb(home: File, topic: String, useShortKey: Boolean = true) extends KesqueIndex with Logging {
-  import KesqueIndex._
+final class KesqueIndexRocksdb(rocksdbConfig: RocksdbConfig, topic: String, useShortKey: Boolean = true) extends KesqueIndex with Logging {
   RocksDB.loadLibrary()
+  import KesqueIndex._
 
   private val table = {
+    val home = {
+      val h = new File(rocksdbConfig.path)
+      if (!h.exists) {
+        h.mkdirs()
+      }
+      h
+    }
+
     val path = new File(home, topic)
     if (!path.exists) {
       path.mkdirs()
     }
 
+    val parallelism = math.max(Runtime.getRuntime.availableProcessors, 2)
+
     val tableOptions = new BlockBasedTableConfig()
       .setFilterPolicy(new BloomFilter(10))
+
     val options = new Options()
       .setCreateIfMissing(true)
       .setMaxOpenFiles(-1)
       .setTableFormatConfig(tableOptions)
+      .setAllowMmapReads(true)
       .setAllowMmapWrites(false)
+      .setIncreaseParallelism(parallelism) // The total number of threads to be used by RocksDB. A good value is the number of cores.
+      .setMaxBackgroundJobs(parallelism)
+      .setWriteBufferSize(rocksdbConfig.writeBufferSize * 1024 * 1024)
+      .setMaxWriteBufferNumber(rocksdbConfig.maxWriteBufferNumber)
+      .setMinWriteBufferNumberToMerge(rocksdbConfig.minWriteBufferNumberToMerge)
 
     OptimisticTransactionDB.open(options, path.getAbsolutePath)
   }

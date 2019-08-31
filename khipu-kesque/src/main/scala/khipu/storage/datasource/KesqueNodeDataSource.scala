@@ -1,11 +1,11 @@
 package khipu.storage.datasource
 
-import java.io.File
 import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
 import khipu.TVal
+import khipu.config.RocksdbConfig
 import khipu.crypto
 import kesque.Kesque
 import kesque.KesqueIndexLmdb
@@ -22,17 +22,17 @@ import org.lmdbjava.Env
 final class KesqueNodeDataSource(
     val topic:       String,
     kesqueDb:        Kesque,
-    lmdbOrRocksdb:   Either[Env[ByteBuffer], File],
+    lmdbOrRocksdb:   Either[Env[ByteBuffer], RocksdbConfig],
     cacheSize:       Int,
-    fetchMaxBytes:   Int                           = kesque.DEFAULT_FETCH_MAX_BYTES,
-    compressionType: CompressionType               = CompressionType.NONE
+    fetchMaxBytes:   Int                                    = kesque.DEFAULT_FETCH_MAX_BYTES,
+    compressionType: CompressionType                        = CompressionType.NONE
 ) extends BlockDataSource[Hash, Array[Byte]] with Logging {
   type This = KesqueNodeDataSource
 
   private val cache = new FIFOCache[Hash, TVal](cacheSize)
   private val index = lmdbOrRocksdb match {
-    case Left(lmdbEnv)      => new KesqueIndexLmdb(lmdbEnv, topic)
-    case Right(rocksdbHome) => new KesqueIndexRocksdb(rocksdbHome, topic, useShortKey = true)
+    case Left(lmdbEnv)        => new KesqueIndexLmdb(lmdbEnv, topic)
+    case Right(rocksdbConfig) => new KesqueIndexRocksdb(rocksdbConfig, topic, useShortKey = true)
   }
 
   private val lock = new ReentrantReadWriteLock()
@@ -64,7 +64,6 @@ final class KesqueNodeDataSource(
             while (recs.hasNext) {
               val rec = recs.next
               //print(s"${rec.offset},")
-
               if (rec.offset == offset) {
                 if (rec.hasValue) {
                   val data = kesque.getBytes(rec.value)

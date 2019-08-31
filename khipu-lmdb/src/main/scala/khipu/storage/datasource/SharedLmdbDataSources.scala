@@ -7,9 +7,9 @@ import org.lmdbjava.Env
 trait SharedLmdbDataSources extends DataSources {
   implicit protected val system: ActorSystem
 
-  val env: Env[ByteBuffer]
+  val lmdbEnv: Env[ByteBuffer]
 
-  lazy val dataSource = new LmdbDataSource("shared", env, cacheSize = 1000)
+  lazy val dataSource = new LmdbDataSource("shared", lmdbEnv, cacheSize = 1000)
 
   lazy val transactionDataSource = dataSource
 

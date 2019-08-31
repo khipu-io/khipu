@@ -17,7 +17,6 @@ import khipu.blockchain.sync.HostService
 import khipu.config.BlockchainConfig
 import khipu.config.DbConfig
 import khipu.config.KhipuConfig
-import khipu.config.LmdbConfig
 import khipu.config.MiningConfig
 import khipu.config.TxPoolConfig
 import khipu.crypto
@@ -30,7 +29,8 @@ import khipu.network.rlpx.KnownNodesService.KnownNodesServiceConfig
 import khipu.network.rlpx.PeerManager
 import khipu.network.rlpx.discovery.DiscoveryConfig
 import khipu.storage.Storages
-import khipu.storage.datasource.KesqueDataSources
+import khipu.storage.datasource.KesqueLmdbDataSources
+import khipu.storage.datasource.KesqueRocksdbDataSources
 import khipu.storage.datasource.LmdbDataSources
 import khipu.validators.BlockHeaderValidator
 import khipu.validators.BlockValidator
@@ -97,19 +97,33 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
 
         protected val config = ServiceBoardExtension.this.config
         protected val log = ServiceBoardExtension.this.log
-        protected val lmdbConfig = new LmdbConfig(KhipuConfig.datadir, config.getConfig("db").getConfig("lmdb"))
+        protected val datadir = KhipuConfig.datadir
 
         val unconfirmedDepth = KhipuConfig.Sync.blockResolveDepth
       }
 
-    case DbConfig.KESQUE =>
-      new Storages.DefaultStorages with KesqueDataSources {
+    case DbConfig.KESQUE_LMDB =>
+      new Storages.DefaultStorages with KesqueLmdbDataSources {
         implicit protected val system = ServiceBoardExtension.this.system
 
         protected val config = ServiceBoardExtension.this.config
         protected val log = ServiceBoardExtension.this.log
-        protected val khipuPath = new File(classOf[Khipu].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
         protected val datadir = KhipuConfig.datadir
+        protected val khipuPath = new File(classOf[Khipu].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
+
+        val unconfirmedDepth = KhipuConfig.Sync.blockResolveDepth
+
+        log.info(s"Kesque started using config file: $kafkaConfigFile")
+      }
+
+    case DbConfig.KESQUE_ROCKSDB =>
+      new Storages.DefaultStorages with KesqueRocksdbDataSources {
+        implicit protected val system = ServiceBoardExtension.this.system
+
+        protected val config = ServiceBoardExtension.this.config
+        protected val log = ServiceBoardExtension.this.log
+        protected val datadir = KhipuConfig.datadir
+        protected val khipuPath = new File(classOf[Khipu].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
 
         val unconfirmedDepth = KhipuConfig.Sync.blockResolveDepth
 

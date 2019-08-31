@@ -1,14 +1,14 @@
 package khipu.storage.datasource
 
 import akka.actor.ActorSystem
-import java.io.File
+import khipu.config.RocksdbConfig
 
 trait SharedRocksdbDataSources extends DataSources {
   implicit protected val system: ActorSystem
 
-  val rocksdbHome: File
+  val rocksdbConfig: RocksdbConfig
 
-  lazy val dataSource = new RocksdbDataSource("shared", rocksdbHome, cacheSize = 1000)
+  lazy val dataSource = new RocksdbDataSource("shared", rocksdbConfig, cacheSize = 1000)
 
   lazy val transactionDataSource = dataSource
 

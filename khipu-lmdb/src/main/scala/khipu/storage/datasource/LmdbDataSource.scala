@@ -90,18 +90,17 @@ final class LmdbDataSource(
     try {
       wtx = env.txnWrite()
 
-      toRemove foreach { key =>
-        val combKey = BytesUtil.concat(namespace, key)
-
-        val tableKey = ByteBuffer.allocateDirect(combKey.length)
-        tableKey.put(combKey).flip()
-        table.delete(wtx, tableKey)
+      val remove = toRemove map { key => BytesUtil.concat(namespace, key) }
+      remove foreach {
+        combKey =>
+          val tableKey = ByteBuffer.allocateDirect(combKey.length)
+          tableKey.put(combKey).flip()
+          table.delete(wtx, tableKey)
       }
 
-      toUpsert foreach {
-        case (key, value) =>
-          val combKey = BytesUtil.concat(namespace, key)
-
+      val upsert = toUpsert map { case (key, value) => (BytesUtil.concat(namespace, key) -> value) }
+      upsert foreach {
+        case (combKey, value) =>
           val tableKey = ByteBuffer.allocateDirect(combKey.length)
           val tableVal = ByteBuffer.allocateDirect(value.length)
 
@@ -112,12 +111,12 @@ final class LmdbDataSource(
 
       wtx.commit()
 
-      toRemove foreach {
-        key => cache.remove(Hash(BytesUtil.concat(namespace, key)))
+      remove foreach {
+        key => cache.remove(Hash(key))
       }
 
-      toUpsert foreach {
-        case (key, value) => cache.put(Hash(BytesUtil.concat(namespace, key)), value)
+      upsert foreach {
+        case (combKey, value) => cache.put(Hash(combKey), value)
       }
     } catch {
       case ex: Throwable =>

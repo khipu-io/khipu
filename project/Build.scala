@@ -33,9 +33,11 @@ object Build extends sbt.Build {
   lazy val khipu_kesque = Project("khipu-kesque", file("khipu-kesque"))
     .dependsOn(khipu_base)
     .dependsOn(khipu_storage)
+    .dependsOn(khipu_lmdb)
+    .dependsOn(khipu_rocksdb)
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.kafka ++ Dependencies.spongycastle ++ Dependencies.caffeine ++ Dependencies.lmdb ++ Dependencies.rocksdb)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.kafka ++ Dependencies.spongycastle ++ Dependencies.caffeine)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
 

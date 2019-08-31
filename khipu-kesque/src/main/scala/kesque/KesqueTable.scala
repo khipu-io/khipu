@@ -1,6 +1,5 @@
 package kesque
 
-import java.io.File
 import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
@@ -8,6 +7,7 @@ import kafka.utils.Logging
 import khipu.Hash
 import khipu.TKeyVal
 import khipu.TVal
+import khipu.config.RocksdbConfig
 import khipu.util.FIFOCache
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.DefaultRecord
@@ -22,10 +22,10 @@ object KesqueTable {
 final class KesqueTable private[kesque] (
     topics:          Array[String],
     kesqueDb:        Kesque,
-    lmdbOrRocksdb:   Either[Env[ByteBuffer], File],
-    fetchMaxBytes:   Int                           = KesqueTable.defaultFetchMaxBytes,
-    compressionType: CompressionType               = CompressionType.NONE,
-    cacheSize:       Int                           = 10000
+    lmdbOrRocksdb:   Either[Env[ByteBuffer], RocksdbConfig],
+    fetchMaxBytes:   Int                                    = KesqueTable.defaultFetchMaxBytes,
+    compressionType: CompressionType                        = CompressionType.NONE,
+    cacheSize:       Int                                    = 10000
 ) extends Logging {
   private val (caches, indexes, topicToCol) = init()
 

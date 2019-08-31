@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import kesque.Kesque
 import khipu.Hash
+import khipu.config.RocksdbConfig
 import khipu.crypto
 import khipu.storage.datasource.KesqueNodeDataSource
 import org.lmdbjava.Env
@@ -49,10 +50,15 @@ class KesqueTool() {
     .setMaxDbs(6)
     .open(home, EnvFlags.MDB_NOTLS, EnvFlags.MDB_NORDAHEAD, EnvFlags.MDB_NOSYNC, EnvFlags.MDB_NOMETASYNC)
 
-  lazy val rocksdbHome = home
+  lazy val rocksdbConfig = new RocksdbConfig(null, null) {
+    override val path = "/home/dcaoyuan/tmp"
+    override val writeBufferSize = 64 * 1024 * 1024
+    override val maxWriteBufferNumber = 4
+    override val minWriteBufferNumberToMerge = 1
+  }
 
   def test(total: Int) = {
-    val table = kesque.getKesqueTable(topic, Right(rocksdbHome), cacheSize = 10000, fetchMaxBytes = 4096)
+    val table = kesque.getKesqueTable(topic, Right(rocksdbConfig), cacheSize = 10000, fetchMaxBytes = 4096)
 
     val keys = write(table, total)
     read(table, keys)

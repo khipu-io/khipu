@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import java.util.Properties
 import kafka.server.QuotaFactory.UnboundedQuota
 import khipu.TKeyVal
+import khipu.config.RocksdbConfig
 import khipu.storage.datasource.KesqueNodeDataSource
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.record.CompressionType
@@ -79,7 +80,7 @@ final class Kesque(props: Properties) {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, cacheSize, fetchMaxBytes, compressionType))
   }
 
-  def getKesqueTable(topic: String, lmdbOrRocksdb: Either[Env[ByteBuffer], File], cacheSize: Int, fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE) = {
+  def getKesqueTable(topic: String, lmdbOrRocksdb: Either[Env[ByteBuffer], RocksdbConfig], cacheSize: Int, fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE) = {
     topicToKesqueTable.getOrElseUpdate(topic, new KesqueNodeDataSource(topic, this, lmdbOrRocksdb, cacheSize, fetchMaxBytes, compressionType))
   }
 

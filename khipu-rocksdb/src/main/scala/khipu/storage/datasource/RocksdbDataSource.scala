@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.event.Logging
 import java.io.File
 import khipu.Hash
+import khipu.config.RocksdbConfig
 import khipu.util.BytesUtil
 import khipu.util.FIFOCache
 import org.rocksdb.BlockBasedTableConfig
@@ -18,9 +19,9 @@ import org.rocksdb.WriteBatch
 import org.rocksdb.WriteOptions
 
 final class RocksdbDataSource(
-    val topic: String,
-    home:      File,
-    cacheSize: Int
+    val topic:     String,
+    rocksdbConfig: RocksdbConfig,
+    cacheSize:     Int
 )(implicit system: ActorSystem) extends DataSource {
   RocksDB.loadLibrary()
 
@@ -31,19 +32,35 @@ final class RocksdbDataSource(
   private val table = createDB()
 
   private def createDB(): OptimisticTransactionDB = {
+    val home = {
+      val h = new File(rocksdbConfig.path)
+      if (!h.exists) {
+        h.mkdirs()
+      }
+      h
+    }
 
     val path = new File(home, topic)
     if (!path.exists) {
       path.mkdirs()
     }
 
+    val parallelism = math.max(Runtime.getRuntime.availableProcessors, 2)
+
     val tableOptions = new BlockBasedTableConfig()
       .setFilterPolicy(new BloomFilter(10))
+
     val options = new Options()
       .setCreateIfMissing(true)
       .setMaxOpenFiles(-1)
       .setTableFormatConfig(tableOptions)
+      .setAllowMmapReads(false) // not necessary for syncState and transactions data
       .setAllowMmapWrites(false)
+      .setIncreaseParallelism(parallelism)
+      .setMaxBackgroundJobs(parallelism)
+      .setWriteBufferSize(rocksdbConfig.writeBufferSize * 1024 * 1024)
+      .setMaxWriteBufferNumber(rocksdbConfig.maxWriteBufferNumber)
+      .setMinWriteBufferNumberToMerge(2)
 
     OptimisticTransactionDB.open(options, path.getAbsolutePath)
   }
@@ -120,7 +137,7 @@ final class RocksdbDataSource(
       txn.commit()
 
       remove foreach {
-        key => cache.remove(Hash(key))
+        combKey => cache.remove(Hash(combKey))
       }
 
       upsert foreach {

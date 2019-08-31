@@ -63,11 +63,11 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
   private def xf(n: Double) = "%1$10.1f".format(n)
 
   val byteOrder = 4321 // big endian
-  val cacheSize = 3 * 1024 * 1024 * 1024L // 3G
+  val cacheSize = 2 * 1024 * 1024 * 1024L // 3G
   val bufLen = 1024 * 1024
 
-  val averKeySize = 4
-  val averDataSize = 1024
+  val KEY_SIZE = 4
+  val VALUE_SIZE = 1024
   val hashNumElements = 300000000
 
   val home = new File("/home/dcaoyuan/tmp")
@@ -107,7 +107,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
       dbconf.setHashNumElements(hashNumElements)
       val pageSize = 4096
       dbconf.setPageSize(pageSize)
-      dbconf.setHashFillFactor((pageSize - 32) / (averKeySize + averDataSize + 8))
+      dbconf.setHashFillFactor((pageSize - 32) / (KEY_SIZE + VALUE_SIZE + 8))
 
     case DatabaseType.BTREE =>
   }
@@ -151,7 +151,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
       var j = 0
       val txn = if (isTransactional) dbenv.beginTransaction(null, null) else null
       while (j < 4000 && i < num) {
-        val v = Array.ofDim[Byte](averDataSize)
+        val v = Array.ofDim[Byte](VALUE_SIZE)
         val bs = ByteBuffer.allocate(8).putLong(i).array
         System.arraycopy(bs, 0, v, v.length - bs.length, bs.length)
 
@@ -159,7 +159,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
 
         start = System.nanoTime
 
-        val sKey = sliceBytes(k)
+        val sKey = toShortKey(k)
         if (isBulk) {
           keySet.append(sKey)
           dataSet.append(v)
@@ -238,7 +238,7 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
     var i = 0
     while (itr.hasNext) {
       val k = itr.next
-      val sKey = sliceBytes(k)
+      val sKey = toShortKey(k)
       val key = new DatabaseEntry(sKey)
 
       val cursor = try {
@@ -292,9 +292,10 @@ class BDBTool(databaseType: DatabaseType, isTransactional: Boolean) {
     println(s"${java.time.LocalTime.now} $i ${xf(speed)}/s - read all in ${xf(totalElapsed)}s")
   }
 
-  final def sliceBytes(bytes: Array[Byte]) = {
-    val slice = Array.ofDim[Byte](4)
-    System.arraycopy(bytes, 0, slice, 0, 4)
+  def toShortKey(bytes: Array[Byte]) = {
+    val slice = Array.ofDim[Byte](KEY_SIZE)
+    val len = math.min(bytes.length, KEY_SIZE)
+    System.arraycopy(bytes, bytes.length - len, slice, 0, len)
     slice
   }
 
