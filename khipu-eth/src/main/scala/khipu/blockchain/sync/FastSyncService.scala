@@ -435,6 +435,7 @@ trait FastSyncService { _: SyncService =>
             saveSyncStateBestReceiptsNumber()
 
           case NodesWork(workHashes, enqueueHashs, downloadedCount, accountNodes, storageNodes, evmcodes) =>
+            val start = System.nanoTime
             if (accountNodes.nonEmpty) {
               saveAccountNodes(accountNodes)
             }
@@ -445,7 +446,7 @@ trait FastSyncService { _: SyncService =>
               saveEvmcodes(evmcodes)
             }
 
-            log.debug(s"Saved acccount: ${accountNodes.size}, storage: ${storageNodes.size}, evmcode: ${evmcodes.size}. Total ${accountNodes.size + storageNodes.size + evmcodes.size} - downloaded: ${downloadedCount}")
+            log.info(s"Saved acccount: ${accountNodes.size}, storage: ${storageNodes.size}, evmcode: ${evmcodes.size}. Total ${accountNodes.size + storageNodes.size + evmcodes.size} in ${(System.nanoTime - start) / 1000000}ms")
 
             workHashes foreach {
               case h: EvmcodeHash                => syncState.workingNonMptNodes -= h

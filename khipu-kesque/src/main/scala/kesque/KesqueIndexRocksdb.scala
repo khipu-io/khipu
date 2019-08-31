@@ -15,8 +15,8 @@ import org.rocksdb.WriteBatch
 import org.rocksdb.WriteOptions
 
 final class KesqueIndexRocksdb(home: File, topic: String, useShortKey: Boolean = true) extends KesqueIndex with Logging {
-  import KesqueIndex._
   RocksDB.loadLibrary()
+  import KesqueIndex._
 
   private val table = {
     val path = new File(home, topic)
@@ -24,13 +24,23 @@ final class KesqueIndexRocksdb(home: File, topic: String, useShortKey: Boolean =
       path.mkdirs()
     }
 
+    val writeBufferSize = 64 * 1024 * 1024
+    val parallelism = math.max(Runtime.getRuntime.availableProcessors, 2)
+
     val tableOptions = new BlockBasedTableConfig()
       .setFilterPolicy(new BloomFilter(10))
+
     val options = new Options()
       .setCreateIfMissing(true)
       .setMaxOpenFiles(-1)
       .setTableFormatConfig(tableOptions)
+      .setAllowMmapReads(true)
       .setAllowMmapWrites(false)
+      .setIncreaseParallelism(parallelism) // The total number of threads to be used by RocksDB. A good value is the number of cores.
+      .setMaxBackgroundJobs(parallelism)
+      .setWriteBufferSize(writeBufferSize)
+      .setMaxWriteBufferNumber(4)
+      .setMinWriteBufferNumberToMerge(1)
 
     OptimisticTransactionDB.open(options, path.getAbsolutePath)
   }

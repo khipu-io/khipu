@@ -37,13 +37,23 @@ final class RocksdbDataSource(
       path.mkdirs()
     }
 
+    val writeBufferSize = 64 * 1024 * 1024
+    val parallelism = math.max(Runtime.getRuntime.availableProcessors, 2)
+
     val tableOptions = new BlockBasedTableConfig()
       .setFilterPolicy(new BloomFilter(10))
+
     val options = new Options()
       .setCreateIfMissing(true)
       .setMaxOpenFiles(-1)
       .setTableFormatConfig(tableOptions)
+      .setAllowMmapReads(false) // not necessary for syncState and transactions data
       .setAllowMmapWrites(false)
+      .setIncreaseParallelism(parallelism)
+      .setMaxBackgroundJobs(parallelism)
+      .setWriteBufferSize(writeBufferSize)
+      .setMaxWriteBufferNumber(4)
+      .setMinWriteBufferNumberToMerge(2)
 
     OptimisticTransactionDB.open(options, path.getAbsolutePath)
   }

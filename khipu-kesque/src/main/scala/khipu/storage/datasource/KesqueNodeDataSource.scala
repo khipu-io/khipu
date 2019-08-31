@@ -64,7 +64,6 @@ final class KesqueNodeDataSource(
             while (recs.hasNext) {
               val rec = recs.next
               //print(s"${rec.offset},")
-
               if (rec.offset == offset) {
                 if (rec.hasValue) {
                   val data = kesque.getBytes(rec.value)
