@@ -49,7 +49,7 @@ trait DataSource {
   /**
    * This function closes the DataSource, without deleting the files used by it.
    */
-  def close(): Unit
+  def terminate(): Unit
 
   /**
    * This function closes the DataSource, if it is not yet closed, and deletes all the files used by it.

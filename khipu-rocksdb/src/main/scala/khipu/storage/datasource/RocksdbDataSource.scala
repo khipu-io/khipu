@@ -186,7 +186,7 @@ final class RocksdbDataSource(
   /**
    * This function closes the DataSource, without deleting the files used by it.
    */
-  override def close() {
+  override def terminate() {
     table.flushWal(true)
   }
 
@@ -195,7 +195,7 @@ final class RocksdbDataSource(
    */
   override def destroy() {
     try {
-      close()
+      terminate()
     } finally {
       //
     }

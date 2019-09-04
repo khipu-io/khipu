@@ -270,7 +270,7 @@ final class KesqueIndexRocksdb(rocksdbConfig: RocksdbConfig, topic: String, useS
     }
   }
 
-  def close() {
+  def terminate() {
     table.flushWal(true)
   }
 }

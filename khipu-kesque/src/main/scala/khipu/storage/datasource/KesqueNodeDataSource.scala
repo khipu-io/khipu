@@ -224,8 +224,8 @@ final class KesqueNodeDataSource(
   def cacheReadCount = cache.readCount
   def resetCacheHitRate() = cache.resetHitRate()
 
-  def close() {
-    index.close()
+  def terminate() {
+    index.terminate()
   }
 }
 

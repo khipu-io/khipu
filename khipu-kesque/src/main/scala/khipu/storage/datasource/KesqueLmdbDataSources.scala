@@ -66,21 +66,23 @@ trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources
   //  lazy val receiptsDataSource = new KesqueDataSource(blockTable, DbConfig.receipts)
   //  lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, DbConfig.td)
 
-  def closeAll() {
+  def terminate() {
     log.info("db syncing...")
 
-    accountNodeDataSource.close()
-    storageNodeDataSource.close()
-    evmcodeDataSource.close()
-    blockNumberDataSource.close()
-    blockHeaderDataSource.close()
-    blockBodyDataSource.close()
-    receiptsDataSource.close()
-    totalDifficultyDataSource.close()
+    //accountNodeDataSource.close()
+    //storageNodeDataSource.close()
+    //evmcodeDataSource.close()
+    //blockNumberDataSource.close()
+    //blockHeaderDataSource.close()
+    //blockBodyDataSource.close()
+    //receiptsDataSource.close()
+    //totalDifficultyDataSource.close()
 
-    dataSource.close()
+    //dataSource.close()
 
-    kesque.shutdown()
+    //kesque.shutdown()
+
+    lmdbEnv.sync(true)
 
     log.info("db synced")
   }

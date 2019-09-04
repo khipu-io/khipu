@@ -172,7 +172,7 @@ final class KesqueIndexLmdb(env: Env[ByteBuffer], topic: String) extends KesqueI
     ret
   }
 
-  def close() {
-    table.close()
+  def terminate() {
+    // not necessary to close db, we'll call env.sync(true) to force sync
   }
 }

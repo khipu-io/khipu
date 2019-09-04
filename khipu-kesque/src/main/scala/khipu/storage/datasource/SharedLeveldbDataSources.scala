@@ -17,8 +17,7 @@ trait SharedLeveldbDataSources extends DataSources {
   val blockHeightsHashesDataSource = dataSource
   val knownNodesDataSource = dataSource
 
-  def closeAll() {
-    dataSource.close()
-    kesque.shutdown()
+  def terminate() {
+    dataSource.terminate()
   }
 }

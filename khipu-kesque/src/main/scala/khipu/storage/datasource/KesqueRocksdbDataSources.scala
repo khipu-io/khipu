@@ -51,21 +51,21 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataS
   //  lazy val receiptsDataSource = new KesqueDataSource(blockTable, DbConfig.receipts)
   //  lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, DbConfig.td)
 
-  def closeAll() {
+  def terminate() {
     log.info("db syncing...")
 
-    accountNodeDataSource.close()
-    storageNodeDataSource.close()
-    evmcodeDataSource.close()
-    blockNumberDataSource.close()
-    blockHeaderDataSource.close()
-    blockBodyDataSource.close()
-    receiptsDataSource.close()
-    totalDifficultyDataSource.close()
+    accountNodeDataSource.terminate()
+    storageNodeDataSource.terminate()
+    evmcodeDataSource.terminate()
+    blockNumberDataSource.terminate()
+    blockHeaderDataSource.terminate()
+    blockBodyDataSource.terminate()
+    receiptsDataSource.terminate()
+    totalDifficultyDataSource.terminate()
 
-    dataSource.close()
+    dataSource.terminate()
 
-    kesque.shutdown()
+    //kesque.shutdown()
 
     log.info("db synced")
   }

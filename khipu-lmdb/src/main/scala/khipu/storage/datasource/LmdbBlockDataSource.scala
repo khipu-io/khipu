@@ -134,5 +134,7 @@ final class LmdbBlockDataSource(
   def cacheReadCount = cache.readCount
   def resetCacheHitRate() = cache.resetHitRate()
 
-  def close() = table.close()
+  def terminate() {
+    // not necessary to close db, we'll call env.sync(true) to force sync 
+  }
 }

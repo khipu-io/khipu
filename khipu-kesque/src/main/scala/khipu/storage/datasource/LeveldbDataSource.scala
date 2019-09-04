@@ -79,14 +79,16 @@ final class LeveldbDataSource(
   /**
    * This function closes the DataSource, without deleting the files used by it.
    */
-  override def close() = db.close()
+  override def terminate() {
+    // TODO sync db
+  }
 
   /**
    * This function closes the DataSource, if it is not yet closed, and deletes all the files used by it.
    */
   override def destroy() {
     try {
-      close()
+      db.close()
     } finally {
       Iq80DBFactory.factory.destroy(new File(levelDbConfig.path), null) // Options are not being used ¯\_(ツ)_/¯
     }
