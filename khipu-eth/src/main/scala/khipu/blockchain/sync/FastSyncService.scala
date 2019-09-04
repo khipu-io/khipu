@@ -446,7 +446,7 @@ trait FastSyncService { _: SyncService =>
               saveEvmcodes(evmcodes)
             }
 
-            log.info(s"Saved acccount: ${accountNodes.size}, storage: ${storageNodes.size}, evmcode: ${evmcodes.size}. Total ${accountNodes.size + storageNodes.size + evmcodes.size} in ${(System.nanoTime - start) / 1000000}ms")
+            log.debug(s"Saved acccount: ${accountNodes.size}, storage: ${storageNodes.size}, evmcode: ${evmcodes.size}. Total ${accountNodes.size + storageNodes.size + evmcodes.size} in ${(System.nanoTime - start) / 1000000}ms")
 
             workHashes foreach {
               case h: EvmcodeHash                => syncState.workingNonMptNodes -= h
