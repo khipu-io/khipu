@@ -255,5 +255,5 @@ final class KesqueDataSource(
   def cacheReadCount = table.cacheReadCount(topic)
   def resetCacheHitRate() = table.resetCacheHitRate(topic)
 
-  def terminate() {}
+  def stop() {}
 }

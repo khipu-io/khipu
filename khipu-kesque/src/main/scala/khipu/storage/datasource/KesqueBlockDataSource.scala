@@ -193,7 +193,7 @@ final class KesqueBlockDataSource(
   def cacheReadCount = cache.readCount
   def resetCacheHitRate() = cache.resetHitRate()
 
-  def terminate() {}
+  def stop() {}
 
 }
 

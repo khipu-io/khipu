@@ -9,5 +9,5 @@ trait DataSources {
   val fastSyncStateDataSource: DataSource
   val knownNodesDataSource: DataSource
 
-  def terminate(): Unit
+  def stop(): Unit
 }

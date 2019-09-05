@@ -17,7 +17,7 @@ trait SharedLeveldbDataSources extends DataSources {
   val blockHeightsHashesDataSource = dataSource
   val knownNodesDataSource = dataSource
 
-  def terminate() {
-    dataSource.terminate()
+  def stop() {
+    dataSource.stop()
   }
 }

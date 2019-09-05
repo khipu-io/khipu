@@ -79,7 +79,7 @@ final class LeveldbDataSource(
   /**
    * This function closes the DataSource, without deleting the files used by it.
    */
-  override def terminate() {
+  override def stop() {
     // TODO sync db
   }
 

@@ -21,5 +21,5 @@ trait KesqueIndex {
 
   def count: Long
 
-  def terminate(): Unit
+  def stop(): Unit
 }

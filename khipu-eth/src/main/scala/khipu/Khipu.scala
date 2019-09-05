@@ -64,7 +64,7 @@ object Khipu {
     CoordinatedShutdown(system).addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "close storage") { () =>
       import system.dispatcher
       Future {
-        serviceBoard.storages.terminate()
+        serviceBoard.storages.stop()
         log.info("Actor system is going to terminate...")
       } map { _ =>
         Done

@@ -218,7 +218,7 @@ final class LmdbNodeDataSource(
     slice
   }
 
-  def terminate() {
+  def stop() {
     // not necessary to close db, we'll call env.sync(true) to force sync 
   }
 }

@@ -46,7 +46,7 @@ trait LmdbDataSources extends SharedLmdbDataSources {
   lazy val receiptsDataSource = new LmdbBlockDataSource(DbConfig.receipts, lmdbEnv, cacheSize = 1000)
   lazy val totalDifficultyDataSource = new LmdbBlockDataSource(DbConfig.td, lmdbEnv, cacheSize = 1000)
 
-  def terminate() {
+  def stop() {
     log.info("db syncing...")
 
     // --- Don't close resouces here, since the futures during sync may not been finished yet

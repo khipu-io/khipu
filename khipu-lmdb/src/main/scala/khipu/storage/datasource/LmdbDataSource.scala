@@ -156,7 +156,7 @@ final class LmdbDataSource(
   /**
    * This function closes the DataSource, without deleting the files used by it.
    */
-  override def terminate() {
+  override def stop() {
     // not necessary to close db, we'll call env.sync(true) to force sync 
   }
 
