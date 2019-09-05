@@ -54,6 +54,9 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataS
   def stop() {
     log.info("db syncing...")
 
+    // always shutdown kesque first to stay at the correct blocknumber
+    kesque.shutdown()
+    
     accountNodeDataSource.stop()
     storageNodeDataSource.stop()
     evmcodeDataSource.stop()
@@ -64,8 +67,6 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataS
     totalDifficultyDataSource.stop()
 
     dataSource.stop()
-
-    //kesque.shutdown()
 
     log.info("db synced")
   }

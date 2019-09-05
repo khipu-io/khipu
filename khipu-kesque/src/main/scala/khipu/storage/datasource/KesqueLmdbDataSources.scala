@@ -69,18 +69,8 @@ trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources
   def stop() {
     log.info("db syncing...")
 
-    //accountNodeDataSource.close()
-    //storageNodeDataSource.close()
-    //evmcodeDataSource.close()
-    //blockNumberDataSource.close()
-    //blockHeaderDataSource.close()
-    //blockBodyDataSource.close()
-    //receiptsDataSource.close()
-    //totalDifficultyDataSource.close()
-
-    //dataSource.close()
-
-    //kesque.shutdown()
+    // always shutdown kesque first to stay at the correct blocknumber
+    kesque.shutdown()
 
     lmdbEnv.sync(true)
 
