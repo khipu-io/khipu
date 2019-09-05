@@ -83,7 +83,7 @@ final class SyncService() extends FastSyncService with RegularSyncService with H
   protected val ledger = serviceBoard.ledger
   protected val validators = serviceBoard.validators
   protected val blockchain = serviceBoard.blockchain
-  protected val peerConfiguration = serviceBoard.peerConfiguration
+  protected val peerConfig = serviceBoard.peerConfig
   private val miningConfig = serviceBoard.miningConfig
 
   protected val storages = serviceBoard.storages

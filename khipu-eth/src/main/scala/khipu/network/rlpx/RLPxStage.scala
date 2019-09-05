@@ -200,7 +200,7 @@ final class RLPxStage(
 
                   val buffer = ByteString.createBuilder ++= responsePacket
                   val messageCodec = createMessageCodec(secrets, messageDecoder, protocolVersion)
-                  if (incomcomingPeersCount.get > serviceBoard.peerConfiguration.maxIncomingPeers) {
+                  if (incomcomingPeersCount.get > serviceBoard.peerConfig.maxIncomingPeers) {
                     val disconnectMsg: MessageSerializable = Disconnect(Disconnect.Reasons.TooManyPeers)
                     val (willDisconnect, payload) = encodeMessages(messageCodec, Vector(disconnectMsg), true, ByteString.newBuilder)
                     push(out, payload.result)

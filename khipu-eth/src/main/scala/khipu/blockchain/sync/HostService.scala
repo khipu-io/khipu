@@ -16,7 +16,7 @@ import scala.concurrent.Future
  *
  * Note blockchain should be read only in this actor
  */
-class HostService(blockchainReadOnly: Blockchain, peerConfiguration: PeerConfiguration)(implicit ec: ExecutionContext) {
+class HostService(blockchainReadOnly: Blockchain, peerConfig: PeerConfiguration)(implicit ec: ExecutionContext) {
 
   private var _isShuttingDown = false
   private def isShuttingDown = _isShuttingDown
@@ -38,7 +38,7 @@ class HostService(blockchainReadOnly: Blockchain, peerConfiguration: PeerConfigu
           val resp: Option[MessageSerializable] = blockNumber match {
             case Some(startBlockNumber) if startBlockNumber >= 0 && maxHeaders >= 0 && skip >= 0 =>
               try {
-                val headersCount = maxHeaders min peerConfiguration.fastSyncHostConfiguration.maxBlocksHeadersPerMessage
+                val headersCount = maxHeaders min peerConfig.fastSyncHostConfiguration.maxBlocksHeadersPerMessage
 
                 val range = if (reverse) {
                   startBlockNumber to (startBlockNumber - (skip + 1) * headersCount + 1) by -(skip + 1)
@@ -68,7 +68,7 @@ class HostService(blockchainReadOnly: Blockchain, peerConfiguration: PeerConfigu
           //log.info("Got request GetBlockBodies")
 
           try {
-            val blockBodies = hashes.take(peerConfiguration.fastSyncHostConfiguration.maxBlocksBodiesPerMessage).flatMap { hash =>
+            val blockBodies = hashes.take(peerConfig.fastSyncHostConfiguration.maxBlocksBodiesPerMessage).flatMap { hash =>
               blockchainReadOnly.getBlockBodyByHash(hash)
             }
 
@@ -86,7 +86,7 @@ class HostService(blockchainReadOnly: Blockchain, peerConfiguration: PeerConfigu
           //log.info("Got request GetReceipts")
 
           try {
-            val receipts = blockHashes.take(peerConfiguration.fastSyncHostConfiguration.maxReceiptsPerMessage).flatMap { hash =>
+            val receipts = blockHashes.take(peerConfig.fastSyncHostConfiguration.maxReceiptsPerMessage).flatMap { hash =>
               blockchainReadOnly.getReceiptsByHash(hash)
             }
 
@@ -104,7 +104,7 @@ class HostService(blockchainReadOnly: Blockchain, peerConfiguration: PeerConfigu
           //log.info("Got request GetNodeData")
 
           try {
-            val hashesRequested = mptElementsHashes.take(peerConfiguration.fastSyncHostConfiguration.maxMptComponentsPerMessage)
+            val hashesRequested = mptElementsHashes.take(peerConfig.fastSyncHostConfiguration.maxMptComponentsPerMessage)
 
             val nodeData: Seq[ByteString] = hashesRequested.flatMap { hash =>
               // fetch mpt node by hash, if no mpt node was found, fetch evm by hash

@@ -116,7 +116,7 @@ trait HandshakedPeersService { _: SyncService =>
 
   private def toDropOneBlacklisted() = {
     val nHandshakedPeers = handshakedPeers.size
-    if (nHandshakedPeers > peerConfiguration.maxPeers * 0.8) {
+    if (nHandshakedPeers > peerConfig.maxPeers * 0.8) {
       val nGoodPeers = handshakedPeers.filterNot(x => isBlacklisted(x._1)).size
       if (nGoodPeers < nHandshakedPeers * 0.5) {
         blacklistCounts.toList.filter(x => x._2 >= 3 && handshakedPeers.contains(x._1)).sortBy(-_._2).headOption foreach {

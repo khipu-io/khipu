@@ -158,11 +158,11 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
     discoveryStatus = ServerStatus.Listening(discoveryConfig.listenAddress)
   )
 
-  val peerConfiguration = KhipuConfig.Network.peer
+  val peerConfig = KhipuConfig.Network.peer
   // TODO knownNodesService
-  val peerManage = system.actorOf(PeerManager.props(peerConfiguration), "peerManage")
+  val peerManage = system.actorOf(PeerManager.props(peerConfig), "peerManage")
 
-  val hostService = new HostService(blockchain, peerConfiguration)
+  val hostService = new HostService(blockchain, peerConfig)
 
   log.info(s"serviceBoard is ready")
 

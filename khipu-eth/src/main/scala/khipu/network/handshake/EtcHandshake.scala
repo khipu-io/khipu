@@ -159,11 +159,11 @@ object EtcHandshake {
 
 }
 final class EtcHandshake(
-    nodeStatus:        NodeStatus,
-    blockchain:        Blockchain,
-    appStateStorage:   AppStateStorage,
-    peerConfiguration: PeerConfiguration,
-    forkResolverOpt:   Option[ForkResolver]
+    nodeStatus:      NodeStatus,
+    blockchain:      Blockchain,
+    appStateStorage: AppStateStorage,
+    peerConfig:      PeerConfiguration,
+    forkResolverOpt: Option[ForkResolver]
 ) {
   import EtcHandshake._
 
@@ -228,7 +228,7 @@ final class EtcHandshake(
     val bestBlockHeader = getBestBlockHeader()
     Status(
       protocolVersion = Versions.PV63,
-      networkId = peerConfiguration.networkId,
+      networkId = peerConfig.networkId,
       totalDifficulty = bestBlockHeader.difficulty,
       bestHash = bestBlockHeader.hash,
       genesisHash = blockchain.genesisHeader.hash
@@ -241,7 +241,7 @@ final class EtcHandshake(
 
   def respondToHello(message: Hello): Handshaking = {
     if (message.capabilities.contains(Capability("eth", Versions.PV63.toByte)))
-      NextMessage(theStatusMessage, peerConfiguration.waitForStatusTimeout)
+      NextMessage(theStatusMessage, peerConfig.waitForStatusTimeout)
     else {
       //log.debug("Connected peer does not support eth {} protocol. Disconnecting.", Versions.PV63.toByte)
       HandshakeFailure(Disconnect.Reasons.IncompatibleP2pProtocolVersion)
@@ -253,7 +253,7 @@ final class EtcHandshake(
     forkResolverOpt match {
       case Some(forkResolver) =>
         // will go to respondBlockheaders
-        NextMessage(theGetBlockHeadersMessage(forkResolver), peerConfiguration.waitForChainCheckTimeout)
+        NextMessage(theGetBlockHeadersMessage(forkResolver), peerConfig.waitForChainCheckTimeout)
       case None =>
         HandshakeSuccess(PeerInfo(message, message.totalDifficulty, true, 0))
     }
