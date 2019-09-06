@@ -3,14 +3,14 @@ package khipu.storage
 import akka.util.ByteString
 import java.nio.ByteOrder
 import khipu.Hash
-import khipu.storage.datasource.DataSource
+import khipu.storage.datasource.KeyValueDataSource
 import khipu.util.SimpleMapWithUnconfirmed
 
 object TransactionStorage {
   final case class TxLocation(blockNumber: Long, txIndex: Int)
 }
 import TransactionStorage._
-final class TransactionStorage(val source: DataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Hash, TxLocation](unconfirmedDepth) {
+final class TransactionStorage(val source: KeyValueDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Hash, TxLocation](unconfirmedDepth) {
   type This = TransactionStorage
 
   implicit val byteOrder = ByteOrder.BIG_ENDIAN

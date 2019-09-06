@@ -39,16 +39,12 @@ trait LmdbDataSources extends SharedLmdbDataSources with DataSources {
   lazy val storageNodeDataSource = new LmdbNodeDataSource(DbConfig.storage, lmdbEnv, cacheConf.cacheSize)
   lazy val evmcodeDataSource = new LmdbNodeDataSource(DbConfig.evmcode, lmdbEnv, cacheSize = 10000)
 
-  lazy val blockNumberDataSource = new LmdbDataSource(DbConfig.blocknum, lmdbEnv, cacheSize = 1000)
+  lazy val blockNumberDataSource = new LmdbKeyValueDataSource(DbConfig.blocknum, lmdbEnv, cacheSize = 1000)
 
   lazy val blockHeaderDataSource = new LmdbBlockDataSource(DbConfig.header, lmdbEnv, cacheSize = 1000)
   lazy val blockBodyDataSource = new LmdbBlockDataSource(DbConfig.body, lmdbEnv, cacheSize = 1000)
   lazy val receiptsDataSource = new LmdbBlockDataSource(DbConfig.receipts, lmdbEnv, cacheSize = 1000)
   lazy val totalDifficultyDataSource = new LmdbBlockDataSource(DbConfig.td, lmdbEnv, cacheSize = 1000)
-
-  def bestHeaderNumber = blockHeaderDataSource.bestBlockNumber
-  def bestBodyNumber = blockBodyDataSource.bestBlockNumber
-  def bestReceiptsNumber = receiptsDataSource.bestBlockNumber
 
   def stop() {
     log.info("db syncing...")

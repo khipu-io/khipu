@@ -2,8 +2,7 @@ package khipu.storage
 
 import java.nio.ByteBuffer
 import khipu.Hash
-import khipu.storage.datasource.DataSource
-import khipu.storage.datasource.LmdbDataSource
+import khipu.storage.datasource.KeyValueDataSource
 import khipu.util.SimpleMapWithUnconfirmed
 import scala.collection.mutable
 
@@ -13,7 +12,7 @@ object BlockNumberStorage {
 /**
  * This class is used to store the blockhash -> blocknumber
  */
-final class BlockNumberStorage(val source: DataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Hash, Long](unconfirmedDepth) {
+final class BlockNumberStorage(val source: KeyValueDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Hash, Long](unconfirmedDepth) {
   type This = BlockNumberStorage
 
   import BlockNumberStorage._
@@ -37,6 +36,6 @@ final class BlockNumberStorage(val source: DataSource, unconfirmedDepth: Int) ex
     this
   }
 
-  def count = source.asInstanceOf[LmdbDataSource].count
+  def count = source.count
 }
 

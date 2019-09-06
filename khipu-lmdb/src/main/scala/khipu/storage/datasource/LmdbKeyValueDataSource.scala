@@ -11,11 +11,11 @@ import org.lmdbjava.Dbi
 import org.lmdbjava.DbiFlags
 import org.lmdbjava.Txn
 
-final class LmdbDataSource(
+final class LmdbKeyValueDataSource(
     val topic: String,
     env:       Env[ByteBuffer],
     cacheSize: Int
-)(implicit system: ActorSystem) extends DataSource {
+)(implicit system: ActorSystem) extends KeyValueDataSource {
   private val log = Logging(system, this.getClass)
 
   private val cache = new FIFOCache[Hash, Array[Byte]](cacheSize)
@@ -83,7 +83,7 @@ final class LmdbDataSource(
    *                  If a key is already in the DataSource its value will be updated.
    * @return the new DataSource after the removals and insertions were done.
    */
-  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
+  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): KeyValueDataSource = {
     // TODO fetch keyBuf from a pool?
 
     var wtx: Txn[ByteBuffer] = null
@@ -147,7 +147,7 @@ final class LmdbDataSource(
    *
    * @return the new DataSource after all the data was removed.
    */
-  override def clear(): DataSource = {
+  override def clear(): KeyValueDataSource = {
     destroy()
     this.table = createTable()
     this

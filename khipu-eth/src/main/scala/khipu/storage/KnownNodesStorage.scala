@@ -1,13 +1,13 @@
 package khipu.storage
 
 import java.net.URI
-import khipu.storage.datasource.DataSource
+import khipu.storage.datasource.KeyValueDataSource
 
 /**
  * This class is used to store discovered nodes
  *   Value: stored nodes list
  */
-final class KnownNodesStorage(val source: DataSource) extends KeyValueStorage[String, Set[String]] {
+final class KnownNodesStorage(val source: KeyValueDataSource) extends KeyValueStorage[String, Set[String]] {
   type This = KnownNodesStorage
 
   val key = "KnownNodes"
@@ -19,7 +19,7 @@ final class KnownNodesStorage(val source: DataSource) extends KeyValueStorage[St
   def valueToBytes(v: Set[String]): Array[Byte] = v.mkString(" ").getBytes
   def valueFromBytes(bytes: Array[Byte]): Set[String] = new String(bytes).split(' ').toSet
 
-  protected def apply(dataSource: DataSource): KnownNodesStorage = new KnownNodesStorage(dataSource)
+  protected def apply(dataSource: KeyValueDataSource): KnownNodesStorage = new KnownNodesStorage(dataSource)
 
   def getKnownNodes: Set[URI] = {
     get(key).getOrElse(Set()).filter(_.nonEmpty).map(new URI(_))

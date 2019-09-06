@@ -10,6 +10,7 @@ import khipu.Updated
 import khipu.crypto
 import khipu.rlp
 import khipu.util.BytesUtil
+import khipu.util.Clock
 import khipu.util.SimpleMap
 import scala.annotation.tailrec
 

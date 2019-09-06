@@ -33,7 +33,7 @@ trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources
   lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, Left(lmdbEnv), cacheSize = cacheCfg.cacheSize)
   lazy val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Left(lmdbEnv), cacheSize = 10000)
 
-  lazy val blockNumberDataSource = new LmdbDataSource(DbConfig.blocknum, lmdbEnv, cacheSize = 1000)
+  lazy val blockNumberDataSource = new LmdbKeyValueDataSource(DbConfig.blocknum, lmdbEnv, cacheSize = 1000)
 
   lazy val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque, cacheSize = 1000)
   lazy val blockBodyDataSource = new KesqueBlockDataSource(DbConfig.body, kesque, cacheSize = 1000)
@@ -65,10 +65,6 @@ trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources
   //  lazy val blockBodyDataSource = new KesqueDataSource(blockTable, DbConfig.body)
   //  lazy val receiptsDataSource = new KesqueDataSource(blockTable, DbConfig.receipts)
   //  lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, DbConfig.td)
-
-  def bestHeaderNumber = blockHeaderDataSource.bestBlockNumber
-  def bestBodyNumber = blockBodyDataSource.bestBlockNumber
-  def bestReceiptsNumber = receiptsDataSource.bestBlockNumber
 
   def stop() {
     log.info("db syncing...")

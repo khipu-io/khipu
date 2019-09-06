@@ -8,7 +8,7 @@ trait SharedRocksdbDataSources extends DataSources {
 
   val rocksdbConfig: RocksdbConfig
 
-  lazy val dataSource = new RocksdbDataSource("shared", rocksdbConfig, cacheSize = 1000)
+  lazy val dataSource = new RocksdbKeyValueDataSource("shared", rocksdbConfig, cacheSize = 1000)
 
   lazy val transactionDataSource = dataSource
 

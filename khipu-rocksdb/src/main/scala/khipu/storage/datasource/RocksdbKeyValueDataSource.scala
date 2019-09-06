@@ -18,11 +18,11 @@ import org.rocksdb.Transaction
 import org.rocksdb.WriteBatch
 import org.rocksdb.WriteOptions
 
-final class RocksdbDataSource(
+final class RocksdbKeyValueDataSource(
     val topic:     String,
     rocksdbConfig: RocksdbConfig,
     cacheSize:     Int
-)(implicit system: ActorSystem) extends DataSource {
+)(implicit system: ActorSystem) extends KeyValueDataSource {
   RocksDB.loadLibrary()
 
   private val log = Logging(system, this.getClass)
@@ -114,7 +114,7 @@ final class RocksdbDataSource(
    *                  If a key is already in the DataSource its value will be updated.
    * @return the new DataSource after the removals and insertions were done.
    */
-  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
+  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): KeyValueDataSource = {
     var writeOptions: WriteOptions = null
     var batch: WriteBatch = null
     var txn: Transaction = null
@@ -179,7 +179,7 @@ final class RocksdbDataSource(
    *
    * @return the new DataSource after all the data was removed.
    */
-  override def clear(): DataSource = {
+  override def clear(): KeyValueDataSource = {
     this
   }
 

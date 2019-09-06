@@ -6,7 +6,7 @@ import khipu.config.LeveldbConfig
 import khipu.util.BytesUtil
 import org.iq80.leveldb.impl.Iq80DBFactory
 
-object LeveldbDataSource {
+object LeveldbKeyValueDataSource {
 
   private def createDB(levelDbConfig: LeveldbConfig): DB = {
     import levelDbConfig._
@@ -21,15 +21,15 @@ object LeveldbDataSource {
     Iq80DBFactory.factory.open(new File(path), options)
   }
 
-  def apply(levelDbConfig: LeveldbConfig): LeveldbDataSource = {
-    new LeveldbDataSource(createDB(levelDbConfig), levelDbConfig)
+  def apply(levelDbConfig: LeveldbConfig): LeveldbKeyValueDataSource = {
+    new LeveldbKeyValueDataSource(createDB(levelDbConfig), levelDbConfig)
   }
 }
 
-final class LeveldbDataSource(
+final class LeveldbKeyValueDataSource(
     private var db:            DB,
     private val levelDbConfig: LeveldbConfig
-) extends DataSource {
+) extends KeyValueDataSource {
 
   def topic = levelDbConfig.path
 
@@ -57,7 +57,7 @@ final class LeveldbDataSource(
    *                  If a key is already in the DataSource its value will be updated.
    * @return the new DataSource after the removals and insertions were done.
    */
-  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): DataSource = {
+  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): KeyValueDataSource = {
     val batch = db.createWriteBatch()
     toRemove.foreach { key => batch.delete(BytesUtil.concat(namespace, key)) }
     toUpsert.foreach { case (key, value) => batch.put(BytesUtil.concat(namespace, key), value) }
@@ -70,9 +70,9 @@ final class LeveldbDataSource(
    *
    * @return the new DataSource after all the data was removed.
    */
-  override def clear: DataSource = {
+  override def clear: KeyValueDataSource = {
     destroy()
-    this.db = LeveldbDataSource.createDB(levelDbConfig)
+    this.db = LeveldbKeyValueDataSource.createDB(levelDbConfig)
     this
   }
 
@@ -93,5 +93,8 @@ final class LeveldbDataSource(
       Iq80DBFactory.factory.destroy(new File(levelDbConfig.path), null) // Options are not being used ¯\_(ツ)_/¯
     }
   }
+
+  // TODO
+  def count = -1
 }
 

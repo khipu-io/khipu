@@ -37,11 +37,11 @@ trait Storages extends BlockchainStorages {
   def fastSyncStateStorage: FastSyncStateStorage
   def knownNodesStorage: KnownNodesStorage
 
-  def bestHeaderNumber: Long
-  def bestBodyNumber: Long
-  def bestReceiptsNumber: Long
-
   def bestBlockNumber = math.min(bestBodyNumber, bestReceiptsNumber)
+
+  def bestHeaderNumber = blockHeaderStorage.bestBlockNumber
+  def bestBodyNumber = blockBodyStorage.bestBlockNumber
+  def bestReceiptsNumber = receiptsStorage.bestBlockNumber
 
   def swithToWithUnconfirmed() {
     accountNodeStorage.swithToWithUnconfirmed()

@@ -166,7 +166,7 @@ class KeyValueCircularArrayQueue[K, V](val capacity: Int) extends CircularArrayQ
     element foreach { kv => cache += kv }
   }
 
-  override def dequeue() = {
+  override def dequeue(): Iterable[(K, V)] = {
     val element = super.dequeue()
     element foreach { kv => cache.remove(kv._1) }
     element

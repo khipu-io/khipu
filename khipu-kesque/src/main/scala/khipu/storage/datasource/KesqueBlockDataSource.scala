@@ -18,7 +18,7 @@ final class KesqueBlockDataSource(
     cacheSize:       Int,
     fetchMaxBytes:   Int             = kesque.DEFAULT_FETCH_MAX_BYTES,
     compressionType: CompressionType = CompressionType.NONE
-) extends BlockDataSource[Long, Array[Byte]] with Logging {
+) extends BlockDataSource with Logging {
   type This = KesqueBlockDataSource
 
   private val cache = new FIFOCache[Long, Array[Byte]](cacheSize)

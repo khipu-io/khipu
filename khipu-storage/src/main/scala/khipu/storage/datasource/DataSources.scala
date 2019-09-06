@@ -1,13 +1,13 @@
 package khipu.storage.datasource
 
 trait DataSources {
-  val dataSource: DataSource
+  val dataSource: KeyValueDataSource
 
-  val blockHeightsHashesDataSource: DataSource
+  val blockHeightsHashesDataSource: KeyValueDataSource
 
-  val appStateDataSource: DataSource
-  val fastSyncStateDataSource: DataSource
-  val knownNodesDataSource: DataSource
+  val appStateDataSource: KeyValueDataSource
+  val fastSyncStateDataSource: KeyValueDataSource
+  val knownNodesDataSource: KeyValueDataSource
 
   def stop(): Unit
 }

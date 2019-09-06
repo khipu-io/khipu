@@ -1,7 +1,7 @@
 package khipu.storage
 
 import java.nio.ByteBuffer
-import khipu.storage.datasource.DataSource
+import khipu.storage.datasource.KeyValueDataSource
 import khipu.util.CircularArrayQueue
 
 object AppStateStorage {
@@ -21,7 +21,7 @@ object AppStateStorage {
  *   Value: stored string value
  */
 import AppStateStorage._
-final class AppStateStorage(val source: DataSource, unconfirmedDepth: Int) extends KeyValueStorage[Key, Long] {
+final class AppStateStorage(val source: KeyValueDataSource, unconfirmedDepth: Int) extends KeyValueStorage[Key, Long] {
   type This = AppStateStorage
 
   def topic = source.topic
@@ -65,7 +65,7 @@ final class AppStateStorage(val source: DataSource, unconfirmedDepth: Int) exten
   private def longToBytes(v: Long) = ByteBuffer.allocate(8).putLong(v).array
   private def bytesToLong(v: Array[Byte]) = ByteBuffer.wrap(v).getLong
 
-  protected def apply(dataSource: DataSource): AppStateStorage = new AppStateStorage(dataSource, unconfirmedDepth)
+  protected def apply(dataSource: KeyValueDataSource): AppStateStorage = new AppStateStorage(dataSource, unconfirmedDepth)
 
   def isFastSyncDone(): Boolean = get(Keys.FastSyncDone).isDefined
 

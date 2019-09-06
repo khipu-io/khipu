@@ -1,23 +1,23 @@
 package khipu.storage
 
-import khipu.Hash
 import khipu.storage.datasource.BlockDataSource
-import khipu.storage.datasource.DataSource
+import khipu.storage.datasource.KeyValueDataSource
+import khipu.storage.datasource.NodeDataSource
 
 trait BlockchainStorages {
   // -- data source
-  def accountNodeDataSource: BlockDataSource[Hash, Array[Byte]]
-  def storageNodeDataSource: BlockDataSource[Hash, Array[Byte]]
-  def evmcodeDataSource: BlockDataSource[Hash, Array[Byte]]
+  def accountNodeDataSource: NodeDataSource
+  def storageNodeDataSource: NodeDataSource
+  def evmcodeDataSource: NodeDataSource
 
-  def blockNumberDataSource: DataSource
+  def blockNumberDataSource: KeyValueDataSource
 
-  def blockHeaderDataSource: BlockDataSource[Long, Array[Byte]]
-  def blockBodyDataSource: BlockDataSource[Long, Array[Byte]]
-  def receiptsDataSource: BlockDataSource[Long, Array[Byte]]
+  def blockHeaderDataSource: BlockDataSource
+  def blockBodyDataSource: BlockDataSource
+  def receiptsDataSource: BlockDataSource
 
-  def totalDifficultyDataSource: BlockDataSource[Long, Array[Byte]]
-  def transactionDataSource: DataSource
+  def totalDifficultyDataSource: BlockDataSource
+  def transactionDataSource: KeyValueDataSource
 
   // -- storage
   def accountNodeStorage: NodeStorage

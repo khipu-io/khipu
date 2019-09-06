@@ -11,7 +11,7 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockHeader belong
  *   Value: the block header
  */
-final class BlockHeaderStorage(val source: BlockDataSource[Long, Array[Byte]], unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, BlockHeader](unconfirmedDepth) {
+final class BlockHeaderStorage(val source: BlockDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, BlockHeader](unconfirmedDepth) {
   type This = BlockHeaderStorage
 
   def topic = source.topic
@@ -27,5 +27,7 @@ final class BlockHeaderStorage(val source: BlockDataSource[Long, Array[Byte]], u
     source.update(toRemove, upsert)
     this
   }
+
+  def bestBlockNumber = unconfirmed.lastOption.flatMap(_.lastOption.map(_._1)).getOrElse(source.bestBlockNumber)
 }
 

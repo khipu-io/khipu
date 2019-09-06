@@ -10,7 +10,7 @@ import scala.collection.mutable
  *   Key: hash of the block to which the BlockBody belong
  *   Value: the block body
  */
-final class BlockBodyStorage(val source: BlockDataSource[Long, Array[Byte]], unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, BlockBody](unconfirmedDepth) {
+final class BlockBodyStorage(val source: BlockDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, BlockBody](unconfirmedDepth) {
   type This = BlockBodyStorage
 
   import BlockBody.BlockBodyDec
@@ -28,4 +28,6 @@ final class BlockBodyStorage(val source: BlockDataSource[Long, Array[Byte]], unc
     source.update(toRemove, upsert)
     this
   }
+
+  def bestBlockNumber = unconfirmed.lastOption.flatMap(_.lastOption.map(_._1)).getOrElse(source.bestBlockNumber)
 }

@@ -10,7 +10,7 @@ import khipu.blockchain.sync.StorageRootHash
 import khipu.blockchain.sync.ContractStorageMptNodeHash
 import khipu.blockchain.sync.EvmcodeHash
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
-import khipu.storage.datasource.DataSource
+import khipu.storage.datasource.KeyValueDataSource
 
 object FastSyncStateStorage {
   val namespace = Namespaces.FastSyncState
@@ -20,7 +20,7 @@ object FastSyncStateStorage {
   val R = Array[Byte]('R'.toByte)
   val N = Array[Byte]('N'.toByte)
 }
-final class FastSyncStateStorage(val source: DataSource) {
+final class FastSyncStateStorage(val source: KeyValueDataSource) {
   import FastSyncStateStorage._
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 

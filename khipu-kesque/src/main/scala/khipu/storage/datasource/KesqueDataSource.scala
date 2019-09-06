@@ -13,6 +13,7 @@ import khipu.TKeyVal
 import khipu.TVal
 import khipu.config.DbConfig
 import khipu.util.Clock
+import khipu.util.SimpleMap
 import org.apache.kafka.common.record.CompressionType
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -219,7 +220,7 @@ object KesqueDataSource {
 final class KesqueDataSource(
     val table: HashKeyValueTable,
     val topic: String
-)(implicit system: ActorSystem) extends BlockDataSource[Hash, TVal] {
+)(implicit system: ActorSystem) extends SimpleMap[Hash, TVal] {
   type This = KesqueDataSource
 
   import KesqueDataSource._

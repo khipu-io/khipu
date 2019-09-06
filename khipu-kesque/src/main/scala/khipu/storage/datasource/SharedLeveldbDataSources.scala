@@ -7,7 +7,7 @@ trait SharedLeveldbDataSources extends DataSources {
   val kesque: Kesque
   val leveldbConfig: LeveldbConfig
 
-  val dataSource = LeveldbDataSource(leveldbConfig)
+  val dataSource = LeveldbKeyValueDataSource(leveldbConfig)
 
   val transactionDataSource = dataSource
 

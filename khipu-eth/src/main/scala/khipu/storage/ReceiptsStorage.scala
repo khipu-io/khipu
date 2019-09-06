@@ -55,7 +55,7 @@ object ReceiptsStorage {
  *   Key: hash of the block to which the list of receipts belong
  *   Value: the list of receipts
  */
-final class ReceiptsStorage(val source: BlockDataSource[Long, Array[Byte]], unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, Seq[Receipt]](unconfirmedDepth) {
+final class ReceiptsStorage(val source: BlockDataSource, unconfirmedDepth: Int) extends SimpleMapWithUnconfirmed[Long, Seq[Receipt]](unconfirmedDepth) {
   type This = ReceiptsStorage
 
   import ReceiptsStorage.ReceiptsSerializer._
@@ -73,5 +73,7 @@ final class ReceiptsStorage(val source: BlockDataSource[Long, Array[Byte]], unco
     source.update(toRemove, upsert)
     this
   }
+
+  def bestBlockNumber = unconfirmed.lastOption.flatMap(_.lastOption.map(_._1)).getOrElse(source.bestBlockNumber)
 }
 

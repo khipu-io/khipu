@@ -18,7 +18,7 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataS
   lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, Right(rocksdbConfig), cacheSize = cacheCfg.cacheSize)
   lazy val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Right(rocksdbConfig), cacheSize = 10000)
 
-  lazy val blockNumberDataSource = new RocksdbDataSource(DbConfig.blocknum, rocksdbConfig, cacheSize = 1000)
+  lazy val blockNumberDataSource = new RocksdbKeyValueDataSource(DbConfig.blocknum, rocksdbConfig, cacheSize = 1000)
 
   lazy val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque, cacheSize = 1000)
   lazy val blockBodyDataSource = new KesqueBlockDataSource(DbConfig.body, kesque, cacheSize = 1000)
@@ -50,10 +50,6 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataS
   //  lazy val blockBodyDataSource = new KesqueDataSource(blockTable, DbConfig.body)
   //  lazy val receiptsDataSource = new KesqueDataSource(blockTable, DbConfig.receipts)
   //  lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, DbConfig.td)
-
-  def bestHeaderNumber = blockHeaderDataSource.bestBlockNumber
-  def bestBodyNumber = blockBodyDataSource.bestBlockNumber
-  def bestReceiptsNumber = receiptsDataSource.bestBlockNumber
 
   def stop() {
     log.info("db syncing...")
