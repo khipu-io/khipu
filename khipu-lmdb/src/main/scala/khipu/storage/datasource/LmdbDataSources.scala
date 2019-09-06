@@ -53,19 +53,7 @@ trait LmdbDataSources extends SharedLmdbDataSources with DataSources {
     // --- and we don't care about the resources releasing, since when closeAll() is called,
     // --- we are shutting down this application.
 
-    //accountNodeDataSource.close()
-    //storageNodeDataSource.close()
-    //evmcodeDataSource.close()
-    //blockNumberDataSource.close()
-    //blockHeaderDataSource.close()
-    //blockBodyDataSource.close()
-    //receiptsDataSource.close()
-    //totalDifficultyDataSource.close()
-
-    //dataSource.close()
-
     lmdbEnv.sync(true)
-    //env.close()
 
     log.info("db synced")
   }

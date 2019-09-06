@@ -17,7 +17,7 @@ abstract class SimpleMapWithUnconfirmed[K, V](unconfirmedDepth: Int) extends Sim
   }
 
   override def get(key: K): Option[V] = {
-    unconfirmed.get(key) orElse doGet(key)
+    unconfirmed.get(key) orElse getFromSource(key)
   }
 
   override def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): This = {
@@ -31,10 +31,9 @@ abstract class SimpleMapWithUnconfirmed[K, V](unconfirmedDepth: Int) extends Sim
       unconfirmed.enqueue(toUpsert)
     }
 
-    doUpdate(toRemove, toFlush)
+    updateToSource(toRemove, toFlush)
   }
 
-  protected def doGet(key: K): Option[V]
-  protected def doUpdate(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): This
-
+  protected def getFromSource(key: K): Option[V]
+  protected def updateToSource(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): This
 }

@@ -62,11 +62,11 @@ final class ReceiptsStorage(val source: BlockDataSource, unconfirmedDepth: Int) 
 
   def topic = source.topic
 
-  override protected def doGet(key: Long): Option[Seq[Receipt]] = {
+  override protected def getFromSource(key: Long): Option[Seq[Receipt]] = {
     source.get(key).map(toReceipts)
   }
 
-  override protected def doUpdate(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Seq[Receipt])]): This = {
+  override protected def updateToSource(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Seq[Receipt])]): This = {
     val upsert = toUpsert map {
       case (key, value) => (key -> toBytes(value))
     }

@@ -16,11 +16,11 @@ final class BlockHeaderStorage(val source: BlockDataSource, unconfirmedDepth: In
 
   def topic = source.topic
 
-  override protected def doGet(key: Long): Option[BlockHeader] = {
+  override protected def getFromSource(key: Long): Option[BlockHeader] = {
     source.get(key).map(_.toBlockHeader)
   }
 
-  override protected def doUpdate(toRemove: Iterable[Long], toUpsert: Iterable[(Long, BlockHeader)]): This = {
+  override protected def updateToSource(toRemove: Iterable[Long], toUpsert: Iterable[(Long, BlockHeader)]): This = {
     val upsert = toUpsert map {
       case (key, value) => (value.number -> value.toBytes)
     }

@@ -14,11 +14,11 @@ final class TotalDifficultyStorage(val source: BlockDataSource, unconfirmedDepth
 
   def topic = source.topic
 
-  override protected def doGet(key: Long): Option[DataWord] = {
+  override protected def getFromSource(key: Long): Option[DataWord] = {
     source.get(key).map(DataWord.safe)
   }
 
-  override protected def doUpdate(toRemove: Iterable[Long], toUpsert: Iterable[(Long, DataWord)]): This = {
+  override protected def updateToSource(toRemove: Iterable[Long], toUpsert: Iterable[(Long, DataWord)]): This = {
     val upsert = toUpsert map {
       case (key, value) => (key -> value.bigEndianMag)
     }

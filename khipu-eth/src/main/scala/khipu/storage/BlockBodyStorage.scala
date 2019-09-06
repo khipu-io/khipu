@@ -17,11 +17,11 @@ final class BlockBodyStorage(val source: BlockDataSource, unconfirmedDepth: Int)
 
   def topic = source.topic
 
-  protected def doGet(key: Long): Option[BlockBody] = {
+  protected def getFromSource(key: Long): Option[BlockBody] = {
     source.get(key).map(_.toBlockBody)
   }
 
-  protected def doUpdate(toRemove: Iterable[Long], toUpsert: Iterable[(Long, BlockBody)]): This = {
+  protected def updateToSource(toRemove: Iterable[Long], toUpsert: Iterable[(Long, BlockBody)]): This = {
     val upsert = toUpsert map {
       case (key, value) => (key -> value.toBytes)
     }

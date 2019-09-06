@@ -23,11 +23,11 @@ final class BlockNumberStorage(val source: KeyValueDataSource, unconfirmedDepth:
   private def valueToBytes(v: Long): Array[Byte] = ByteBuffer.allocate(8).putLong(v).array
   private def valueFromBytes(bytes: Array[Byte]): Long = ByteBuffer.wrap(bytes).getLong
 
-  override protected def doGet(key: Hash): Option[Long] = {
+  override protected def getFromSource(key: Hash): Option[Long] = {
     source.get(namespace, keyToBytes(key)).map(valueFromBytes)
   }
 
-  override protected def doUpdate(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Long)]): This = {
+  override protected def updateToSource(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Long)]): This = {
     val remove = toRemove map { key => keyToBytes(key) }
     val upsert = toUpsert map {
       case (key, value) => (keyToBytes(key) -> valueToBytes(value))

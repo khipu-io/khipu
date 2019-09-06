@@ -37,10 +37,10 @@ final class TransactionStorage(val source: KeyValueDataSource, unconfirmedDepth:
     TxLocation(blockNumber, txIndex)
   }
 
-  override protected def doGet(key: Hash): Option[TxLocation] =
+  override protected def getFromSource(key: Hash): Option[TxLocation] =
     source.get(namespace, keyToBytes(key)).map(valueFromBytes)
 
-  override protected def doUpdate(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, TxLocation)]): This = {
+  override protected def updateToSource(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, TxLocation)]): This = {
     val remove = toRemove.map(keyToBytes)
     val upsert = toUpsert.map { case (k, v) => keyToBytes(k) -> valueToBytes(v) }
     source.update(namespace, remove, upsert)

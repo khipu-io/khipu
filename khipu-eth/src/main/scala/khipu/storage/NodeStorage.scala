@@ -9,11 +9,11 @@ final class NodeStorage(source: NodeDataSource, unconfirmedDepth: Int) extends S
 
   def topic = source.topic
 
-  override protected def doGet(key: Hash): Option[Array[Byte]] = {
+  override protected def getFromSource(key: Hash): Option[Array[Byte]] = {
     source.get(key)
   }
 
-  override protected def doUpdate(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): NodeStorage = {
+  override protected def updateToSource(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): NodeStorage = {
     // do not do remove ?
     source.update(Nil, toUpsert)
     this
