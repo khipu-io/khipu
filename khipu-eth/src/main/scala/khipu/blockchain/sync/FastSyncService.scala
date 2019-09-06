@@ -304,7 +304,7 @@ trait FastSyncService { _: SyncService =>
 
     private var blockchainOnlyPeers = Set[String]()
 
-    private var prevSyncedBlockNumber = appStateStorage.getBestBlockNumber
+    private var prevSyncedBlockNumber = storages.bestBlockNumber
     private var prevDownloadeNodes = syncState.downloadedNodesCount
     private var prevReportTime = System.nanoTime
 
@@ -505,7 +505,7 @@ trait FastSyncService { _: SyncService =>
       if (isFullySynced) {
         updateBestBlockNumber()
         reportStatus()
-        val bestBlockNumber = appStateStorage.getBestBlockNumber
+        val bestBlockNumber = storages.bestBlockNumber
         if (bestBlockNumber == syncState.targetBlockNumber) {
           log.info(s"[fast] Block synchronization in fast mode finished, switching to regular mode")
           finishFastSync()
@@ -847,7 +847,7 @@ trait FastSyncService { _: SyncService =>
     // --- saving methods
     private def updateBestBlockNumber() {
       val bestBlockNumber = math.min(syncState.bestBodyNumber, syncState.bestReceiptsNumber)
-      log.debug(s"bestBlockNumber: $bestBlockNumber, prevBestBlockNumber: ${appStateStorage.getBestBlockNumber}, bestBodyNumber: ${syncState.bestBodyNumber}, bestReceiptsNumber: ${syncState.bestReceiptsNumber}.")
+      log.debug(s"bestBlockNumber: $bestBlockNumber, prevBestBlockNumber: ${storages.bestBlockNumber}, bestBodyNumber: ${storages.bestBodyNumber}, bestReceiptsNumber: ${storages.bestReceiptsNumber}.")
       if (bestBlockNumber > appStateStorage.getBestBlockNumber) {
         appStateStorage.putBestBlockNumber(bestBlockNumber)
       }
@@ -921,14 +921,14 @@ trait FastSyncService { _: SyncService =>
       val nPendingNodes = syncState.pendingMptNodes.size + syncState.pendingNonMptNodes.size
       val nWorkingNodes = syncState.workingMptNodes.size + syncState.workingNonMptNodes.size
       val nTotalNodes = syncState.downloadedNodesCount + nPendingNodes + nWorkingNodes
-      val syncedBlockNumber = appStateStorage.getBestBlockNumber
+      val syncedBlockNumber = storages.bestBlockNumber
       val blockRate = ((syncedBlockNumber - prevSyncedBlockNumber) / duration).toInt
       val stateRate = ((syncState.downloadedNodesCount - prevDownloadeNodes) / duration).toInt
       val nNodeOkPeers = goodPeers.filterNot(x => blockchainOnlyPeers.contains(x._1.id)).size
       val nHeaderPeers = headerWhitePeers.size
       val nBlackPeers = handshakedPeers.size - goodPeers.size
       log.info(
-        s"""|[fast] Block: ${appStateStorage.getBestBlockNumber}/${syncState.targetBlockNumber}, $blockRate/s.
+        s"""|[fast] Block: ${syncedBlockNumber}/${syncState.targetBlockNumber}, $blockRate/s.
             |State: ${syncState.downloadedNodesCount}/$nTotalNodes, $stateRate/s.
             |Peers: (in/out) (${incomingPeers.size}/${outgoingPeers.size}), (working/good/header/node/black) (${workingPeers.size}/${goodPeers.size}/${nHeaderPeers}/${nNodeOkPeers}/${nBlackPeers})
             |""".stripMargin.replace("\n", " ")

@@ -34,6 +34,8 @@ final class LmdbBlockDataSource(
 
   val clock = new Clock()
 
+  log.info(s"Table $topic best block number $bestBlockNumber")
+
   def get(key: Long): Option[Array[Byte]] = {
     cache.get(key) match {
       case None =>
@@ -79,6 +81,9 @@ final class LmdbBlockDataSource(
     }
   }
 
+  /**
+   * toUpsert should be append only by inreasing block number
+   */
   def update(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Array[Byte])]): LmdbBlockDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
@@ -129,6 +134,8 @@ final class LmdbBlockDataSource(
     rtx.close()
     ret
   }
+
+  def bestBlockNumber = count - 1 // block number starts from 0
 
   def cacheHitRate = cache.hitRate
   def cacheReadCount = cache.readCount

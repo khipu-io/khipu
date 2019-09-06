@@ -103,7 +103,7 @@ trait RegularSyncService { _: SyncService =>
     bestPeer match {
       case Some(peer) =>
         val nextBlockNumber = lookbackFromBlock match {
-          case None                          => appStateStorage.getBestBlockNumber + 1
+          case None                          => storages.bestBlockNumber + 1
           case Some(reimportFromBlockNumber) => reimportFromBlockNumber
         }
 
@@ -139,7 +139,7 @@ trait RegularSyncService { _: SyncService =>
     if (workingHeaders.isEmpty && !isRequesting) {
       // we are at the top of chain we can insert new block
       blockchain.getTotalDifficultyByHash(block.header.parentHash) match {
-        case Some(parentTd) if block.header.number > appStateStorage.getBestBlockNumber =>
+        case Some(parentTd) if block.header.number > storages.bestBlockNumber =>
           // just insert block and let resolve it with regular download
           val f = executeAndInsertBlock(block, parentTd, isBatch = false) andThen {
             case Success(Right(newBlock)) =>

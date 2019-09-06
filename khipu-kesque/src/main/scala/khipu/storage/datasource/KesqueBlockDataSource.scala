@@ -29,7 +29,7 @@ final class KesqueBlockDataSource(
 
   val clock = new Clock()
 
-  info(s"Table $topic $count")
+  info(s"Table $topic best block number $bestBlockNumber")
 
   def get(key: Long): Option[Array[Byte]] = {
     try {
@@ -188,6 +188,7 @@ final class KesqueBlockDataSource(
   }
 
   def count = kesqueDb.getLogEndOffset(topic)
+  def bestBlockNumber = count - 1 // block number starts from 0
 
   def cacheHitRate = cache.hitRate
   def cacheReadCount = cache.readCount

@@ -79,7 +79,7 @@ object Khipu {
     //new khipu.tools.BlockDump(serviceBoard.blockchain, serviceBoard.storages.kesque)(system).dump()
     //new khipu.tools.DataFinder()(system).find()
 
-    log.info(s"Best block number is ${serviceBoard.storages.appStateStorage.getBestBlockNumber}")
+    log.info(s"Best block number is ${serviceBoard.storages.bestBlockNumber}")
 
     if (serviceBoard.discoveryConfig.discoveryEnabled) {
       startDiscoveryService()

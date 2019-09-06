@@ -161,7 +161,7 @@ trait HandshakedPeersService { _: SyncService =>
   }
 
   protected def setCurrBlockHeaderForChecking() {
-    val bestBlockNumber = appStateStorage.getBestBlockNumber
+    val bestBlockNumber = storages.bestBlockNumber
     blockHeaderForChecking = blockchain.getBlockHeaderByNumber(bestBlockNumber - blockResolveDepth)
   }
 

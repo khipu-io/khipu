@@ -158,7 +158,7 @@ class PersonalService(
       val maybeNextTxNonce = maybeLatestPendingTxNonce.map(_ + DataWord.Zero) orElse maybeCurrentNonce
       val tx = request.toTransaction(maybeNextTxNonce.getOrElse(blockchainConfig.accountStartNonce))
 
-      val stx = if (appStateStorage.getBestBlockNumber >= blockchainConfig.eip155BlockNumber) {
+      val stx = if (blockchain.storages.bestBlockNumber >= blockchainConfig.eip155BlockNumber) {
         wallet.signTx(tx, Some(blockchainConfig.chainId))
       } else {
         wallet.signTx(tx, None)
@@ -171,7 +171,7 @@ class PersonalService(
   }
 
   private def getCurrentAccount(address: Address): Option[Account] =
-    blockchain.getAccount(address, appStateStorage.getBestBlockNumber)
+    blockchain.getAccount(address, blockchain.storages.bestBlockNumber)
 
   private def getMessageToSign(message: ByteString) = {
     val prefixed: Array[Byte] =

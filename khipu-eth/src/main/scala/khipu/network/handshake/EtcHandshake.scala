@@ -328,7 +328,7 @@ final class EtcHandshake(
   }
 
   private def getBestBlockHeader() = {
-    val bestBlockNumber = appStateStorage.getBestBlockNumber
+    val bestBlockNumber = blockchain.storages.bestBlockNumber
     blockchain.getBlockHeaderByNumber(bestBlockNumber).getOrElse(blockchain.genesisHeader)
   }
 }

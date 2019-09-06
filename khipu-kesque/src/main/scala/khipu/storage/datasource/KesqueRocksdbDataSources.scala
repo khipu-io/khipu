@@ -3,7 +3,7 @@ package khipu.storage.datasource
 import khipu.config.DbConfig
 import khipu.config.RocksdbConfig
 
-trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataSources {
+trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataSources with DataSources {
   lazy val rocksdbConfig = new RocksdbConfig(datadir, config.getConfig("db").getConfig("rocksdb"))
 
   // block size evalution: https://etherscan.io/chart/blocksize, https://ethereum.stackexchange.com/questions/1106/is-there-a-limit-for-transaction-size/1110#1110
@@ -51,12 +51,16 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataS
   //  lazy val receiptsDataSource = new KesqueDataSource(blockTable, DbConfig.receipts)
   //  lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, DbConfig.td)
 
+  def bestHeaderNumber = blockHeaderDataSource.bestBlockNumber
+  def bestBodyNumber = blockBodyDataSource.bestBlockNumber
+  def bestReceiptsNumber = receiptsDataSource.bestBlockNumber
+
   def stop() {
     log.info("db syncing...")
 
     // always shutdown kesque first to stay at the correct blocknumber
     kesque.shutdown()
-    
+
     accountNodeDataSource.stop()
     storageNodeDataSource.stop()
     evmcodeDataSource.stop()

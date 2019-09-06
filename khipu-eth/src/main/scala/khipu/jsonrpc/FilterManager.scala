@@ -132,7 +132,7 @@ class FilterManager(
 
   private def addFilterAndSendResponse(filter: Filter): Unit = {
     filters += (filter.id -> filter)
-    lastCheckBlocks += (filter.id -> appStateStorage.getBestBlockNumber)
+    lastCheckBlocks += (filter.id -> blockchain.storages.bestBlockNumber)
     lastCheckTimestamps += (filter.id -> System.currentTimeMillis())
     resetTimeout(filter.id)
     sender() ! NewFilterResponse(filter.id)
@@ -150,7 +150,7 @@ class FilterManager(
   private def getFilterLogs(id: DataWord) {
     val filterOpt = filters.get(id)
     filterOpt.foreach { _ =>
-      lastCheckBlocks += (id -> appStateStorage.getBestBlockNumber)
+      lastCheckBlocks += (id -> blockchain.storages.bestBlockNumber)
       lastCheckTimestamps += (id -> System.currentTimeMillis())
     }
     resetTimeout(id)
@@ -196,7 +196,7 @@ class FilterManager(
       }
     }
 
-    val bestBlockNumber = appStateStorage.getBestBlockNumber
+    val bestBlockNumber = blockchain.storages.bestBlockNumber
 
     val fromBlockNumber =
       startingBlockNumber.getOrElse(resolveBlockNumber(filter.fromBlock.getOrElse(BlockParam.Latest), bestBlockNumber))
@@ -212,7 +212,7 @@ class FilterManager(
   }
 
   private def getFilterChanges(id: DataWord) {
-    val bestBlockNumber = appStateStorage.getBestBlockNumber
+    val bestBlockNumber = blockchain.storages.bestBlockNumber
     val lastCheckBlock = lastCheckBlocks.getOrElse(id, bestBlockNumber)
     val lastCheckTimestamp = lastCheckTimestamps.getOrElse(id, System.currentTimeMillis())
 
@@ -273,7 +273,7 @@ class FilterManager(
   }
 
   private def getBlockHashesAfter(blockNumber: Long): Seq[Hash] = {
-    val bestBlock = appStateStorage.getBestBlockNumber
+    val bestBlock = blockchain.storages.bestBlockNumber
 
     @tailrec
     def recur(currentBlockNumber: Long, hashesSoFar: Seq[Hash]): Seq[Hash] = {

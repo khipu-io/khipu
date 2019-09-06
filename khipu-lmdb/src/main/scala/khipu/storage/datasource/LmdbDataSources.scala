@@ -10,7 +10,7 @@ import khipu.config.LmdbConfig
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
 
-trait LmdbDataSources extends SharedLmdbDataSources {
+trait LmdbDataSources extends SharedLmdbDataSources with DataSources {
   implicit protected val system: ActorSystem
 
   protected val config: Config
@@ -45,6 +45,10 @@ trait LmdbDataSources extends SharedLmdbDataSources {
   lazy val blockBodyDataSource = new LmdbBlockDataSource(DbConfig.body, lmdbEnv, cacheSize = 1000)
   lazy val receiptsDataSource = new LmdbBlockDataSource(DbConfig.receipts, lmdbEnv, cacheSize = 1000)
   lazy val totalDifficultyDataSource = new LmdbBlockDataSource(DbConfig.td, lmdbEnv, cacheSize = 1000)
+
+  def bestHeaderNumber = blockHeaderDataSource.bestBlockNumber
+  def bestBodyNumber = blockBodyDataSource.bestBlockNumber
+  def bestReceiptsNumber = receiptsDataSource.bestBlockNumber
 
   def stop() {
     log.info("db syncing...")

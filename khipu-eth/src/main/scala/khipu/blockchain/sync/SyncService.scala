@@ -122,7 +122,7 @@ final class SyncService() extends FastSyncService with RegularSyncService with H
 
   def idle: Receive = peerUpdateBehavior orElse {
     case StartSync =>
-      appStateStorage.putSyncStartingBlock(appStateStorage.getBestBlockNumber)
+      appStateStorage.putSyncStartingBlock(storages.bestBlockNumber)
       (appStateStorage.isFastSyncDone, KhipuConfig.Sync.doFastSync) match {
         case (false, true) =>
           startFastSync()

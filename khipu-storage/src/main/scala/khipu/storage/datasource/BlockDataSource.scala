@@ -11,6 +11,7 @@ trait BlockDataSource[K, V] extends SimpleMap[K, V] {
   def clock: Clock
 
   def count: Long
+
   def cacheHitRate: Double
   def cacheReadCount: Long
   def resetCacheHitRate(): Unit

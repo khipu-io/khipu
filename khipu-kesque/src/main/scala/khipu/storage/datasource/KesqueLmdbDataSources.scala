@@ -6,7 +6,7 @@ import khipu.config.LmdbConfig
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
 
-trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources {
+trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources with DataSources {
   private lazy val lmdbConfig = new LmdbConfig(datadir, config.getConfig("db").getConfig("lmdb"))
   private lazy val lmdbHome = {
     val h = new File(lmdbConfig.path)
@@ -65,6 +65,10 @@ trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources
   //  lazy val blockBodyDataSource = new KesqueDataSource(blockTable, DbConfig.body)
   //  lazy val receiptsDataSource = new KesqueDataSource(blockTable, DbConfig.receipts)
   //  lazy val totalDifficultyDataSource = new KesqueDataSource(blockTable, DbConfig.td)
+
+  def bestHeaderNumber = blockHeaderDataSource.bestBlockNumber
+  def bestBodyNumber = blockBodyDataSource.bestBlockNumber
+  def bestReceiptsNumber = receiptsDataSource.bestBlockNumber
 
   def stop() {
     log.info("db syncing...")

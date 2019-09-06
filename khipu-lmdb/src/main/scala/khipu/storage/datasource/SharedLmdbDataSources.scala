@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import java.nio.ByteBuffer
 import org.lmdbjava.Env
 
-trait SharedLmdbDataSources extends DataSources {
+trait SharedLmdbDataSources {
   implicit protected val system: ActorSystem
 
   val lmdbEnv: Env[ByteBuffer]

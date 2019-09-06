@@ -135,7 +135,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM) extends Log
 
   def startup() {
     try {
-      info("starting")
+      info("Kesque starting")
 
       val (brokerId, initialOfflineDirs) = getBrokerIdAndOfflineDirs
       config.brokerId = brokerId
@@ -168,7 +168,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM) extends Log
    */
   def shutdown() {
     try {
-      info("shutting down")
+      info("Kesque shutting down")
 
       // To ensure correct behavior under concurrent calls, we need to check `shutdownLatch` first since it gets updated
       // last in the `if` block. If the order is reversed, we could shutdown twice or leave `isShuttingDown` set to
@@ -196,7 +196,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM) extends Log
       //isShuttingDown.set(false)
       //CoreUtils.swallow(AppInfoParser.unregisterAppInfo(jmxPrefix, config.brokerId.toString, metrics), this)
       //shutdownLatch.countDown()
-      info("shut down completed")
+      info("Kesque shut down")
       //}
     } catch {
       case e: Throwable =>

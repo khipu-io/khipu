@@ -207,7 +207,7 @@ class EthService(
    * @return Current block number the client is on.
    */
   def bestBlockNumber(req: BestBlockNumberRequest): ServiceResponse[BestBlockNumberResponse] = Future {
-    Right(BestBlockNumberResponse(appStateStorage.getBestBlockNumber))
+    Right(BestBlockNumberResponse(blockchain.storages.bestBlockNumber))
   }
 
   /**
@@ -405,7 +405,7 @@ class EthService(
 
   def getGetGasPrice(req: GetGasPriceRequest): ServiceResponse[GetGasPriceResponse] = {
     val blockDifference = 30
-    val bestBlock = appStateStorage.getBestBlockNumber
+    val bestBlock = blockchain.storages.bestBlockNumber
 
     Future {
       val gasPrice = ((bestBlock - blockDifference) to bestBlock)
@@ -461,7 +461,7 @@ class EthService(
     reportActive()
     import khipu.mining.pow.PowCache._
 
-    val blockNumber = appStateStorage.getBestBlockNumber + 1
+    val blockNumber = blockchain.storages.bestBlockNumber + 1
 
     getOmmersFromPool(blockNumber).zip(getTransactionsFromPool).map {
       case (ommers, pendingTxs) =>
@@ -508,7 +508,7 @@ class EthService(
     reportActive()
     Future {
       blockGenerator.getPrepared(req.powHeaderHash) match {
-        case Some(pendingBlock) if appStateStorage.getBestBlockNumber <= pendingBlock.block.header.number =>
+        case Some(pendingBlock) if blockchain.storages.bestBlockNumber <= pendingBlock.block.header.number =>
           import pendingBlock._
           syncService ! MinedBlock(block.copy(header = block.header.copy(nonce = req.nonce, mixHash = req.mixHash)))
           Right(SubmitWorkResponse(true))
@@ -524,7 +524,7 @@ class EthService(
    * @return The syncing status if the node is syncing or None if not
    */
   def syncing(req: SyncingRequest): ServiceResponse[SyncingResponse] = Future {
-    val currentBlock = appStateStorage.getBestBlockNumber
+    val currentBlock = blockchain.storages.bestBlockNumber
     val highestBlock = appStateStorage.getEstimatedHighestBlock()
 
     //The node is syncing if there's any block that other peers have and this peer doesn't
@@ -720,7 +720,7 @@ class EthService(
     blockParam match {
       case BlockParam.WithNumber(blockNumber) => getBlock(blockNumber.longValue).map(ResolvedBlock(_, pending = false))
       case BlockParam.Earliest                => getBlock(0).map(ResolvedBlock(_, pending = false))
-      case BlockParam.Latest                  => getBlock(appStateStorage.getBestBlockNumber).map(ResolvedBlock(_, pending = false))
+      case BlockParam.Latest                  => getBlock(blockchain.storages.bestBlockNumber).map(ResolvedBlock(_, pending = false))
       case BlockParam.Pending =>
         blockGenerator.getPending.map(pb => ResolvedBlock(pb.block, pending = true))
           .map(Right.apply)
