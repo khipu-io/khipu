@@ -17,6 +17,12 @@ import akka.util.ByteStringBuilder
 import java.util.concurrent.atomic.AtomicInteger
 import khipu.blockchain.sync.SyncService
 import khipu.network.Control
+import khipu.network.IncomingPeer
+import khipu.network.KnownNodesService
+import khipu.network.OutgoingPeer
+import khipu.network.Peer
+import khipu.network.PeerEntity
+import khipu.network.PeerManager
 import khipu.network.Tick
 import khipu.network.WireDisconnected
 import khipu.network.handshake.EtcHandshake

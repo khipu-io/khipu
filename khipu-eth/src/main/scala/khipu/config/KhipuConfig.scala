@@ -8,9 +8,9 @@ import khipu.DataWord
 import khipu.domain.Address
 import khipu.jsonrpc.JsonRpcController.JsonRpcConfig
 import khipu.jsonrpc.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
-import khipu.network.rlpx.FastSyncHostConfiguration
-import khipu.network.rlpx.PeerConfiguration
-import khipu.network.rlpx.RLPxConfiguration
+import khipu.network.FastSyncHostConfiguration
+import khipu.network.PeerConfiguration
+import khipu.network.RLPxConfiguration
 import scala.concurrent.duration._
 import scala.util.Try
 

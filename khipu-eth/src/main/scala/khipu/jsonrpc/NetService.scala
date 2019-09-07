@@ -7,7 +7,7 @@ import khipu.jsonrpc.NetService.NetServiceConfig
 import com.typesafe.config.Config
 import khipu.NodeStatus
 import khipu.ServerStatus.{ Listening, NotListening }
-import khipu.network.rlpx.PeerManager
+import khipu.network.PeerManager
 import khipu.service.ServiceBoard
 import scala.concurrent.Future
 import scala.concurrent.duration._

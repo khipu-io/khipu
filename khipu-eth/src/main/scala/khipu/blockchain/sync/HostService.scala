@@ -2,11 +2,11 @@ package khipu.blockchain.sync
 
 import akka.util.ByteString
 import khipu.domain.Blockchain
+import khipu.network.PeerConfiguration
 import khipu.network.p2p.Message
 import khipu.network.p2p.MessageSerializable
 import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.PV63
-import khipu.network.rlpx.PeerConfiguration
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 

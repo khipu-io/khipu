@@ -17,10 +17,10 @@ import khipu.config.KhipuConfig
 import khipu.crypto
 import khipu.domain.BlockHeader
 import khipu.domain.Receipt
+import khipu.network.Peer
 import khipu.network.handshake.EtcHandshake.PeerInfo
 import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.CommonMessages.Status
-import khipu.network.rlpx.Peer
 import khipu.network.rlpx.RLPxStage
 import khipu.util.SimpleMap
 import scala.collection.immutable

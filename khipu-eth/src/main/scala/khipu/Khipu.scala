@@ -21,10 +21,10 @@ import khipu.jsonrpc.Web3Service
 import khipu.jsonrpc.http.JsonRpcHttpServer
 import khipu.keystore.KeyStore
 import khipu.mining.BlockGenerator
+import khipu.network.KnownNodesService
+import khipu.network.OutgoingPeer
+import khipu.network.Peer
 import khipu.network.handshake.EtcHandshake
-import khipu.network.rlpx.KnownNodesService
-import khipu.network.rlpx.OutgoingPeer
-import khipu.network.rlpx.Peer
 import khipu.network.rlpx.RLPx
 import khipu.network.rlpx.auth.AuthHandshake
 import khipu.network.rlpx.discovery.NodeDiscoveryService

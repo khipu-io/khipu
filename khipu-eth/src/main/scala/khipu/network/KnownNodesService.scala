@@ -1,4 +1,4 @@
-package khipu.network.rlpx
+package khipu.network
 
 import akka.actor.{ Actor, ActorLogging, Props, Scheduler, ActorSystem, ActorRef, PoisonPill }
 import akka.cluster.client.ClusterClientReceptionist

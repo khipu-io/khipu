@@ -1,4 +1,4 @@
-package khipu.network.rlpx
+package khipu.network
 
 import akka.actor.Actor
 import akka.actor.ActorLogging
@@ -9,9 +9,10 @@ import akka.pattern.ask
 import akka.pattern.pipe
 import akka.util.Timeout
 import java.net.URI
+import khipu.network.PeerEntity.Status.Handshaked
 import khipu.network.handshake.EtcHandshake
 import khipu.network.p2p.MessageSerializable
-import khipu.network.rlpx.PeerEntity.Status.Handshaked
+import khipu.network.rlpx.RLPx
 import khipu.network.rlpx.auth.AuthHandshake
 import khipu.network.rlpx.discovery.NodeDiscoveryService
 import khipu.service.ServiceBoard

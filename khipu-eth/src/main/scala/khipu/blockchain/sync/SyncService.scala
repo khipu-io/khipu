@@ -20,10 +20,10 @@ import khipu.config.KhipuConfig
 import khipu.crypto
 import khipu.domain.Block
 import khipu.domain.BlockHeader
+import khipu.network.Peer
 import khipu.network.p2p.Message
 import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.PV63
-import khipu.network.rlpx.Peer
 import khipu.ommers.OmmersPool
 import khipu.service.ServiceBoard
 import khipu.transactions.PendingTransactionsService

@@ -7,6 +7,7 @@ import khipu.DataWord
 import khipu.config.KhipuConfig
 import khipu.domain.Blockchain
 import khipu.network.ForkResolver
+import khipu.network.PeerConfiguration
 import khipu.network.p2p.Message
 import khipu.network.p2p.MessageSerializable
 import khipu.network.p2p.messages.CommonMessages.NewBlock
@@ -14,7 +15,6 @@ import khipu.network.p2p.messages.CommonMessages.Status
 import khipu.network.p2p.messages.PV62
 import khipu.network.p2p.messages.Versions
 import khipu.network.p2p.messages.WireProtocol.{ Capability, Disconnect, Hello }
-import khipu.network.rlpx.PeerConfiguration
 import khipu.storage.AppStateStorage
 import scala.concurrent.duration._
 

@@ -16,11 +16,11 @@ import khipu.ledger.Ledger.BlockExecutionError
 import khipu.ledger.Ledger.BlockResult
 import khipu.ledger.Ledger.MissingNodeExecptionError
 import khipu.ledger.Ledger.ValidationBeforeExecError
+import khipu.network.Peer
+import khipu.network.PeerEntity
 import khipu.network.handshake.EtcHandshake.PeerInfo
 import khipu.network.p2p.messages.CommonMessages.NewBlock
 import khipu.network.p2p.messages.PV62
-import khipu.network.rlpx.Peer
-import khipu.network.rlpx.PeerEntity
 import khipu.transactions.PendingTransactionsService
 import khipu.ommers.OmmersPool
 import scala.annotation.tailrec

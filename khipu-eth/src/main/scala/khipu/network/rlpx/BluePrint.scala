@@ -8,7 +8,9 @@ import akka.stream.scaladsl.GraphDSL
 import akka.stream.scaladsl.MergePreferred
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import khipu.network
+import khipu.network.Control
+import khipu.network.Peer
+import khipu.network.Tick
 import khipu.network.handshake.EtcHandshake
 import khipu.network.p2p.Message
 import khipu.network.p2p.MessageDecoder
@@ -35,12 +37,12 @@ object BluePrint {
     Flow.fromGraph(GraphDSL.create() { implicit builder =>
       import GraphDSL.Implicits._
 
-      val control = builder.add(Source.tick(0.seconds, 1.millis, Left(network.Tick)).buffer(1, OverflowStrategy.dropNew))
+      val control = builder.add(Source.tick(0.seconds, 1.millis, Left(Tick)).buffer(1, OverflowStrategy.dropNew))
       val incoming = builder.add(Flow[ByteString])
       val wireStage = builder.add(new WireStage())
       val rlpxFlow = builder.add(Flow.fromGraph(new RLPxStage(peer, messageDecoder, protocolVersion, authHandshake, handshake)))
 
-      val merge = builder.add(MergePreferred[Either[network.Control, ByteString]](1))
+      val merge = builder.add(MergePreferred[Either[Control, ByteString]](1))
 
       incoming ~> wireStage ~> merge.preferred
       control ~> merge.in(0)

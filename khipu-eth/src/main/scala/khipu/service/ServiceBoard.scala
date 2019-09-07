@@ -23,10 +23,10 @@ import khipu.crypto
 import khipu.domain.Blockchain
 import khipu.ledger.Ledger
 import khipu.network.ForkResolver
+import khipu.network.KnownNodesService.KnownNodesServiceConfig
+import khipu.network.PeerManager
 import khipu.network.p2p.MessageDecoder
 import khipu.network.p2p.messages.Versions
-import khipu.network.rlpx.KnownNodesService.KnownNodesServiceConfig
-import khipu.network.rlpx.PeerManager
 import khipu.network.rlpx.discovery.DiscoveryConfig
 import khipu.storage.Storages
 import khipu.storage.datasource.KesqueLmdbDataSources

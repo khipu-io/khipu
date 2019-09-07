@@ -7,7 +7,9 @@ import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.stream.scaladsl.Tcp
 import java.net.InetSocketAddress
-import khipu.network
+import khipu.network.IncomingPeer
+import khipu.network.OutgoingPeer
+import khipu.network.Peer
 import khipu.network.handshake.EtcHandshake
 import khipu.network.p2p.Message
 import khipu.network.p2p.MessageDecoder

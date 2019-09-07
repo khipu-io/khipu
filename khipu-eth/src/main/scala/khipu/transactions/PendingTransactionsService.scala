@@ -15,8 +15,8 @@ import khipu.ProcessedTransactions
 import khipu.blockchain.sync
 import khipu.config.TxPoolConfig
 import khipu.domain.SignedTransaction
+import khipu.network.PeerEntity
 import khipu.network.p2p.messages.CommonMessages.SignedTransactions
-import khipu.network.rlpx.PeerEntity
 import scala.concurrent.duration._
 
 object PendingTransactionsService {

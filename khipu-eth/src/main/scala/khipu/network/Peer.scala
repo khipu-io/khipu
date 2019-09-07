@@ -1,4 +1,4 @@
-package khipu.network.rlpx
+package khipu.network
 
 import akka.actor.ActorRef
 import java.net.InetSocketAddress
