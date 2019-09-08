@@ -6,10 +6,10 @@ It is built on earlier work on Mantis by [Grothendieck Team](https://iohk.io/pro
 The major researches of Khipu so far:
 
   - Try to execute transactions in a block as in parallel as possible. Average 80% transactions in one block could be executed in parallel currently
-  - LMDB based storage engine carefully designed for blockchain with high performance both on random/sequential reading and writing
+  - Kafka based storage engine carefully designed for blockchain with high performance both on random/sequential reading and writing
   - The fastest Ethereum implemention
 
-### Status - Beta Release 0.2.0
+### Status - Beta Release 0.3.0
 
 This version of the code supports
 
@@ -46,8 +46,8 @@ Running from command line:
 
 
 ```
-unzip khipu-eth-0.2.0.zip
-cd khipu-eth-0.2.0/bin
+unzip khipu-eth-0.3.0.zip
+cd khipu-eth-0.3.0/bin
 ./khipu-eth
 ```
 or
@@ -60,10 +60,10 @@ Khipu data directory is $HOME/.khipu.eth
 
 ```
 $ ls .khipu.eth
-keystore lmdb nodeId.keys
+kesque.logs  keystore  nodeId.keys  rocksdb
 ```
 
-Remove lmdb will level a installation with empty blockchain data, but the keystore and nodeId.keys will be kept.
+Remove kesque.logs and rocksdb will level a installation with empty blockchain data, but the keystore and nodeId.keys will be kept.
 
 
 #### Prerequisites to build
