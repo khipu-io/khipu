@@ -90,7 +90,8 @@ class PeerEntity(peer: Peer) extends Actor with Timers with ActorLogging {
   /**
    * stores information which tx hashes are "known" by which peers Seq[peerId]
    */
-  private val knownTransactions = mutable.HashSet[Hash]()
+  private val MAX_KNOWN_TRANSACTIONS = 20000
+  private var knownTransactions = mutable.LinkedHashMap[Hash, Long]()
 
   val mediator = DistributedPubSub(context.system).mediator
   mediator ! Subscribe(sync.TxTopic, self)
@@ -120,22 +121,23 @@ class PeerEntity(peer: Peer) extends Actor with Timers with ActorLogging {
     case BroadcastNewBlocks(newBlocks) => // from khipu.NewBlockTopic
       for {
         pi <- peerInfo
-        newBlock <- newBlocks if (shouldSendNewBlock(newBlock, pi))
+        newBlock <- newBlocks if shouldSendNewBlock(newBlock, pi)
       } {
         self ! PeerEntity.MessageToPeer(peer.id, newBlock)
       }
 
     case BroadcastTransactions(transactions) => // from khipu.TxTopic
-      val transactionsNonKnown = transactions.filterNot(isTxKnown)
+      val transactionsNonKnown = transactions.filterNot(x => knownTransactions.contains(x.hash))
       if (transactionsNonKnown.nonEmpty) {
-        // TODO broadcast it only after fast-sync done? otherwise seems will cause 
-        // too busy to request/respond
+        // During fast-sync, the knownTransactions may always not be processed and thus won't be removed
+        // TODO broadcast it only after fast-sync done? otherwise seems will cause too busy to request/respond
+
         //self ! PeerEntity.MessageToPeer(peerId, SignedTransactions(transactionsNonKnown))
         setTxKnown(transactionsNonKnown)
       }
 
     case ProcessedTransactions(transactions) => // from khipu.TxTopic
-      knownTransactions.filterNot(transactions.map(_.hash).contains)
+      knownTransactions --= transactions.map(_.hash)
 
     case PeerHandshaked(peer, peerInfo) =>
       this.peerInfo = Some(peerInfo)
@@ -247,9 +249,13 @@ class PeerEntity(peer: Peer) extends Actor with Timers with ActorLogging {
   private def isTxKnown(transactions: SignedTransaction): Boolean =
     knownTransactions.contains(transactions.hash)
 
-  // !!!!! TODO - how to avoid memory leak when some entries in knownTransactions are never removed
   private def setTxKnown(transactions: Seq[SignedTransaction]) {
-    knownTransactions ++= transactions.map(_.hash)
+    knownTransactions ++= transactions.map(_.hash -> System.currentTimeMillis)
+    // limit max size to avoid memory leak when some entries in knownTransactions are never removed
+    val exceedLimit = knownTransactions.size - MAX_KNOWN_TRANSACTIONS
+    if (exceedLimit > 0) {
+      knownTransactions = knownTransactions.drop(exceedLimit)
+    }
   }
 
 }

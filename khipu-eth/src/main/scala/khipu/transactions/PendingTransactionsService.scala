@@ -97,28 +97,26 @@ final class PendingTransactionsService(txPoolConfig: TxPoolConfig) extends Actor
       addTransactions(signedTransactions.toList)
   }
 
-  def addTransactions(signedTransactions: List[SignedTransaction]) {
+  private def addTransactions(signedTransactions: List[SignedTransaction]) {
     val transactionsToAdd = signedTransactions.filterNot(stx => pendingTransactions.contains(stx.hash))
     if (transactionsToAdd.nonEmpty) {
-      val timestamp = System.currentTimeMillis
-      pendingTransactions = (transactionsToAdd.map(PendingTransaction(_, timestamp)) ::: pendingTransactions).take(txPoolConfig.txPoolSize)
+      pendingTransactions = (transactionsToAdd.map(PendingTransaction(_, System.currentTimeMillis)) ::: pendingTransactions).take(txPoolConfig.txPoolSize)
 
       broadcastNewTransactions(transactionsToAdd)
     }
   }
 
-  def addOrOverrideTransaction(newTx: SignedTransaction) {
+  private def addOrOverrideTransaction(newTx: SignedTransaction) {
     val txsWithoutObsoletes = pendingTransactions.filterNot { ptx =>
       ptx.stx.sender == newTx.sender && ptx.stx.tx.nonce == newTx.tx.nonce
     }
 
-    val timestamp = System.currentTimeMillis()
-    pendingTransactions = (PendingTransaction(newTx, timestamp) :: txsWithoutObsoletes).take(txPoolConfig.txPoolSize)
+    pendingTransactions = (PendingTransaction(newTx, System.currentTimeMillis) :: txsWithoutObsoletes).take(txPoolConfig.txPoolSize)
 
     broadcastNewTransactions(List(newTx))
   }
 
-  def broadcastNewTransactions(signedTransactions: Seq[SignedTransaction]) = {
+  private def broadcastNewTransactions(signedTransactions: Seq[SignedTransaction]) = {
     val ptxHashs = pendingTransactions.map(_.stx.hash).toSet
     val txsToNotify = signedTransactions.filter(tx => ptxHashs.contains(tx.hash)) // signed transactions that are still pending
     if (txsToNotify.nonEmpty) {
