@@ -182,12 +182,14 @@ trait RegularSyncService { _: SyncService =>
     }
   }
 
+  private var isUnderReorg = false
   private def doProcessBlockHeaders(peer: Peer, headers: List[BlockHeader]) {
     if (checkHeaders(headers)) {
       val firstHeader = headers.head
       blockchain.getBlockHeaderByNumber(firstHeader.number - 1) match {
         case Some(parent) =>
           if (parent.hash == firstHeader.parentHash) {
+            isUnderReorg = false
             // we have same chain prefix
             val oldBranch = getPrevBlocks(headers)
             val oldBranchTotalDifficulty = oldBranch.map(_.header.difficulty).foldLeft(DataWord.Zero)(_ + _)
@@ -228,24 +230,32 @@ trait RegularSyncService { _: SyncService =>
           } else {
             log.info(s"[sync] Received branch block ${headers.head.number} from ${peer.id}, resolving fork ...")
 
-            blockchain.clearUnconfirmed()
+            if (isUnderReorg) {
+              blockPeerAndResumeWithAnotherOne(peer, s"Got reorg error in block headers response for requested: ${firstHeader.parentHash}")
+            } else {
+              isUnderReorg = true
+              blockchain.clearUnconfirmed()
+              blockchain.getBlockHeaderByNumber(blockchain.storages.bestHeaderNumber) match {
+                case Some(bestHeader) =>
+                  requestingHeaders(peer, None, Right(bestHeader.hash), blockResolveDepth, skip = 0, reverse = false)(syncRequestTimeout) andThen {
+                    case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
+                      self ! ResetBlacklistCount(peer.id)
+                      self ! ProcessBlockHeaders(peer, headers)
 
-            requestingHeaders(peer, None, Right(firstHeader.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) andThen {
-              case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
-                self ! ResetBlacklistCount(peer.id)
-                self ! ProcessBlockHeaders(peer, headers)
+                    case Success(Some(BlockHeadersResponse(peerId, List(), false))) =>
+                      blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: ${firstHeader.parentHash}")
 
-              case Success(Some(BlockHeadersResponse(peerId, List(), false))) =>
-                blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: ${firstHeader.parentHash}")
+                    case Success(None) =>
+                      scheduleResume()
 
-              case Success(None) =>
-                scheduleResume()
+                    case Failure(e: AskTimeoutException) =>
+                      blockPeerAndResumeWithAnotherOne(peer, s"timeout, ${e.getMessage}")
 
-              case Failure(e: AskTimeoutException) =>
-                blockPeerAndResumeWithAnotherOne(peer, s"timeout, ${e.getMessage}")
-
-              case Failure(e) =>
-                blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
+                    case Failure(e) =>
+                      blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
+                  }
+                case None => scheduleResume()
+              }
             }
           }
 
