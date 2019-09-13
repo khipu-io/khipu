@@ -96,7 +96,7 @@ object Build extends sbt.Build {
     fork in run := true,
     fork in Test := true,
     parallelExecution in Test := false,
-    scalaVersion := "2.12.8",
+    scalaVersion := "2.12.10",
     scalacOptions ++= Seq("-unchecked", "-deprecation")
   //javacOptions ++= Seq("-source", "1.8", "-target", "1.8")  // TODO options cause javadoc fail
   ) ++ Environment.settings ++ Formatting.settings
