@@ -15,7 +15,7 @@ final class ArchiveNodeStorage(source: SimpleMap[Hash, Array[Byte]]) extends Sim
 
   override def get(key: Hash): Option[Array[Byte]] = source.get(key)
 
-  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): ArchiveNodeStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): This = {
     source.update(Nil, toUpsert)
     this
   }

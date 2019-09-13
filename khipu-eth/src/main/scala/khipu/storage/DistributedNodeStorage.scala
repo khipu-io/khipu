@@ -38,7 +38,7 @@ final class DistributedNodeStorage(source: NodeStorage)(implicit system: ActorSy
   }
 
   // TODO return Future
-  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): DistributedNodeStorage = {
+  override def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): This = {
     // TODO pruning mode to delete from source
     source.update(Nil, toUpsert)
 

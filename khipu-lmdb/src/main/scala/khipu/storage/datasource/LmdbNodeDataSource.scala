@@ -6,7 +6,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import khipu.Hash
 import khipu.crypto
-import khipu.util.Clock
 import khipu.util.DirectByteBufferPool
 import khipu.util.FIFOCache
 import org.lmdbjava.Cursor
@@ -53,8 +52,6 @@ final class LmdbNodeDataSource(
     DbiFlags.MDB_DUPSORT,
     DbiFlags.MDB_DUPFIXED
   )
-
-  val clock = new Clock()
 
   private var nextId: Long = count
 
@@ -146,7 +143,7 @@ final class LmdbNodeDataSource(
     }
   }
 
-  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): LmdbNodeDataSource = {
+  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): This = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
 
     var byteBufs: List[ByteBuffer] = Nil

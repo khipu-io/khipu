@@ -2,18 +2,16 @@ package khipu.storage
 
 import java.nio.ByteBuffer
 import khipu.storage.datasource.KeyValueDataSource
+import khipu.util.BytesUtil
 import khipu.util.CircularArrayQueue
 
 object AppStateStorage {
-  final case class Key(name: String) { val bytes = name.getBytes }
-
-  object Keys {
-    val BestBlockNumber = Key("BestBlockNumber")
-    val FastSyncDone = Key("FastSyncDone")
-    val EstimatedHighestBlock = Key("EstimatedHighestBlock")
-    val SyncStartingBlock = Key("SyncStartingBlock")
-    val LastPrunedBlock = Key("LastPrunedBlock")
-  }
+  private val namespace = Namespaces.AppState
+  val BestBlockNumber = BytesUtil.concat(namespace, "BestBlockNumber".getBytes)
+  val FastSyncDone = BytesUtil.concat(namespace, "FastSyncDone".getBytes)
+  val EstimatedHighestBlock = BytesUtil.concat(namespace, "EstimatedHighestBlock".getBytes)
+  val SyncStartingBlock = BytesUtil.concat(namespace, "SyncStartingBlock".getBytes)
+  val LastPrunedBlock = BytesUtil.concat(namespace, "LastPrunedBlock".getBytes)
 }
 /**
  * This class is used to store app state variables
@@ -21,7 +19,7 @@ object AppStateStorage {
  *   Value: stored string value
  */
 import AppStateStorage._
-final class AppStateStorage(val source: KeyValueDataSource, unconfirmedDepth: Int) extends KeyValueStorage[Key, Long] {
+final class AppStateStorage(val source: KeyValueDataSource, unconfirmedDepth: Int) extends KeyValueStorage[Array[Byte], Long] {
   type This = AppStateStorage
 
   def topic = source.topic
@@ -35,7 +33,7 @@ final class AppStateStorage(val source: KeyValueDataSource, unconfirmedDepth: In
     _withUnconfirmed = true
   }
 
-  def getBestBlockNumber: Long = (unconfirmed.lastOption orElse get(Keys.BestBlockNumber)).getOrElse(0)
+  def getBestBlockNumber: Long = (unconfirmed.lastOption orElse get(BestBlockNumber)).getOrElse(0)
 
   def putBestBlockNumber(bestBlockNumber: Long): AppStateStorage = {
     val toFlush = if (withUnconfirmed) {
@@ -48,7 +46,7 @@ final class AppStateStorage(val source: KeyValueDataSource, unconfirmedDepth: In
       unconfirmed.enqueue(bestBlockNumber)
     }
 
-    toFlush foreach { number => put(Keys.BestBlockNumber, number) }
+    toFlush foreach { number => put(BestBlockNumber, number) }
 
     this
   }
@@ -57,30 +55,29 @@ final class AppStateStorage(val source: KeyValueDataSource, unconfirmedDepth: In
     unconfirmed.clear()
   }
 
-  val namespace: Array[Byte] = Namespaces.AppState
-  def keyToBytes(k: Key): Array[Byte] = k.bytes
+  def keyToBytes(k: Array[Byte]): Array[Byte] = k
   def valueToBytes(v: Long): Array[Byte] = longToBytes(v)
   def valueFromBytes(bytes: Array[Byte]): Long = bytesToLong(bytes)
 
   private def longToBytes(v: Long) = ByteBuffer.allocate(8).putLong(v).array
   private def bytesToLong(v: Array[Byte]) = ByteBuffer.wrap(v).getLong
 
-  protected def apply(dataSource: KeyValueDataSource): AppStateStorage = new AppStateStorage(dataSource, unconfirmedDepth)
+  protected def apply(source: KeyValueDataSource): AppStateStorage = new AppStateStorage(source, unconfirmedDepth)
 
-  def isFastSyncDone(): Boolean = get(Keys.FastSyncDone).isDefined
+  def isFastSyncDone(): Boolean = get(FastSyncDone).isDefined
 
-  def fastSyncDone(): AppStateStorage = put(Keys.FastSyncDone, 1L)
+  def fastSyncDone(): AppStateStorage = put(FastSyncDone, 1L)
 
-  def getEstimatedHighestBlock(): Long = get(Keys.EstimatedHighestBlock).getOrElse(0)
+  def getEstimatedHighestBlock(): Long = get(EstimatedHighestBlock).getOrElse(0)
 
-  def putEstimatedHighestBlock(n: Long): AppStateStorage = put(Keys.EstimatedHighestBlock, n)
+  def putEstimatedHighestBlock(n: Long): AppStateStorage = put(EstimatedHighestBlock, n)
 
-  def getSyncStartingBlock(): Long = get(Keys.SyncStartingBlock).getOrElse(0)
+  def getSyncStartingBlock(): Long = get(SyncStartingBlock).getOrElse(0)
 
-  def putSyncStartingBlock(n: Long): AppStateStorage = put(Keys.SyncStartingBlock, n)
+  def putSyncStartingBlock(n: Long): AppStateStorage = put(SyncStartingBlock, n)
 
-  def putLastPrunedBlock(n: Long): AppStateStorage = put(Keys.LastPrunedBlock, n)
+  def putLastPrunedBlock(n: Long): AppStateStorage = put(LastPrunedBlock, n)
 
-  def getLastPrunedBlock(): Long = get(Keys.LastPrunedBlock).getOrElse(0)
+  def getLastPrunedBlock(): Long = get(LastPrunedBlock).getOrElse(0)
 }
 

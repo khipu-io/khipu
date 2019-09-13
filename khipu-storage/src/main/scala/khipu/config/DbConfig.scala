@@ -16,6 +16,8 @@ object DbConfig {
   val body = "body"
   val td = "td" // total difficulty
   val receipts = "receipts"
+  val tx = "tx" // transactions
+  val shared = "shared"
 
 }
 class DbConfig(dbConfig: Config) {

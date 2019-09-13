@@ -3,7 +3,7 @@ package khipu.storage.datasource
 import khipu.config.DbConfig
 import khipu.config.RocksdbConfig
 
-trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataSources with DataSources {
+trait KesqueRocksdbDataSources extends KesqueDataSources with RocksdbSharedDataSources with DataSources {
   lazy val rocksdbConfig = new RocksdbConfig(datadir, config.getConfig("db").getConfig("rocksdb"))
 
   // block size evalution: https://etherscan.io/chart/blocksize, https://ethereum.stackexchange.com/questions/1106/is-there-a-limit-for-transaction-size/1110#1110
@@ -18,12 +18,13 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataS
   lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, Right(rocksdbConfig), cacheSize = cacheCfg.cacheSize)
   lazy val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Right(rocksdbConfig), cacheSize = 10000)
 
-  lazy val blockNumberDataSource = new RocksdbKeyValueDataSource(DbConfig.blocknum, rocksdbConfig, cacheSize = 1000)
-
   lazy val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque, cacheSize = 1000)
   lazy val blockBodyDataSource = new KesqueBlockDataSource(DbConfig.body, kesque, cacheSize = 1000)
   lazy val receiptsDataSource = new KesqueBlockDataSource(DbConfig.receipts, kesque, cacheSize = 1000)
   lazy val totalDifficultyDataSource = new KesqueBlockDataSource(DbConfig.td, kesque, cacheSize = 1000)
+
+  lazy val blockNumberDataSource = new RocksdbKeyValueDataSource(DbConfig.blocknum, rocksdbConfig, cacheSize = 10000000)
+  lazy val transactionDataSource = new RocksdbKeyValueDataSource(DbConfig.tx, rocksdbConfig, cacheSize = 1000)
 
   //  private val futureTables = Future.sequence(List(
   //    Future(kesque.getTable(Array(DbConfig.account), 4096, CompressionType.NONE, cacheCfg.cacheSize)),
@@ -66,7 +67,7 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with SharedRocksdbDataS
     receiptsDataSource.stop()
     totalDifficultyDataSource.stop()
 
-    dataSource.stop()
+    sharedDataSource.stop()
 
     log.info("db synced")
   }

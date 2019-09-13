@@ -11,33 +11,34 @@ import khipu.blockchain.sync.ContractStorageMptNodeHash
 import khipu.blockchain.sync.EvmcodeHash
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.storage.datasource.KeyValueDataSource
+import khipu.util.BytesUtil
 
 object FastSyncStateStorage {
-  val namespace = Namespaces.FastSyncState
-  val T = Array[Byte]('T'.toByte)
-  val H = Array[Byte]('H'.toByte)
-  val B = Array[Byte]('B'.toByte)
-  val R = Array[Byte]('R'.toByte)
-  val N = Array[Byte]('N'.toByte)
+  private val namespace = Namespaces.FastSyncState
+  val T = BytesUtil.concat(namespace, Array[Byte]('T'.toByte))
+  val H = BytesUtil.concat(namespace, Array[Byte]('H'.toByte))
+  val B = BytesUtil.concat(namespace, Array[Byte]('B'.toByte))
+  val R = BytesUtil.concat(namespace, Array[Byte]('R'.toByte))
+  val N = BytesUtil.concat(namespace, Array[Byte]('N'.toByte))
 }
 final class FastSyncStateStorage(val source: KeyValueDataSource) {
   import FastSyncStateStorage._
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
   def putTargetBlockHeader(syncState: SyncState) {
-    source.update(namespace, Nil, List(T -> syncState.targetBlockHeader.toBytes))
+    source.update(Nil, List(T -> syncState.targetBlockHeader.toBytes))
   }
 
   def putBestHeaderNumber(syncState: SyncState) {
-    source.update(namespace, Nil, List(H -> longToBytes(syncState.bestHeaderNumber)))
+    source.update(Nil, List(H -> longToBytes(syncState.bestHeaderNumber)))
   }
 
   def putBestBodyNumber(syncState: SyncState) {
-    source.update(namespace, Nil, List(B -> longToBytes(syncState.bestBodyNumber)))
+    source.update(Nil, List(B -> longToBytes(syncState.bestBodyNumber)))
   }
 
   def putBestReceiptsNumber(syncState: SyncState) {
-    source.update(namespace, Nil, List(R -> longToBytes(syncState.bestReceiptsNumber)))
+    source.update(Nil, List(R -> longToBytes(syncState.bestReceiptsNumber)))
   }
 
   def putNodesData(syncState: SyncState) {
@@ -61,7 +62,7 @@ final class FastSyncStateStorage(val source: KeyValueDataSource) {
       builder.putBytes(x.bytes)
     }
 
-    source.update(namespace, Nil, List(N -> builder.result.toArray))
+    source.update(Nil, List(N -> builder.result.toArray))
   }
 
   private def longToBytes(long: Long): Array[Byte] = ByteBuffer.allocate(java.lang.Long.BYTES).putLong(long).array
@@ -81,13 +82,13 @@ final class FastSyncStateStorage(val source: KeyValueDataSource) {
   }
 
   def getSyncState(): Option[SyncState] = {
-    source.get(namespace, T).map(_.toBlockHeader).map { targetBlockHeader =>
+    source.get(T).map(_.toBlockHeader).map { targetBlockHeader =>
 
-      val bestHeaderNumber = source.get(namespace, H).map(bytesToLong).getOrElse(0L)
-      val bestBodyNumber = source.get(namespace, B).map(bytesToLong).getOrElse(0L)
-      val bestReceiptsNumber = source.get(namespace, R).map(bytesToLong).getOrElse(0L)
+      val bestHeaderNumber = source.get(H).map(bytesToLong).getOrElse(0L)
+      val bestBodyNumber = source.get(B).map(bytesToLong).getOrElse(0L)
+      val bestReceiptsNumber = source.get(R).map(bytesToLong).getOrElse(0L)
 
-      val (downloadedNodesCount, mptNodes, nonMptNodes) = source.get(namespace, N) match {
+      val (downloadedNodesCount, mptNodes, nonMptNodes) = source.get(N) match {
         case Some(bytes) if bytes.length != 0 =>
           val data = ByteString(bytes).iterator
           val downloadedNodesCount = data.getLong
@@ -137,7 +138,7 @@ final class FastSyncStateStorage(val source: KeyValueDataSource) {
   }
 
   def purge() {
-    source.update(namespace, List(T, H, B, R, N), Nil)
+    source.update(List(T, H, B, R, N), Nil)
   }
 
 }

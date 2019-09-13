@@ -15,8 +15,6 @@ final class TransactionStorage(val source: KeyValueDataSource, unconfirmedDepth:
 
   implicit val byteOrder = ByteOrder.BIG_ENDIAN
 
-  private val namespace = Namespaces.Transaction
-
   def topic = source.topic
 
   private def keyToBytes(k: Hash): Array[Byte] = k.bytes
@@ -38,12 +36,12 @@ final class TransactionStorage(val source: KeyValueDataSource, unconfirmedDepth:
   }
 
   override protected def getFromSource(key: Hash): Option[TxLocation] =
-    source.get(namespace, keyToBytes(key)).map(valueFromBytes)
+    source.get(keyToBytes(key)).map(valueFromBytes)
 
   override protected def updateToSource(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, TxLocation)]): This = {
     val remove = toRemove.map(keyToBytes)
     val upsert = toUpsert.map { case (k, v) => keyToBytes(k) -> valueToBytes(v) }
-    source.update(namespace, remove, upsert)
+    source.update(remove, upsert)
     this
   }
 }

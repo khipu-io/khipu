@@ -1,7 +1,7 @@
 package khipu.storage.datasource
 
 trait DataSources {
-  val dataSource: KeyValueDataSource
+  val sharedDataSource: KeyValueDataSource
 
   val blockHeightsHashesDataSource: KeyValueDataSource
 

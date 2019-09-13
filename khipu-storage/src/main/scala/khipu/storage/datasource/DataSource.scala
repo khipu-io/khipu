@@ -4,9 +4,7 @@ import khipu.util.Clock
 import khipu.util.SimpleMap
 
 trait DataSource[K, V] extends SimpleMap[K, V] {
-  type This <: DataSource[K, V]
-
-  def clock: Clock
+  val clock = new Clock()
 
   def count: Long
 

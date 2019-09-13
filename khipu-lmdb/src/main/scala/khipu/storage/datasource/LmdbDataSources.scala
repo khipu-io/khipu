@@ -10,7 +10,7 @@ import khipu.config.LmdbConfig
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
 
-trait LmdbDataSources extends SharedLmdbDataSources with DataSources {
+trait LmdbDataSources extends LmdbSharedDataSources with DataSources {
   implicit protected val system: ActorSystem
 
   protected val config: Config
@@ -39,12 +39,13 @@ trait LmdbDataSources extends SharedLmdbDataSources with DataSources {
   lazy val storageNodeDataSource = new LmdbNodeDataSource(DbConfig.storage, lmdbEnv, cacheConf.cacheSize)
   lazy val evmcodeDataSource = new LmdbNodeDataSource(DbConfig.evmcode, lmdbEnv, cacheSize = 10000)
 
-  lazy val blockNumberDataSource = new LmdbKeyValueDataSource(DbConfig.blocknum, lmdbEnv, cacheSize = 1000)
-
   lazy val blockHeaderDataSource = new LmdbBlockDataSource(DbConfig.header, lmdbEnv, cacheSize = 1000)
   lazy val blockBodyDataSource = new LmdbBlockDataSource(DbConfig.body, lmdbEnv, cacheSize = 1000)
   lazy val receiptsDataSource = new LmdbBlockDataSource(DbConfig.receipts, lmdbEnv, cacheSize = 1000)
   lazy val totalDifficultyDataSource = new LmdbBlockDataSource(DbConfig.td, lmdbEnv, cacheSize = 1000)
+
+  lazy val blockNumberDataSource = new LmdbKeyValueDataSource(DbConfig.blocknum, lmdbEnv, cacheSize = 10000000)
+  lazy val transactionDataSource = new LmdbKeyValueDataSource(DbConfig.tx, lmdbEnv, cacheSize = 1000)
 
   def stop() {
     log.info("db syncing...")
@@ -58,3 +59,4 @@ trait LmdbDataSources extends SharedLmdbDataSources with DataSources {
     log.info("db synced")
   }
 }
+

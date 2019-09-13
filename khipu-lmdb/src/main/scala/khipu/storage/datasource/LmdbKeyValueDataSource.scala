@@ -16,6 +16,8 @@ final class LmdbKeyValueDataSource(
     env:       Env[ByteBuffer],
     cacheSize: Int
 )(implicit system: ActorSystem) extends KeyValueDataSource {
+  type This = LmdbKeyValueDataSource
+
   private val log = Logging(system, this.getClass)
 
   private val cache = new FIFOCache[Hash, Array[Byte]](cacheSize)
@@ -31,12 +33,10 @@ final class LmdbKeyValueDataSource(
    * @param key
    * @return the value associated with the passed key.
    */
-  override def get(namespace: Array[Byte], key: Array[Byte]): Option[Array[Byte]] = {
+  override def get(key: Array[Byte]): Option[Array[Byte]] = {
     val start = System.nanoTime
 
-    val combKey = BytesUtil.concat(namespace, key)
-
-    cache.get(Hash(combKey)) match {
+    cache.get(Hash(key)) match {
       case None =>
         // TODO fetch keyBuf from a pool?
 
@@ -45,8 +45,8 @@ final class LmdbKeyValueDataSource(
         try {
           rtx = env.txnRead()
 
-          val tableKey = ByteBuffer.allocateDirect(combKey.length)
-          tableKey.put(combKey).flip()
+          val tableKey = ByteBuffer.allocateDirect(key.length)
+          tableKey.put(key).flip()
           val data = table.get(rtx, tableKey)
           ret = if (data ne null) {
             val value = Array.ofDim[Byte](data.remaining)
@@ -67,7 +67,7 @@ final class LmdbKeyValueDataSource(
 
         clock.elapse(System.nanoTime - start)
 
-        ret foreach { data => cache.put(Hash(combKey), data) }
+        ret foreach { data => cache.put(Hash(key), data) }
         ret
 
       case x => x
@@ -83,40 +83,38 @@ final class LmdbKeyValueDataSource(
    *                  If a key is already in the DataSource its value will be updated.
    * @return the new DataSource after the removals and insertions were done.
    */
-  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): KeyValueDataSource = {
+  override def update(toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): This = {
     // TODO fetch keyBuf from a pool?
 
     var wtx: Txn[ByteBuffer] = null
     try {
       wtx = env.txnWrite()
 
-      val remove = toRemove map { key => BytesUtil.concat(namespace, key) }
-      remove foreach {
-        combKey =>
-          val tableKey = ByteBuffer.allocateDirect(combKey.length)
-          tableKey.put(combKey).flip()
+      toRemove foreach {
+        key =>
+          val tableKey = ByteBuffer.allocateDirect(key.length)
+          tableKey.put(key).flip()
           table.delete(wtx, tableKey)
       }
 
-      val upsert = toUpsert map { case (key, value) => (BytesUtil.concat(namespace, key) -> value) }
-      upsert foreach {
-        case (combKey, value) =>
-          val tableKey = ByteBuffer.allocateDirect(combKey.length)
+      toUpsert foreach {
+        case (key, value) =>
+          val tableKey = ByteBuffer.allocateDirect(key.length)
           val tableVal = ByteBuffer.allocateDirect(value.length)
 
-          tableKey.put(combKey).flip()
+          tableKey.put(key).flip()
           tableVal.put(value).flip()
           table.put(wtx, tableKey, tableVal)
       }
 
       wtx.commit()
 
-      remove foreach {
+      toRemove foreach {
         key => cache.remove(Hash(key))
       }
 
-      upsert foreach {
-        case (combKey, value) => cache.put(Hash(combKey), value)
+      toUpsert foreach {
+        case (key, value) => cache.put(Hash(key), value)
       }
     } catch {
       case ex: Throwable =>
@@ -142,33 +140,15 @@ final class LmdbKeyValueDataSource(
     ret
   }
 
-  /**
-   * This function updates the DataSource by deleting all the (key-value) pairs in it.
-   *
-   * @return the new DataSource after all the data was removed.
-   */
-  override def clear(): KeyValueDataSource = {
-    destroy()
-    this.table = createTable()
-    this
-  }
+  def cacheHitRate = cache.hitRate
+  def cacheReadCount = cache.readCount
+  def resetCacheHitRate() = cache.resetHitRate()
 
   /**
    * This function closes the DataSource, without deleting the files used by it.
    */
   override def stop() {
     // not necessary to close db, we'll call env.sync(true) to force sync 
-  }
-
-  /**
-   * This function closes the DataSource, if it is not yet closed, and deletes all the files used by it.
-   */
-  override def destroy() {
-    try {
-      table.close()
-    } finally {
-      //
-    }
   }
 
   private def ensureValueBufferSize(buf: ByteBuffer, size: Int): ByteBuffer = {
@@ -179,25 +159,32 @@ final class LmdbKeyValueDataSource(
     }
   }
 
-  def printTable(namespace: Array[Byte]) {
-    val txn = env.txnRead()
-    val itr = table.iterate(txn)
-    while (itr.hasNext) {
-      val entry = itr.next()
+  def printTable(namespace: Array[Byte], key: Option[Array[Byte]] = None) {
+    println(s"table '$topic' content of namespace '${new String(namespace)}'")
+    println("====================================")
+    try {
+      val txn = env.txnRead()
+      val itr = table.iterate(txn)
+      while (itr.hasNext) {
+        val entry = itr.next()
 
-      val key = new Array[Byte](entry.key.remaining)
-      entry.key.get(key)
-      val (ns, k) = BytesUtil.split(key, namespace.length)
-      if (java.util.Arrays.equals(ns, namespace)) {
-        val data = new Array[Byte](entry.`val`.remaining)
-        entry.`val`.get(data)
+        val key = new Array[Byte](entry.key.remaining)
+        entry.key.get(key)
+        val (ns, k) = BytesUtil.split(key, namespace.length)
+        if (java.util.Arrays.equals(ns, namespace)) {
+          val data = new Array[Byte](entry.`val`.remaining)
+          entry.`val`.get(data)
 
-        println(s"${new String(k)} -> ${data.mkString(",")}")
+          println(s"${new String(k)} -> ${data.mkString(",")}")
+        }
       }
+      itr.close()
+      txn.commit()
+      txn.close()
+    } catch {
+      case ex: Throwable => ex.printStackTrace()
     }
-    itr.close()
-    txn.commit()
-    txn.close()
+    println("====================================")
   }
 }
 

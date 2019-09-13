@@ -5,7 +5,6 @@ import akka.event.Logging
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import khipu.crypto
-import khipu.util.Clock
 import khipu.util.DirectByteBufferPool
 import khipu.util.FIFOCache
 import org.lmdbjava.DbiFlags
@@ -31,8 +30,6 @@ final class LmdbBlockDataSource(
     DbiFlags.MDB_CREATE,
     DbiFlags.MDB_INTEGERKEY
   )
-
-  val clock = new Clock()
 
   log.info(s"Table $topic best block number $bestBlockNumber")
 
@@ -84,7 +81,7 @@ final class LmdbBlockDataSource(
   /**
    * toUpsert should be append only by inreasing block number
    */
-  def update(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Array[Byte])]): LmdbBlockDataSource = {
+  def update(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Array[Byte])]): This = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
 

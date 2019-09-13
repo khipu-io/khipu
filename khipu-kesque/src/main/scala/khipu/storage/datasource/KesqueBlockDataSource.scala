@@ -5,7 +5,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
 import kesque.Kesque
-import khipu.util.Clock
 import khipu.util.FIFOCache
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.DefaultRecord
@@ -26,8 +25,6 @@ final class KesqueBlockDataSource(
   private val lock = new ReentrantReadWriteLock()
   private val readLock = lock.readLock
   private val writeLock = lock.writeLock
-
-  val clock = new Clock()
 
   info(s"Table $topic best block number $bestBlockNumber")
 
@@ -74,7 +71,7 @@ final class KesqueBlockDataSource(
     }
   }
 
-  def update(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Array[Byte])]): KesqueBlockDataSource = {
+  def update(toRemove: Iterable[Long], toUpsert: Iterable[(Long, Array[Byte])]): This = {
 
     // we'll keep the batch size not exceeding fetchMaxBytes to get better random read performance
     var batchedRecords = Vector[(Seq[(Long, Array[Byte])], Seq[SimpleRecord])]()

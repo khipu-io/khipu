@@ -4,19 +4,19 @@ import khipu.storage.datasource.KeyValueDataSource
 import khipu.util.SimpleMap
 
 object Namespaces {
-  val Node = Array[Byte]('n'.toByte)
-  val AppState = Array[Byte]('s'.toByte)
-  val KnownNodes = Array[Byte]('k'.toByte)
-  val Heights = Array[Byte]('i'.toByte)
-  val FastSyncState = Array[Byte]('h'.toByte)
-  val Transaction = Array[Byte]('l'.toByte)
+  val Node = Array('n'.toByte)
+  val AppState = Array('s'.toByte)
+  val KnownNodes = Array('k'.toByte)
+  val Heights = Array('i'.toByte)
+  val FastSyncState = Array('h'.toByte)
+  val Transaction = Array('l'.toByte)
 }
 
 trait KeyValueStorage[K, V] extends SimpleMap[K, V] {
   type This <: KeyValueStorage[K, V]
 
   val source: KeyValueDataSource
-  protected val namespace: Array[Byte]
+
   def keyToBytes(k: K): Array[Byte]
   def valueToBytes(k: V): Array[Byte]
   def valueFromBytes(bytes: Array[Byte]): V
@@ -30,7 +30,7 @@ trait KeyValueStorage[K, V] extends SimpleMap[K, V] {
    * @return the value associated with the passed key, if there exists one.
    */
   def get(key: K): Option[V] =
-    source.get(namespace, keyToBytes(key)).map(valueFromBytes)
+    source.get(keyToBytes(key)).map(valueFromBytes)
 
   /**
    * This function updates the KeyValueStorage by deleting, updating and inserting new (key-value) pairs
@@ -43,7 +43,6 @@ trait KeyValueStorage[K, V] extends SimpleMap[K, V] {
    */
   def update(toRemove: Iterable[K], toUpsert: Iterable[(K, V)]): This = {
     val newDataSource = source.update(
-      namespace = namespace,
       toRemove = toRemove.map(keyToBytes),
       toUpsert = toUpsert.map { case (k, v) => keyToBytes(k) -> valueToBytes(v) }
     )

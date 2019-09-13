@@ -16,7 +16,6 @@ import khipu.rlp
 import khipu.rlp.RLPImplicits._
 import khipu.rlp.RLPList
 import khipu.storage.ArchiveNodeStorage
-import khipu.storage.datasource.KeyValueDataSource
 import khipu.storage.datasource.EphemNodeDataSource
 import khipu.trie
 import khipu.trie.MerklePatriciaTrie
@@ -69,7 +68,6 @@ object GenesisDataLoader {
   }
 }
 class GenesisDataLoader(
-    dataSource:       KeyValueDataSource,
     blockchain:       Blockchain,
     blockchainConfig: BlockchainConfig
 )(implicit system: ActorSystem) {

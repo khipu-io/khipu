@@ -3,7 +3,7 @@ package khipu.storage.datasource
 import java.io.File
 import org.iq80.leveldb.{ DB, Options, WriteOptions }
 import khipu.config.LeveldbConfig
-import khipu.util.BytesUtil
+import khipu.util.FIFOCache
 import org.iq80.leveldb.impl.Iq80DBFactory
 
 object LeveldbKeyValueDataSource {
@@ -22,16 +22,20 @@ object LeveldbKeyValueDataSource {
   }
 
   def apply(levelDbConfig: LeveldbConfig): LeveldbKeyValueDataSource = {
-    new LeveldbKeyValueDataSource(createDB(levelDbConfig), levelDbConfig)
+    new LeveldbKeyValueDataSource(createDB(levelDbConfig), levelDbConfig, 1000)
   }
 }
 
 final class LeveldbKeyValueDataSource(
     private var db:            DB,
-    private val levelDbConfig: LeveldbConfig
+    private val levelDbConfig: LeveldbConfig,
+    cacheSize:                 Int
 ) extends KeyValueDataSource {
+  type This = LeveldbKeyValueDataSource
 
   def topic = levelDbConfig.path
+
+  private val cache = new FIFOCache[Array[Byte], Array[Byte]](cacheSize)
 
   /**
    * This function obtains the associated value to a key, if there exists one.
@@ -40,10 +44,9 @@ final class LeveldbKeyValueDataSource(
    * @param key
    * @return the value associated with the passed key.
    */
-  override def get(namespace: Array[Byte], key: Array[Byte]): Option[Array[Byte]] = {
-    val dbKey = BytesUtil.concat(namespace, key)
+  override def get(key: Array[Byte]): Option[Array[Byte]] = {
     val start = System.nanoTime
-    val value = db.get(dbKey)
+    val value = db.get(key)
     clock.elapse(System.nanoTime - start)
     Option(value)
   }
@@ -57,22 +60,11 @@ final class LeveldbKeyValueDataSource(
    *                  If a key is already in the DataSource its value will be updated.
    * @return the new DataSource after the removals and insertions were done.
    */
-  override def update(namespace: Array[Byte], toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): KeyValueDataSource = {
+  override def update(toRemove: Iterable[Array[Byte]], toUpsert: Iterable[(Array[Byte], Array[Byte])]): This = {
     val batch = db.createWriteBatch()
-    toRemove.foreach { key => batch.delete(BytesUtil.concat(namespace, key)) }
-    toUpsert.foreach { case (key, value) => batch.put(BytesUtil.concat(namespace, key), value) }
+    toRemove.foreach { key => batch.delete(key) }
+    toUpsert.foreach { case (key, value) => batch.put(key, value) }
     db.write(batch, new WriteOptions())
-    this
-  }
-
-  /**
-   * This function updates the DataSource by deleting all the (key-value) pairs in it.
-   *
-   * @return the new DataSource after all the data was removed.
-   */
-  override def clear: KeyValueDataSource = {
-    destroy()
-    this.db = LeveldbKeyValueDataSource.createDB(levelDbConfig)
     this
   }
 
@@ -83,18 +75,11 @@ final class LeveldbKeyValueDataSource(
     // TODO sync db
   }
 
-  /**
-   * This function closes the DataSource, if it is not yet closed, and deletes all the files used by it.
-   */
-  override def destroy() {
-    try {
-      db.close()
-    } finally {
-      Iq80DBFactory.factory.destroy(new File(levelDbConfig.path), null) // Options are not being used ¯\_(ツ)_/¯
-    }
-  }
-
   // TODO
   def count = -1
+
+  def cacheHitRate = cache.hitRate
+  def cacheReadCount = cache.readCount
+  def resetCacheHitRate() = cache.resetHitRate()
 }
 

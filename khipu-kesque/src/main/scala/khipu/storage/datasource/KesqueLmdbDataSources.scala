@@ -6,7 +6,7 @@ import khipu.config.LmdbConfig
 import org.lmdbjava.Env
 import org.lmdbjava.EnvFlags
 
-trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources with DataSources {
+trait KesqueLmdbDataSources extends KesqueDataSources with LmdbSharedDataSources with DataSources {
   private lazy val lmdbConfig = new LmdbConfig(datadir, config.getConfig("db").getConfig("lmdb"))
   private lazy val lmdbHome = {
     val h = new File(lmdbConfig.path)
@@ -33,12 +33,13 @@ trait KesqueLmdbDataSources extends KesqueDataSources with SharedLmdbDataSources
   lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, Left(lmdbEnv), cacheSize = cacheCfg.cacheSize)
   lazy val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Left(lmdbEnv), cacheSize = 10000)
 
-  lazy val blockNumberDataSource = new LmdbKeyValueDataSource(DbConfig.blocknum, lmdbEnv, cacheSize = 1000)
-
   lazy val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque, cacheSize = 1000)
   lazy val blockBodyDataSource = new KesqueBlockDataSource(DbConfig.body, kesque, cacheSize = 1000)
   lazy val receiptsDataSource = new KesqueBlockDataSource(DbConfig.receipts, kesque, cacheSize = 1000)
   lazy val totalDifficultyDataSource = new KesqueBlockDataSource(DbConfig.td, kesque, cacheSize = 1000)
+
+  lazy val blockNumberDataSource = new LmdbKeyValueDataSource(DbConfig.blocknum, lmdbEnv, cacheSize = 10000000)
+  lazy val transactionDataSource = new LmdbKeyValueDataSource(DbConfig.tx, lmdbEnv, cacheSize = 1000)
 
   //  private val futureTables = Future.sequence(List(
   //    Future(kesque.getTable(Array(DbConfig.account), 4096, CompressionType.NONE, cacheCfg.cacheSize)),

@@ -9,8 +9,6 @@ trait SharedLeveldbDataSources extends DataSources {
 
   val dataSource = LeveldbKeyValueDataSource(leveldbConfig)
 
-  val transactionDataSource = dataSource
-
   val fastSyncStateDataSource = dataSource
   val appStateDataSource = dataSource
 

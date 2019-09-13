@@ -11,7 +11,6 @@ import kesque.Kesque
 import kesque.KesqueIndexLmdb
 import kesque.KesqueIndexRocksdb
 import khipu.Hash
-import khipu.util.Clock
 import khipu.util.FIFOCache
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.DefaultRecord
@@ -38,8 +37,6 @@ final class KesqueNodeDataSource(
   private val lock = new ReentrantReadWriteLock()
   private val readLock = lock.readLock
   private val writeLock = lock.writeLock
-
-  val clock = new Clock()
 
   info(s"Table $topic nodes $count")
 
@@ -92,7 +89,7 @@ final class KesqueNodeDataSource(
     }
   }
 
-  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): KesqueNodeDataSource = {
+  def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, Array[Byte])]): This = {
     // we'll keep the batch size not exceeding fetchMaxBytes to get better random read performance
     var batchedRecords = Vector[(Seq[(Hash, Array[Byte])], Seq[SimpleRecord])]()
 
