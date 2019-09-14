@@ -1,5 +1,6 @@
 package khipu.storage
 
+import khipu.DataWord
 import khipu.domain.BlockHeader
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.storage.datasource.BlockDataSource
@@ -29,5 +30,8 @@ final class BlockHeaderStorage(val source: BlockDataSource, unconfirmedDepth: In
   }
 
   def bestBlockNumber = unconfirmed.lastOption.flatMap(_.lastOption.map(_._1)).getOrElse(source.bestBlockNumber)
-}
 
+  def totalDifficultyOfUncomfirmed = unconfirmed.foldLeft(DataWord.Zero) {
+    case (acc, header) => acc + header.lastOption.map(_._2.difficulty).fold(acc)(acc + _)
+  }
+}

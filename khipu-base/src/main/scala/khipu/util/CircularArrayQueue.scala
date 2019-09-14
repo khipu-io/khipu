@@ -10,33 +10,7 @@ object CircularArrayQueue {
   def main(args: Array[String]) {
     val queue = new CircularArrayQueue[String](10)
 
-    println("\n--- enqueue")
-    var i = 1
-    while (i <= 15) {
-      val v = i.toString
-      println
-      queue.enqueue(v)
-      printQueue
-      i += 1
-    }
-
-    println("\n--- dequeue")
-    while (queue.nonEmpty) {
-      println
-      println(queue.dequeue)
-      print(queue)
-      printQueue
-    }
-
-    println("\n--- clear")
-    queue.clear()
-    printQueue
-
-    println("\n--- enqueue")
-    queue.enqueue("abcd")
-    printQueue
-
-    def printQueue {
+    def printQueue() {
       print(queue)
       if (queue.nonEmpty) {
         println(": " + queue.head + " -> " + queue.last)
@@ -44,6 +18,46 @@ object CircularArrayQueue {
         println
       }
     }
+
+    println("\n--- enqueue")
+    var i = 1
+    while (i <= 15) {
+      val v = i.toString
+      println
+      queue.enqueue(v)
+      printQueue()
+      i += 1
+    }
+
+    println("\n--- foreach")
+    queue.foreach { x =>
+      print(x + ",")
+    }
+
+    println("\n--- foldLeft")
+    val sum = queue.foldLeft(0) {
+      case (acc, x) =>
+        println(acc)
+        acc + x.toInt
+    }
+    println(s"sum $sum")
+
+    println("\n--- dequeue")
+    while (queue.nonEmpty) {
+      println
+      println(queue.dequeue)
+      print(queue)
+      printQueue()
+    }
+
+    println("\n--- clear")
+    queue.clear()
+    printQueue()
+
+    println("\n--- enqueue")
+    queue.enqueue("abcd")
+    printQueue()
+
   }
 }
 class CircularArrayQueue[T: ClassTag](capacity: Int) {
@@ -144,7 +158,39 @@ class CircularArrayQueue[T: ClassTag](capacity: Int) {
     var i = 0
     var ptr = front
     while (i < count) {
-      ret(i) = (queue(ptr))
+      ret(i) = queue(ptr)
+      ptr += 1
+      if (ptr >= queue.length) {
+        ptr = queue.length - ptr
+      }
+      i += 1
+    }
+
+    ret
+  }
+
+  def foreach(f: (T) => Unit) {
+    var i = 0
+    var ptr = front
+    while (i < count) {
+      val elem = queue(ptr)
+      f(elem)
+      ptr += 1
+      if (ptr >= queue.length) {
+        ptr = queue.length - ptr
+      }
+      i += 1
+    }
+  }
+
+  def foldLeft[B](z: B)(op: (B, T) => B): B = {
+    var ret = z
+
+    var i = 0
+    var ptr = front
+    while (i < count) {
+      val elem = queue(ptr)
+      ret = op(ret, elem)
       ptr += 1
       if (ptr >= queue.length) {
         ptr = queue.length - ptr
