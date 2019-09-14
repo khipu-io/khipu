@@ -93,8 +93,8 @@ trait RegularSyncService { _: SyncService =>
     timers.startSingleTimer(ResumeRegularSyncTask, ResumeRegularSyncTick, checkForNewBlockInterval)
   }
 
-  private def blockPeerAndResumeWithAnotherOne(currPeer: Peer, reason: String) {
-    self ! BlacklistPeer(currPeer.id, reason)
+  private def blockPeerAndResumeWithAnotherOne(currPeer: Peer, reason: String, force: Boolean = false) {
+    self ! BlacklistPeer(currPeer.id, reason, force)
     self ! ResumeRegularSyncTick
   }
 
@@ -189,13 +189,18 @@ trait RegularSyncService { _: SyncService =>
       blockchain.getBlockHeaderByNumber(firstHeader.number - 1) match {
         case Some(parent) =>
           if (parent.hash == firstHeader.parentHash) {
-            isUnderReorg = false
             // we have same chain prefix
+            // TODO check if received headers override already confirmed blocks, if so, should prevent it. 
             val oldBranch = getPrevBlocks(headers)
             val oldBranchTotalDifficulty = oldBranch.map(_.header.difficulty).foldLeft(DataWord.Zero)(_ + _)
             val newBranchTotalDifficulty = headers.map(_.difficulty).foldLeft(DataWord.Zero)(_ + _)
 
             if (newBranchTotalDifficulty.compareTo(oldBranchTotalDifficulty) > 0) { // TODO what about == 0 ?
+              if (isUnderReorg) {
+                blockchain.clearUnconfirmed()
+              }
+              isUnderReorg = false
+
               val transactionsToAdd = oldBranch.flatMap(_.body.transactionList)
               pendingTransactionsService ! PendingTransactionsService.AddTransactions(transactionsToAdd.toList)
               val hashes = headers.take(blockBodiesPerRequest).map(_.hash)
@@ -222,6 +227,7 @@ trait RegularSyncService { _: SyncService =>
               }
 
             } else {
+              isUnderReorg = false
               // add first block from branch as ommer
               ommersPool ! OmmersPool.AddOmmers(List(firstHeader))
               scheduleResume()
@@ -231,30 +237,26 @@ trait RegularSyncService { _: SyncService =>
             log.info(s"[sync] Received branch block ${headers.head.number} from ${peer.id}, resolving fork ...")
 
             if (isUnderReorg) {
-              blockPeerAndResumeWithAnotherOne(peer, s"Got reorg error in block headers response for requested: ${firstHeader.parentHash}")
+              // the new branch with blockResolveDepth backward is still not match the first header's parent hash.
+              blockPeerAndResumeWithAnotherOne(peer, s"Got reorg error in block headers response for requested: ${firstHeader.parentHash}", force = true)
             } else {
               isUnderReorg = true
-              blockchain.clearUnconfirmed()
-              blockchain.getBlockHeaderByNumber(blockchain.storages.bestHeaderNumber) match {
-                case Some(bestHeader) =>
-                  requestingHeaders(peer, None, Right(bestHeader.hash), blockResolveDepth, skip = 0, reverse = false)(syncRequestTimeout) andThen {
-                    case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
-                      self ! ResetBlacklistCount(peer.id)
-                      self ! ProcessBlockHeaders(peer, headers)
+              requestingHeaders(peer, None, Right(firstHeader.parentHash), blockResolveDepth, skip = 0, reverse = true)(syncRequestTimeout) andThen {
+                case Success(Some(BlockHeadersResponse(peerId, headers, true))) =>
+                  self ! ResetBlacklistCount(peer.id)
+                  self ! ProcessBlockHeaders(peer, headers)
 
-                    case Success(Some(BlockHeadersResponse(peerId, List(), false))) =>
-                      blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: ${firstHeader.parentHash}")
+                case Success(Some(BlockHeadersResponse(peerId, List(), false))) =>
+                  blockPeerAndResumeWithAnotherOne(peer, s"Got error in block headers response for requested: ${firstHeader.parentHash}")
 
-                    case Success(None) =>
-                      scheduleResume()
+                case Success(None) =>
+                  scheduleResume()
 
-                    case Failure(e: AskTimeoutException) =>
-                      blockPeerAndResumeWithAnotherOne(peer, s"timeout, ${e.getMessage}")
+                case Failure(e: AskTimeoutException) =>
+                  blockPeerAndResumeWithAnotherOne(peer, s"timeout, ${e.getMessage}")
 
-                    case Failure(e) =>
-                      blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
-                  }
-                case None => scheduleResume()
+                case Failure(e) =>
+                  blockPeerAndResumeWithAnotherOne(peer, s"${e.getMessage}")
               }
             }
           }

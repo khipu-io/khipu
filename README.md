@@ -9,7 +9,7 @@ The major researches of Khipu so far:
   - Kafka based storage engine carefully designed for blockchain with high performance both on random/sequential reading and writing
   - The fastest Ethereum implemention
 
-### Status - Beta Release 0.3.0
+### Status - Beta Release 0.3.x
 
 This version of the code supports
 
@@ -46,8 +46,8 @@ Running from command line:
 
 
 ```
-unzip khipu-eth-0.3.0.zip
-cd khipu-eth-0.3.0/bin
+unzip khipu-eth-x.x.x.zip
+cd khipu-eth-x.x.x/bin
 ./khipu-eth
 ```
 or
