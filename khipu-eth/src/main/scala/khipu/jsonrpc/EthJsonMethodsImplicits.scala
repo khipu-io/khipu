@@ -103,7 +103,7 @@ object EthJsonMethodsImplicits extends JsonMethodsImplicits {
       case Some(JArray(hashRate :: JString(id) :: Nil)) =>
         val result: Either[JsonRpcError, SubmitHashRateRequest] = for {
           rate <- extractQuantity(hashRate)
-          miner <- extractHash(id)
+          miner <- extractBytes(id)
         } yield SubmitHashRateRequest(rate, miner)
         result
       case _ =>

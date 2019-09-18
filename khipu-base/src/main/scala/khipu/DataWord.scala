@@ -21,9 +21,9 @@ object DataWord {
   private val MAX_POW = TWO_FIVE_SIX
 
   // --- Beware mutable MODULUS/MAX_VALUE/MAX_SIGNED_VALUE, use them with copy
-  private val MODULUS = TWO.pow(SIZE_IN_BITS)
-  private val MAX_VALUE = TWO.pow(SIZE_IN_BITS) subtract BigInteger.ONE
-  private val MAX_SIGNED_VALUE = TWO.pow(SIZE_IN_BITS - 1) subtract BigInteger.ONE
+  val MODULUS = TWO.pow(SIZE_IN_BITS) // or ONE.shiftLeft(SIZE_IN_BITS)
+  val MAX_VALUE = TWO.pow(SIZE_IN_BITS) subtract BigInteger.ONE
+  val MAX_SIGNED_VALUE = TWO.pow(SIZE_IN_BITS - 1) subtract BigInteger.ONE
 
   // DataWord value should be put behind MODULUS (will be used in DataWord constructor) etc
 

@@ -229,4 +229,107 @@ object BytesUtil {
     System.arraycopy(bytes2, 0, concat, bytes1.length, bytes2.length)
     concat
   }
+
+  def intsToBytes(arr: Array[Int], bigEndian: Boolean): Array[Byte] = {
+    val ret = Array.ofDim[Byte](arr.length * 4)
+    intsToBytes(arr, ret, bigEndian)
+    ret
+  }
+
+  def bytesToInts(arr: Array[Byte], bigEndian: Boolean): Array[Int] = {
+    val ret = Array.ofDim[Int](arr.length / 4)
+    bytesToInts(arr, ret, bigEndian)
+    ret
+  }
+
+  def bytesToInts(b: Array[Byte], arr: Array[Int], bigEndian: Boolean) {
+    if (!bigEndian) {
+      var off = 0
+      var i = 0
+      while (i < arr.length) {
+        var ii = b(off) & 0x000000FF
+        off += 1
+        ii |= (b(off) << 8) & 0x0000FF00
+        off += 1
+        ii |= (b(off) << 16) & 0x00FF0000
+        off += 1
+        ii |= (b(off) << 24)
+        off += 1
+
+        arr(i) = ii
+        i += 1
+      }
+    } else {
+      var off = 0;
+      var i = 0
+      while (i < arr.length) {
+        var ii = b(off) << 24
+        off += 1
+        ii |= (b(off) << 16) & 0x00FF0000
+        off += 1
+        ii |= (b(off) << 8) & 0x0000FF00
+        off += 1
+        ii |= b(off) & 0x000000FF
+        off += 1
+
+        arr(i) = ii
+        i += 1
+      }
+    }
+  }
+
+  def intsToBytes(arr: Array[Int], b: Array[Byte], bigEndian: Boolean) {
+    if (!bigEndian) {
+      var off = 0;
+      var i = 0
+      while (i < arr.length) {
+        val ii = arr(i)
+
+        b(off) = (ii & 0xFF).toByte
+        off += 1
+        b(off) = ((ii >> 8) & 0xFF).toByte
+        off += 1
+        b(off) = ((ii >> 16) & 0xFF).toByte
+        off += 1
+        b(off) = ((ii >> 24) & 0xFF).toByte
+        off += 1
+
+        i += 1
+      }
+    } else {
+      var off = 0
+      var i = 0
+      while (i < arr.length) {
+        val ii = arr(i)
+
+        b(off) = ((ii >> 24) & 0xFF).toByte
+        off += 1
+        b(off) = ((ii >> 16) & 0xFF).toByte
+        off += 1
+        b(off) = ((ii >> 8) & 0xFF).toByte
+        off += 1
+        b(off) = (ii & 0xFF).toByte
+        off += 1
+
+        i += 1
+      }
+    }
+  }
+
+  def longToBytes(v: Long): Array[Byte] = {
+    ByteBuffer.allocate(java.lang.Long.BYTES).putLong(v).array
+  }
+
+  def merge(arrays: Array[Byte]*): Array[Byte] = {
+    val count = arrays.map(_.length).sum
+
+    // Create new array and copy all array contents
+    val mergedArray = Array.ofDim[Byte](count)
+    var start = 0
+    for (array <- arrays) {
+      System.arraycopy(array, 0, mergedArray, start, array.length)
+      start += array.length
+    }
+    mergedArray
+  }
 }

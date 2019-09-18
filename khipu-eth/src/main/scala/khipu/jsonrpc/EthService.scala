@@ -15,7 +15,6 @@ import khipu.DataWord
 import khipu.domain.Account
 import khipu.domain.Address
 import khipu.domain.Block
-import khipu.domain.BlockHeader
 import khipu.domain.Blockchain
 import khipu.domain.Receipt
 import khipu.domain.SignedTransaction
@@ -42,7 +41,6 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success, Try }
 
-// scalastyle:off number.of.methods number.of.types
 object EthService {
 
   val CurrentProtocolVersion = 63
@@ -71,7 +69,7 @@ object EthService {
   final case class UncleByBlockNumberAndIndexRequest(block: BlockParam, uncleIndex: Long)
   final case class UncleByBlockNumberAndIndexResponse(uncleBlockResponse: Option[BlockResponse])
 
-  final case class SubmitHashRateRequest(hashRate: DataWord, id: Hash)
+  final case class SubmitHashRateRequest(hashRate: DataWord, id: ByteString)
   final case class SubmitHashRateResponse(success: Boolean)
 
   final case class GetMiningRequest()
@@ -193,7 +191,7 @@ class EthService(
 
   def syncService = SyncService.proxy(system)
 
-  val hashRate: AtomicReference[Map[Hash, (DataWord, Date)]] = new AtomicReference[Map[Hash, (DataWord, Date)]](Map())
+  val hashRate: AtomicReference[Map[ByteString, (DataWord, Date)]] = new AtomicReference[Map[ByteString, (DataWord, Date)]](Map())
   val lastActive = new AtomicReference[Option[Date]](None)
 
   def pendingTransactionsService = PendingTransactionsService.proxy(system)
@@ -393,8 +391,8 @@ class EthService(
 
   def submitHashRate(req: SubmitHashRateRequest): ServiceResponse[SubmitHashRateResponse] = {
     reportActive()
-    hashRate.updateAndGet(new UnaryOperator[Map[Hash, (DataWord, Date)]] {
-      override def apply(t: Map[Hash, (DataWord, Date)]): Map[Hash, (DataWord, Date)] = {
+    hashRate.updateAndGet(new UnaryOperator[Map[ByteString, (DataWord, Date)]] {
+      override def apply(t: Map[ByteString, (DataWord, Date)]): Map[ByteString, (DataWord, Date)] = {
         val now = new Date
         removeObsoleteHashrates(now, t + (req.id -> (req.hashRate, now)))
       }
@@ -440,8 +438,8 @@ class EthService(
   }
 
   def getHashRate(req: GetHashRateRequest): ServiceResponse[GetHashRateResponse] = {
-    val hashRates: Map[Hash, (DataWord, Date)] = hashRate.updateAndGet(new UnaryOperator[Map[Hash, (DataWord, Date)]] {
-      override def apply(t: Map[Hash, (DataWord, Date)]): Map[Hash, (DataWord, Date)] = {
+    val hashRates: Map[ByteString, (DataWord, Date)] = hashRate.updateAndGet(new UnaryOperator[Map[ByteString, (DataWord, Date)]] {
+      override def apply(t: Map[ByteString, (DataWord, Date)]): Map[ByteString, (DataWord, Date)] = {
         removeObsoleteHashrates(new Date, t)
       }
     })
@@ -450,7 +448,7 @@ class EthService(
     Future.successful(Right(GetHashRateResponse(hashRates.mapValues { case (hr, _) => hr }.values.foldLeft(DataWord.Zero)(_ + _))))
   }
 
-  private def removeObsoleteHashrates(now: Date, rates: Map[Hash, (DataWord, Date)]): Map[Hash, (DataWord, Date)] = {
+  private def removeObsoleteHashrates(now: Date, rates: Map[ByteString, (DataWord, Date)]): Map[ByteString, (DataWord, Date)] = {
     rates.filter {
       case (_, (_, reported)) =>
         Duration.between(reported.toInstant, now.toInstant).toMillis < miningConfig.activeTimeout.toMillis
@@ -468,7 +466,7 @@ class EthService(
         blockGenerator.generateBlockForMining(blockNumber, pendingTxs.pendingTransactions.map(_.stx), ommers.headers, miningConfig.coinbase) match {
           case Right(pb) =>
             Right(GetWorkResponse(
-              powHeaderHash = Hash(crypto.kec256(BlockHeader.getEncodedWithoutNonce(pb.block.header))),
+              powHeaderHash = Hash(crypto.kec256(pb.block.header.getEncodedWithoutNonce)),
               dagSeed = seedForBlock(pb.block.header.number),
               target = ByteString((DataWord.Modulus / pb.block.header.difficulty).bigEndianMag)
             ))

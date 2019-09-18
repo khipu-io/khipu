@@ -16,18 +16,27 @@ import khipu.ServerStatus
 import khipu.blockchain.sync.HostService
 import khipu.config.BlockchainConfig
 import khipu.config.DbConfig
+import khipu.config.FilterConfig
 import khipu.config.KhipuConfig
 import khipu.config.MiningConfig
 import khipu.config.TxPoolConfig
+import khipu.consensus.pow.EthashAlgo
 import khipu.crypto
 import khipu.domain.Blockchain
+import khipu.jsonrpc.EthService
+import khipu.jsonrpc.FilterManager
+import khipu.jsonrpc.PersonalService
+import khipu.keystore.KeyStore
 import khipu.ledger.Ledger
+import khipu.mining.BlockGenerator
+import khipu.mining.Miner
 import khipu.network.ForkResolver
 import khipu.network.KnownNodesService.KnownNodesServiceConfig
 import khipu.network.PeerManager
 import khipu.network.p2p.MessageDecoder
 import khipu.network.p2p.messages.Versions
 import khipu.network.rlpx.discovery.DiscoveryConfig
+import khipu.ommers.OmmersPool
 import khipu.storage.Storages
 import khipu.storage.datasource.KesqueLmdbDataSources
 import khipu.storage.datasource.KesqueRocksdbDataSources
@@ -134,16 +143,18 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
   // There should be only one instance, instant it here or a standalone singleton service
   val blockchain: Blockchain = Blockchain(storages)
 
+  val miningConfig = MiningConfig(config)
+
+  val etashAlgo = EthashAlgo(miningConfig.ethashParams)
+
   val validators = new Validators {
     val blockValidator: BlockValidator = BlockValidator
-    val blockHeaderValidator: BlockHeaderValidator.I = new BlockHeaderValidator(blockchainConfig)
-    val ommersValidator: OmmersValidator.I = new OmmersValidator(blockchainConfig)
+    val blockHeaderValidator: BlockHeaderValidator.I = new BlockHeaderValidator(blockchainConfig, etashAlgo)
+    val ommersValidator: OmmersValidator.I = new OmmersValidator(blockchainConfig, blockHeaderValidator)
     val signedTransactionValidator = new SignedTransactionValidator(blockchainConfig)
   }
 
   val ledger: Ledger.I = new Ledger(blockchain, blockchainConfig)(system)
-
-  val miningConfig = MiningConfig(config)
 
   val txPoolConfig = TxPoolConfig(config)
 
@@ -163,6 +174,45 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
   val peerManage = system.actorOf(PeerManager.props(peerConfig), "peerManage")
 
   val hostService = new HostService(blockchain, peerConfig)
+
+  // TODO This should be cluster single instance only
+  val ommersPool = system.actorOf(OmmersPool.props(blockchain, miningConfig), "ommersPool")
+
+  lazy val keyStore: KeyStore.I = new KeyStore(KhipuConfig.keyStoreDir, secureRandom)
+
+  lazy val blockGenerator = new BlockGenerator(blockchain, blockchainConfig, miningConfig, ledger, validators)(system)
+
+  lazy val filterConfig = FilterConfig(KhipuConfig.config)
+  lazy val filterManager = system.actorOf(FilterManager.props(
+    blockchain,
+    blockGenerator,
+    storages.appStateStorage,
+    keyStore,
+    filterConfig,
+    txPoolConfig
+  ), "filter-manager")
+
+  lazy val ethService = new EthService(
+    blockchain,
+    blockGenerator,
+    storages.appStateStorage,
+    miningConfig,
+    ledger,
+    keyStore,
+    filterManager,
+    filterConfig,
+    blockchainConfig
+  )(system)
+
+  lazy val personalService = new PersonalService(
+    keyStore,
+    blockchain,
+    storages.appStateStorage,
+    blockchainConfig,
+    txPoolConfig
+  )(system)
+
+  lazy val miner = system.actorOf(Miner.props(blockchain, blockGenerator, miningConfig, Some(ethService)), "miner")
 
   log.info(s"serviceBoard is ready")
 

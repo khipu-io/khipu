@@ -1,9 +1,9 @@
 package khipu.validators
 
-import java.math.BigInteger
 import khipu.Hash
 import khipu.DataWord
 import khipu.config.BlockchainConfig
+import khipu.consensus.pow.EthashAlgo
 import khipu.crypto
 import khipu.domain.Block
 import khipu.domain.BlockHeader
@@ -13,16 +13,36 @@ import khipu.domain.DifficultyCalculator
 object BlockHeaderValidator {
   trait I {
     def validate(blockHeader: BlockHeader, blockchain: Blockchain, validatingBlocks: Map[Hash, Block]): Either[BlockHeaderError, BlockHeader]
+    def syncDone(): Unit
   }
-}
-
-final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends BlockHeaderValidator.I {
 
   val MaxExtraDataSize: Int = 32
   val GasLimitBoundDivisor: Int = 1024
   val MinGasLimit: Long = 5000L //Although the paper states this value is 125000, on the different clients 5000 is used
-  val difficulty = new DifficultyCalculator(blockchainConfig)
+  val MaxGasLimit = Long.MaxValue // max gasLimit is equal 2^63-1 according to EIP106
+  val MaxPowCaches: Int = 2 // maximum number of epochs for which PoW cache is stored in memory
+
+  final class PowCacheData(val cache: Array[Int], val dagSize: Long)
+
+  // FIXME [EC-331]: this is used to speed up ETS Blockchain tests. All blocks in those tests have low numbers (1, 2, 3 ...)
+  // so keeping the cache for epoch 0 avoids recalculating it for each individual test. The difference in test runtime
+  // can be dramatic - full suite: 26 hours vs 21 minutes on same machine
+  // It might be desirable to find a better solution for this - one that doesn't keep this cache unnecessarily
+  //  lazy val epoch0PowCache = new PowCacheData(
+  //    cache = Ethash.makeCache(0),
+  //    dagSize = Ethash.dagSize(0))
+}
+
+final class BlockHeaderValidator(blockchainConfig: BlockchainConfig, ethashAlgo: EthashAlgo) extends BlockHeaderValidator.I {
+  import BlockHeaderValidator._
   import BlockHeaderError._
+
+  val difficulty = new DifficultyCalculator(blockchainConfig)
+  val powValidator = new PoWValidator(ethashAlgo, blockchainConfig.powValidateMode)
+
+  def syncDone() {
+    powValidator.syncDone = true
+  }
 
   /**
    * This method allows validate a BlockHeader (stated on
@@ -31,11 +51,11 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param blockHeader BlockHeader to validate.
    * @param blockchain from where the header of the parent of the block will be fetched.
    */
-  def validate(blockHeader: BlockHeader, blockchain: Blockchain, validatingBlocks: Map[Hash, Block]): Either[BlockHeaderError, BlockHeader] = {
+  def validate(header: BlockHeader, blockchain: Blockchain, validatingBlocks: Map[Hash, Block]): Either[BlockHeaderError, BlockHeader] = {
     for {
-      blockHeaderParent <- getBlockParentHeader(blockHeader, blockchain, validatingBlocks)
-      _ <- validate(blockHeader, blockHeaderParent)
-    } yield blockHeader
+      blockHeaderParent <- getBlockParentHeader(header, blockchain, validatingBlocks)
+      _ <- validate(header, blockHeaderParent)
+    } yield header
   }
 
   /**
@@ -45,16 +65,16 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param blockHeader BlockHeader to validate.
    * @param parentHeader BlockHeader of the parent of the block to validate.
    */
-  private def validate(blockHeader: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
+  private def validate(header: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
     for {
-      _ <- validateExtraData(blockHeader)
-      _ <- validateTimestamp(blockHeader, parentHeader)
-      _ <- validateDifficulty(blockHeader, parentHeader)
-      _ <- validateGasUsed(blockHeader)
-      _ <- validateGasLimit(blockHeader, parentHeader)
-      _ <- validateNumber(blockHeader, parentHeader)
-      _ <- validatePoW(blockHeader)
-    } yield blockHeader
+      _ <- validateExtraData(header)
+      _ <- validateTimestamp(header, parentHeader)
+      _ <- validateDifficulty(header, parentHeader)
+      _ <- validateGasUsed(header)
+      _ <- validateGasLimit(header, parentHeader)
+      _ <- validateNumber(header, parentHeader)
+      _ <- validatePoW(header)
+    } yield header
   }
 
   /**
@@ -64,9 +84,9 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param blockHeader BlockHeader to validate.
    * @return BlockHeader if valid, an [[HeaderExtraDataError]] otherwise
    */
-  private def validateExtraData(blockHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] =
-    if (blockHeader.extraData.length <= MaxExtraDataSize) {
-      Right(blockHeader)
+  private def validateExtraData(header: BlockHeader): Either[BlockHeaderError, BlockHeader] =
+    if (header.extraData.length <= MaxExtraDataSize) {
+      Right(header)
     } else {
       Left(HeaderExtraDataError)
     }
@@ -79,9 +99,9 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param parentHeader BlockHeader of the parent of the block to validate.
    * @return BlockHeader if valid, an [[HeaderTimestampError]] otherwise
    */
-  private def validateTimestamp(blockHeader: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] =
-    if (blockHeader.unixTimestamp > parentHeader.unixTimestamp) {
-      Right(blockHeader)
+  private def validateTimestamp(header: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] =
+    if (header.unixTimestamp > parentHeader.unixTimestamp) {
+      Right(header)
     } else {
       Left(HeaderTimestampError)
     }
@@ -94,12 +114,12 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param parentHeader BlockHeader of the parent of the block to validate.
    * @return BlockHeader if valid, an [[HeaderDifficultyError]] otherwise
    */
-  private def validateDifficulty(blockHeader: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
-    val d = difficulty.calculateDifficulty(blockHeader, parentHeader)
-    if (d.compareTo(blockHeader.difficulty) == 0) {
-      Right(blockHeader)
+  private def validateDifficulty(header: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
+    val d = difficulty.calculateDifficulty(header, parentHeader)
+    if (d.compareTo(header.difficulty) == 0) {
+      Right(header)
     } else {
-      Left(HeaderDifficultyError(blockHeader.difficulty, d))
+      Left(HeaderDifficultyError(header.difficulty, d))
     }
   }
 
@@ -110,9 +130,9 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param blockHeader BlockHeader to validate.
    * @return BlockHeader if valid, an [[HeaderGasUsedError]] otherwise
    */
-  private def validateGasUsed(blockHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] =
-    if (blockHeader.gasUsed >= 0 && blockHeader.gasUsed <= blockHeader.gasLimit) {
-      Right(blockHeader)
+  private def validateGasUsed(header: BlockHeader): Either[BlockHeaderError, BlockHeader] =
+    if (header.gasUsed >= 0 && header.gasUsed <= header.gasLimit) {
+      Right(header)
     } else {
       Left(HeaderGasUsedError)
     }
@@ -125,11 +145,11 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param parentHeader BlockHeader of the parent of the block to validate.
    * @return BlockHeader if valid, an [[HeaderGasLimitError]] otherwise
    */
-  private def validateGasLimit(blockHeader: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
-    val gasLimitDiff = (blockHeader.gasLimit - parentHeader.gasLimit).abs
+  private def validateGasLimit(header: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
+    val gasLimitDiff = (header.gasLimit - parentHeader.gasLimit).abs
     val gasLimitDiffLimit = parentHeader.gasLimit / GasLimitBoundDivisor
-    if (gasLimitDiff < gasLimitDiffLimit && blockHeader.gasLimit >= MinGasLimit) {
-      Right(blockHeader)
+    if (gasLimitDiff < gasLimitDiffLimit && header.gasLimit >= MinGasLimit) {
+      Right(header)
     } else {
       Left(HeaderGasLimitError)
     }
@@ -143,9 +163,9 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param parentHeader BlockHeader of the parent of the block to validate.
    * @return BlockHeader if valid, an [[HeaderNumberError]] otherwise
    */
-  private def validateNumber(blockHeader: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] =
-    if (blockHeader.number == parentHeader.number + 1) {
-      Right(blockHeader)
+  private def validateNumber(header: BlockHeader, parentHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] =
+    if (header.number == parentHeader.number + 1) {
+      Right(header)
     } else {
       Left(HeaderNumberError)
     }
@@ -157,23 +177,8 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param blockHeader BlockHeader to validate.
    * @return BlockHeader if valid, an [[HeaderPoWError]] otherwise
    */
-  //FIXME: Simple PoW validation without using DAG [EC-88]
-  private def validatePoW(blockHeader: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
-    val powBoundary = DataWord.Modulus / blockHeader.difficulty
-    val powValue = DataWord(new BigInteger(1, calculatePoWValue(blockHeader).toArray))
-    if (powValue.compareTo(powBoundary) <= 0) {
-      Right(blockHeader)
-    } else {
-      Left(HeaderPoWError)
-    }
-  }
-
-  private def calculatePoWValue(blockHeader: BlockHeader): Array[Byte] = {
-    val nonceReverted = blockHeader.nonce.reverse
-    val hashBlockWithoutNonce = crypto.kec256(BlockHeader.getEncodedWithoutNonce(blockHeader))
-    val seedHash = crypto.kec512(hashBlockWithoutNonce ++ nonceReverted)
-
-    crypto.kec256(seedHash ++ blockHeader.mixHash.bytes)
+  private def validatePoW(header: BlockHeader): Either[BlockHeaderError, BlockHeader] = {
+    powValidator.validate(header)
   }
 
   /**
@@ -183,8 +188,8 @@ final class BlockHeaderValidator(blockchainConfig: BlockchainConfig) extends Blo
    * @param blockchain where the header of the parent of the block will be fetched.
    * @return the BlockHeader of the parent if it exists, an [[HeaderParentNotFoundError]] otherwise
    */
-  private def getBlockParentHeader(blockHeader: BlockHeader, blockchain: Blockchain, validatingBlocks: Map[Hash, Block]): Either[BlockHeaderError, BlockHeader] = {
-    validatingBlocks.get(blockHeader.parentHash).map(_.header).orElse(blockchain.getBlockHeaderByHash(blockHeader.parentHash)) match {
+  private def getBlockParentHeader(header: BlockHeader, blockchain: Blockchain, validatingBlocks: Map[Hash, Block]): Either[BlockHeaderError, BlockHeader] = {
+    validatingBlocks.get(header.parentHash).map(_.header).orElse(blockchain.getBlockHeaderByHash(header.parentHash)) match {
       case Some(blockParentHeader) => Right(blockParentHeader)
       case None                    => Left(HeaderParentNotFoundError)
     }
@@ -200,5 +205,5 @@ object BlockHeaderError {
   case object HeaderGasUsedError extends BlockHeaderError
   case object HeaderGasLimitError extends BlockHeaderError
   case object HeaderNumberError extends BlockHeaderError
-  case object HeaderPoWError extends BlockHeaderError
+  final case class HeaderPoWError(reason: String) extends BlockHeaderError
 }

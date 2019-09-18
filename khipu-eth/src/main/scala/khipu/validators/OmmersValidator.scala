@@ -22,9 +22,7 @@ object OmmersValidator {
     case object OmmersDuplicatedError extends OmmersError
   }
 }
-final class OmmersValidator(blockchainConfig: BlockchainConfig) extends OmmersValidator.I {
-
-  val blockHeaderValidator = new BlockHeaderValidator(blockchainConfig)
+final class OmmersValidator(blockchainConfig: BlockchainConfig, blockHeaderValidator: BlockHeaderValidator.I) extends OmmersValidator.I {
 
   val OmmerGenerationLimit: Int = 6 //Stated on section 11.1, eq. (143) of the YP
   val OmmerSizeLimit: Int = 2

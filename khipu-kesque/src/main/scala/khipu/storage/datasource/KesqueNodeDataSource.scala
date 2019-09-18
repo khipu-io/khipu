@@ -4,13 +4,13 @@ import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
-import khipu.TVal
-import khipu.config.RocksdbConfig
-import khipu.crypto
 import kesque.Kesque
 import kesque.KesqueIndexLmdb
 import kesque.KesqueIndexRocksdb
 import khipu.Hash
+import khipu.TVal
+import khipu.config.RocksdbConfig
+import khipu.crypto
 import khipu.util.FIFOCache
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.DefaultRecord

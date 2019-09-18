@@ -8,19 +8,13 @@ import akka.pattern.ask
 import java.net.URI
 import khipu.blockchain.data.GenesisDataLoader
 import khipu.blockchain.sync.SyncService
-import khipu.config.FilterConfig
 import khipu.config.KhipuConfig
 import khipu.entity.NodeEntity
-import khipu.jsonrpc.EthService
-import khipu.jsonrpc.FilterManager
 import khipu.jsonrpc.JsonRpcController
 import khipu.jsonrpc.NetService
 import khipu.jsonrpc.NetService.NetServiceConfig
-import khipu.jsonrpc.PersonalService
 import khipu.jsonrpc.Web3Service
 import khipu.jsonrpc.http.JsonRpcHttpServer
-import khipu.keystore.KeyStore
-import khipu.mining.BlockGenerator
 import khipu.network.KnownNodesService
 import khipu.network.OutgoingPeer
 import khipu.network.Peer
@@ -168,45 +162,13 @@ object Khipu {
     val jsonRpcHttpServerConfig = KhipuConfig.Network.Rpc
 
     if (jsonRpcHttpServerConfig.enabled) {
-
       val web3Service = new Web3Service()
 
       val netServiceConfig = NetServiceConfig(KhipuConfig.config)
       val netService = new NetService(serviceBoard.nodeStatus, netServiceConfig)
 
-      val blockGenerator = new BlockGenerator(serviceBoard.blockchain, serviceBoard.blockchainConfig, serviceBoard.miningConfig, serviceBoard.ledger, serviceBoard.validators)
-
-      val keyStore: KeyStore.I = new KeyStore(KhipuConfig.keyStoreDir, serviceBoard.secureRandom)
-
-      val filterConfig = FilterConfig(KhipuConfig.config)
-      val filterManager = system.actorOf(FilterManager.props(
-        serviceBoard.blockchain,
-        blockGenerator,
-        serviceBoard.storages.appStateStorage,
-        keyStore,
-        filterConfig,
-        serviceBoard.txPoolConfig
-      ), "filter-manager")
-
-      val ethService = new EthService(
-        serviceBoard.blockchain,
-        blockGenerator,
-        serviceBoard.storages.appStateStorage,
-        serviceBoard.miningConfig,
-        serviceBoard.ledger,
-        keyStore,
-        filterManager,
-        filterConfig,
-        serviceBoard.blockchainConfig
-      )
-
-      val personalService = new PersonalService(
-        keyStore,
-        serviceBoard.blockchain,
-        serviceBoard.storages.appStateStorage,
-        serviceBoard.blockchainConfig,
-        serviceBoard.txPoolConfig
-      )
+      val ethService = serviceBoard.ethService
+      val personalService = serviceBoard.personalService
 
       val jsonRpcController = new JsonRpcController(web3Service, netService, ethService, personalService, KhipuConfig.Network.Rpc)
       val jsonRpcHttpServer = new JsonRpcHttpServer(jsonRpcController, jsonRpcHttpServerConfig)

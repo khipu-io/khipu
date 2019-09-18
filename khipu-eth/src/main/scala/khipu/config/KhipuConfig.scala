@@ -5,12 +5,15 @@ import com.typesafe.config.{ ConfigFactory, Config }
 import java.math.BigInteger
 import java.net.InetSocketAddress
 import khipu.DataWord
+import khipu.consensus.pow.EthashParams
 import khipu.domain.Address
 import khipu.jsonrpc.JsonRpcController.JsonRpcConfig
 import khipu.jsonrpc.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
 import khipu.network.FastSyncHostConfiguration
 import khipu.network.PeerConfiguration
 import khipu.network.RLPxConfiguration
+import khipu.validators.BlockHeaderValidator
+import khipu.validators.PoWValidator
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -152,20 +155,32 @@ object MiningConfig {
     val miningConfig = etcClientConfig.getConfig("mining")
 
     new MiningConfig {
+      val miningEnabled = miningConfig.getBoolean("mining-enabled")
       val coinbase = Address(miningConfig.getString("coinbase"))
       val blockCacheSize = miningConfig.getInt("block-cashe-size")
       val ommersPoolSize = miningConfig.getInt("ommers-pool-size")
       val activeTimeout = miningConfig.getDuration("active-timeout").toMillis.millis
       val ommerPoolQueryTimeout = miningConfig.getDuration("ommer-pool-query-timeout").toMillis.millis
+      val headerExtraData = ByteString(miningConfig.getString("header-extra-data").getBytes).take(BlockHeaderValidator.MaxExtraDataSize)
+      val ethashDir = KhipuConfig.datadir + "/" + miningConfig.getString("ethash-dir")
+      val startNonce = miningConfig.getLong("start-nonce")
+      val mineRounds = miningConfig.getInt("mine-rounds")
+      val ethashParams = new EthashParams()
     }
   }
 }
 trait MiningConfig {
-  val ommersPoolSize: Int
-  val blockCacheSize: Int
+  val miningEnabled: Boolean
   val coinbase: Address
+  val blockCacheSize: Int
+  val ommersPoolSize: Int
   val activeTimeout: FiniteDuration
   val ommerPoolQueryTimeout: FiniteDuration
+  val headerExtraData: ByteString
+  val ethashDir: String
+  val startNonce: Long
+  val mineRounds: Int
+  val ethashParams: EthashParams
 }
 
 object BlockchainConfig {
@@ -209,6 +224,8 @@ object BlockchainConfig {
       val monetaryPolicyConfig = MonetaryPolicyConfig(blockchainConfig.getConfig("monetary-policy"))
 
       val isDebugTraceEnabled = blockchainConfig.getBoolean("debug-trace-enabled")
+
+      val powValidateMode: PoWValidator.Mode = PoWValidator.Mode.parse(blockchainConfig.getString("pow-validate-mode"), PoWValidator.Mixed)
     }
   }
 }
@@ -250,6 +267,8 @@ trait BlockchainConfig {
   def monetaryPolicyConfig: MonetaryPolicyConfig
 
   def isDebugTraceEnabled: Boolean
+
+  def powValidateMode: PoWValidator.Mode
 }
 
 object MonetaryPolicyConfig {

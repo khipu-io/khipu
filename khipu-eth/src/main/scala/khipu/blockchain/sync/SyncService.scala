@@ -84,7 +84,7 @@ final class SyncService() extends FastSyncService with RegularSyncService with H
   protected val validators = serviceBoard.validators
   protected val blockchain = serviceBoard.blockchain
   protected val peerConfig = serviceBoard.peerConfig
-  private val miningConfig = serviceBoard.miningConfig
+  protected val miningConfig = serviceBoard.miningConfig
 
   protected val storages = serviceBoard.storages
   protected val fastSyncStateStorage = storages.fastSyncStateStorage
@@ -98,9 +98,7 @@ final class SyncService() extends FastSyncService with RegularSyncService with H
 
   protected var isRequesting = false
 
-  // This should be cluster single instance only, instant it in SyncService
-  val ommersPool = context.actorOf(OmmersPool.props(blockchain, miningConfig), "ommersPool")
-
+  protected def ommersPool = serviceBoard.ommersPool
   protected def peerManager = serviceBoard.peerManage
   protected def pendingTransactionsService = PendingTransactionsService.proxy(context.system)
 

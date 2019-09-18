@@ -63,6 +63,7 @@ trait RegularSyncService { _: SyncService =>
     appStateStorage.fastSyncDone()
     setCurrBlockHeaderForChecking()
     blockchain.swithToWithUnconfirmed()
+    validators.blockHeaderValidator.syncDone()
     context become (handleRegularSync orElse peerUpdateBehavior orElse ommersBehavior orElse stopBehavior)
     resumeRegularSync()
   }
@@ -82,7 +83,8 @@ trait RegularSyncService { _: SyncService =>
       log.debug(s"Received ${message.getClass.getName} from $peerId")
 
     case SyncService.MinedBlock(block) =>
-      processMinedBlock(block)
+    //TODO
+    //processMinedBlock(block)
   }
 
   private def resumeRegularSync() {

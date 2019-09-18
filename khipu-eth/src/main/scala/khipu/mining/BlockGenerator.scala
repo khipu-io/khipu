@@ -131,9 +131,9 @@ final class BlockGenerator(
   def getPrepared(powHeaderHash: Hash): Option[PendingBlock] = {
     cache.getAndUpdate(new UnaryOperator[List[PendingBlock]] {
       override def apply(t: List[PendingBlock]): List[PendingBlock] =
-        t.filterNot(pb => Hash(crypto.kec256(BlockHeader.getEncodedWithoutNonce(pb.block.header))) == powHeaderHash)
+        t.filterNot(pb => Hash(crypto.kec256(pb.block.header.getEncodedWithoutNonce)) == powHeaderHash)
     }).find { pb =>
-      Hash(crypto.kec256(BlockHeader.getEncodedWithoutNonce(pb.block.header))) == powHeaderHash
+      Hash(crypto.kec256(pb.block.header.getEncodedWithoutNonce)) == powHeaderHash
     }
   }
 

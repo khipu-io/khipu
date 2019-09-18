@@ -8,18 +8,11 @@ import khipu.crypto
 import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
 import khipu.rlp
 import khipu.rlp.RLPList
+import org.spongycastle.util.BigIntegers
 
 object BlockHeader {
   // 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347
   private val EmptyOmmersHash = crypto.kec256(rlp.EmptyRLPList)
-
-  def getEncodedWithoutNonce(blockHeader: BlockHeader): Array[Byte] = {
-    val rlpEncoded = blockHeader.toRLPEncodable match {
-      case rlpList: RLPList => RLPList(rlpList.items.dropRight(2): _*)
-      case _                => throw new Exception("BlockHeader cannot be encoded without nonce and mixHash")
-    }
-    rlp.encode(rlpEncoded)
-  }
 }
 final case class BlockHeader(
     parentHash:       Hash, // The SHA3 256-bit hash of the parent block, in its entirety
@@ -48,6 +41,24 @@ final case class BlockHeader(
 
   def nonUncles = Arrays.equals(ommersHash.bytes, BlockHeader.EmptyOmmersHash)
   def hasUncles = !nonUncles
+
+  def getPowBoundary: Array[Byte] = BigIntegers.asUnsignedByteArray(32, DataWord.MODULUS.divide(difficulty.n))
+
+  def getEncodedWithoutNonce: Array[Byte] = {
+    val rlpEncoded = this.toRLPEncodable match {
+      case rlpList: RLPList => RLPList(rlpList.items.dropRight(2): _*)
+      case x                => throw new Exception(s"BlockHeader cannot be encoded: $x")
+    }
+    rlp.encode(rlpEncoded)
+  }
+
+  def calculatePoWValue: Array[Byte] = {
+    val nonceReverted = nonce.reverse
+    val hashBlockWithoutNonce = crypto.kec256(getEncodedWithoutNonce)
+    val seedHash = crypto.kec512(hashBlockWithoutNonce ++ nonceReverted)
+
+    crypto.kec256(seedHash ++ mixHash.bytes)
+  }
 
   def compare(that: BlockHeader) = {
     if (number < that.number) {

@@ -96,7 +96,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
   private val log = Logging(system, this.getClass)
 
-  val txProcessTimeout = 180.seconds
+  val txProcessTimeout = 600.seconds
   val blockRewardCalculator = new BlockRewardCalculator(blockchainConfig)
 
   val txProcessor = system.actorOf(TxProcessor.props(this), "TxProcessor")
