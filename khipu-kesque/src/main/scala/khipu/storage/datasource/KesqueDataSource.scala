@@ -126,19 +126,19 @@ object KesqueDataSource {
     var offset = fetchOffset
     var nRead = 0
     do {
-      val records = mutable.ArrayBuffer[(Array[Byte], Array[Byte], Long, Long)]()
+      val records = mutable.ArrayBuffer[(Array[Byte], Array[Byte], Long)]()
       tableSrc.readOnce(offset, src) {
-        case TKeyVal(k, v, offset, t) =>
+        case TKeyVal(k, v, offset) =>
           val NodeRecord(flag, key, value) = NodeRecord.fromBytes(v)
           val hash = Hash(key)
           hashOffsets.put(hash.hashCode, offset.toInt, 0) // TODO
 
-          records += ((key, value, offset, t))
+          records += ((key, value, offset))
       } match {
         case (n, o) =>
           println("nRecs read: " + n + ", lastOffset: " + o)
 
-          val sorted = records.sortBy(x => x._3).map(x => TKeyVal(x._1, x._2, x._3, x._4))
+          val sorted = records.sortBy(x => x._3).map(x => TKeyVal(x._1, x._2, x._3))
           val writeResults = tableTgt.write(sorted, tgt)
           println(writeResults) // TODO check exceptions
 
@@ -159,7 +159,7 @@ object KesqueDataSource {
 
     val records = new mutable.HashMap[Hash, ByteString]()
     table.iterateOver(0, topic) {
-      case TKeyVal(key, value, offset, timestamp) =>
+      case TKeyVal(key, value, offset) =>
         //print(s"$offset - ${Hash(key).hexString},")
         val hash = Hash(key)
         if (records.contains(hash)) {
@@ -196,7 +196,7 @@ object KesqueDataSource {
     var prevValue: Option[Array[Byte]] = None
     val table = db.getTable(Array(topic), cacheSize = 10000)
     table.iterateOver(0, topic) {
-      case TKeyVal(key, value, offset, timestamp) =>
+      case TKeyVal(key, value, offset) =>
         if (Arrays.equals(key, lostKey)) {
           val keyHash = Hash(lostKey).hashCode
           println(s"Found $keyInHex at offset $offset, key hash is $keyHash")
@@ -247,7 +247,7 @@ final class KesqueDataSource(
   def update(toRemove: Iterable[Hash], toUpsert: Iterable[(Hash, TVal)]): KesqueDataSource = {
     // TODO what's the meaning of remove a node? sometimes causes node not found
     //table.remove(toRemove.map(_.bytes).toList)
-    table.write(toUpsert.map { case (key, tval) => TKeyVal(key.bytes, tval.value, tval.offset, _currWritingBlockNumber) }, topic)
+    table.write(toUpsert.map { case (key, tval) => TKeyVal(key.bytes, tval.value, tval.offset) }, topic)
     this
   }
 

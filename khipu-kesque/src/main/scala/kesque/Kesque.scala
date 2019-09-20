@@ -51,7 +51,7 @@ object Kesque {
 
   private def testWrite(table: HashKeyValueTable, topic: String, seq: Int) = {
     val kvs = 1 to 100000 map { i =>
-      TKeyVal(i.toString.getBytes, (s"value_$i").getBytes, -1, -1)
+      TKeyVal(i.toString.getBytes, (s"value_$i").getBytes, -1)
     }
     table.write(kvs, topic)
   }
@@ -162,7 +162,7 @@ final class Kesque(props: Properties) {
         val value = if (rec.hasValue) kesque.getBytes(rec.value) else null
         val timestamp = rec.timestamp
 
-        op(TKeyVal(key, value, offset.toInt, timestamp))
+        op(TKeyVal(key, value, offset))
 
         lastOffset = offset
         count += 1
@@ -191,7 +191,7 @@ final class Kesque(props: Properties) {
         val value = if (rec.hasValue) kesque.getBytes(rec.value) else null
         val timestamp = rec.timestamp
 
-        batch += TKeyVal(key, value, offset.toInt, timestamp)
+        batch += TKeyVal(key, value, offset)
 
         lastOffset = offset
       }

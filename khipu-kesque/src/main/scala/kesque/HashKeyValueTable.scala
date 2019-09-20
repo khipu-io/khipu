@@ -132,7 +132,7 @@ final class HashKeyValueTable private[kesque] (
     val (_, counts) = indexTopicsOfFileno.foldLeft(0, initCounts) {
       case ((fileno, counts), idxTps) =>
         db.iterateOver(idxTps(col), 0, fetchMaxBytesInLoadOffsets) {
-          case TKeyVal(hash, recordOffsetValue, offset, timestamp) =>
+          case TKeyVal(hash, recordOffsetValue, offset) =>
             if (hash != null && recordOffsetValue != null) {
               hashOffsets.put(bytesToInt(hash), toMixedOffset(fileno, bytesToInt(recordOffsetValue)), col)
               counts(fileno) += 1
@@ -156,9 +156,9 @@ final class HashKeyValueTable private[kesque] (
     var count = 0
     topicsOfFileno foreach { tps =>
       db.iterateOver(tps(0), 0, fetchMaxBytesInLoadOffsets) {
-        case TKeyVal(key, value, offset, timestamp) =>
+        case TKeyVal(key, value, offset) =>
           if (key != null && value != null) {
-            putTimeToKey(timestamp, key)
+            putTimeToKey(offset, key)
             count += 1
           }
       }
@@ -230,7 +230,7 @@ final class HashKeyValueTable private[kesque] (
                   val rec = recs.next
                   //debug(s"${rec.offset}")
                   if (rec.offset == offset && Arrays.equals(kesque.getBytes(rec.key), keyBytes)) {
-                    foundValue = if (rec.hasValue) Some(TVal(kesque.getBytes(rec.value), mixedOffset, rec.timestamp)) else None
+                    foundValue = if (rec.hasValue) Some(TVal(kesque.getBytes(rec.value), mixedOffset)) else None
                   }
                 }
                 i -= 1
@@ -263,12 +263,12 @@ final class HashKeyValueTable private[kesque] (
     var keyToPrevMixedOffset = Map[Hash, Long]()
     val itr = kvs.iterator
     while (itr.hasNext) {
-      val tkv @ TKeyVal(keyBytes, value, offset, timestamp) = itr.next()
+      val tkv @ TKeyVal(keyBytes, value, offset) = itr.next()
       val key = Hash(keyBytes)
       caches(col).get(key) match {
-        case Some(TVal(prevValue, prevMixedOffset, _)) =>
+        case Some(TVal(prevValue, prevMixedOffset)) =>
           if (isValueChanged(value, prevValue)) {
-            val rec = if (timestamp < 0) new SimpleRecord(keyBytes, value) else new SimpleRecord(timestamp, keyBytes, value)
+            val rec = new SimpleRecord(keyBytes, value)
             tkvs ::= tkv
             records ::= rec
             keyToPrevMixedOffset += key -> prevMixedOffset
@@ -278,7 +278,7 @@ final class HashKeyValueTable private[kesque] (
             debug(s"$topic: value not changed. cache: hit ${caches(col).hitRate}, miss ${caches(col).missRate}}")
           }
         case None =>
-          val rec = if (timestamp < 0) new SimpleRecord(keyBytes, value) else new SimpleRecord(timestamp, keyBytes, value)
+          val rec = new SimpleRecord(keyBytes, value)
           tkvs ::= tkv
           records ::= rec
       }
@@ -309,7 +309,7 @@ final class HashKeyValueTable private[kesque] (
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
             val (lastOffset, idxRecords) = tkvs.foldLeft(firstOffert, Vector[SimpleRecord]()) {
-              case ((longOffset, idxRecords), TKeyVal(keyBytes, value, _, timestamp)) =>
+              case ((longOffset, idxRecords), TKeyVal(keyBytes, value, _)) =>
                 val offset = longOffset.toInt
                 val key = Hash(keyBytes)
                 val hash = key.hashCode
@@ -322,7 +322,7 @@ final class HashKeyValueTable private[kesque] (
                   case None => // there is none prevOffset
                     hashOffsets.put(hash, mixedOffset, col)
                 }
-                caches(col).put(key, TVal(value, mixedOffset, timestamp))
+                caches(col).put(key, TVal(value, mixedOffset))
                 (offset + 1, idxRecords :+ indexRecord)
             }
 

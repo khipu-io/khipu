@@ -94,7 +94,7 @@ object KesqueCompactor {
         Some(key, blockNumber)
       } else {
         nodeTable.read(key, topic, bypassCache = true) match {
-          case Some(TVal(bytes, mixedOffset, blockNumber)) =>
+          case Some(TVal(bytes, mixedOffset)) =>
             nodeCount += 1
             if (nodeCount % 1000 == 0) {
               val elapsed = (System.nanoTime - start) / 1000000000
@@ -102,7 +102,7 @@ object KesqueCompactor {
               log.info(s"[comp] $topic nodes $nodeCount $speed/s, at #$blockNumber, table size ${nodeTable.size}")
             }
 
-            nodeGot(TKeyVal(key, bytes, mixedOffset, blockNumber))
+            nodeGot(TKeyVal(key, bytes, mixedOffset))
             Some(bytes, blockNumber)
 
           case None =>
@@ -136,15 +136,15 @@ object KesqueCompactor {
 
     def flush() {
       buf foreach {
-        case TKeyVal(key, _, mixedOffset, _) =>
+        case TKeyVal(key, _, mixedOffset) =>
           nodeTable.removeIndexEntry(key, mixedOffset.toInt, topic)
       }
 
       val kvs = buf map {
-        case TKeyVal(key, value, mixedOffset, timestamp) =>
+        case TKeyVal(key, value, mixedOffset) =>
           val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset.toInt)
           _maxOffset = math.max(_maxOffset, offset)
-          TKeyVal(key, value, offset, timestamp)
+          TKeyVal(key, value, offset)
       }
       nodeTable.write(kvs, topic, toFileNo)
 

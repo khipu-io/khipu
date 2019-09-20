@@ -66,7 +66,7 @@ final class KesqueNodeDataSource(
                   val data = kesque.getBytes(rec.value)
                   val fullKey = crypto.kec256(data)
                   if (java.util.Arrays.equals(fullKey, keyBytes)) {
-                    foundValue = Some(TVal(data, offset, 0))
+                    foundValue = Some(TVal(data, offset))
                   }
                 } else {
                   None
@@ -184,7 +184,7 @@ final class KesqueNodeDataSource(
                 val keyBytes = key.bytes
                 val indexRecord = (keyBytes -> longOffset)
 
-                cache.put(key, TVal(value, offset, 0L))
+                cache.put(key, TVal(value, offset))
                 (offset + 1, idxRecords :+ indexRecord)
             }
 

@@ -75,7 +75,7 @@ final class KesqueTable private[kesque] (
               //print(s"${rec.offset},")
               if (rec.offset == offset && java.util.Arrays.equals(kesque.getBytes(rec.key), keyBytes)) {
                 foundValue = if (rec.hasValue) {
-                  Some(TVal(kesque.getBytes(rec.value), offset.toInt, rec.timestamp))
+                  Some(TVal(kesque.getBytes(rec.value), offset.toInt))
                 } else {
                   None
                 }
@@ -112,14 +112,14 @@ final class KesqueTable private[kesque] (
     var records = Vector[SimpleRecord]()
     var keyToPrevOffset = Map[Hash, Long]()
     kvs foreach {
-      case kv @ TKeyVal(keyBytes, value, offset, timestamp) =>
+      case kv @ TKeyVal(keyBytes, value, offset) =>
         val key = Hash(keyBytes)
         caches(col).get(key) match {
-          case Some(TVal(prevValue, prevOffset, _)) =>
+          case Some(TVal(prevValue, prevOffset)) =>
             if (isValueChanged(value, prevValue)) {
-              val record = new SimpleRecord(timestamp, keyBytes, value)
+              val record = new SimpleRecord(keyBytes, value)
               if (firstTimestamp == Long.MinValue) {
-                firstTimestamp = timestamp
+                firstTimestamp = 0
               }
               val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
               if (estimatedSize < fetchMaxBytes) {
@@ -151,9 +151,9 @@ final class KesqueTable private[kesque] (
               debug(s"$topic: value not changed. cache: hit ${caches(col).hitRate}, miss ${caches(col).missRate}}")
             }
           case None =>
-            val record = new SimpleRecord(timestamp, keyBytes, value)
+            val record = new SimpleRecord(keyBytes, value)
             if (firstTimestamp == Long.MinValue) {
-              firstTimestamp = timestamp
+              firstTimestamp = 0
             }
             val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
             //println(s"$newSize, $estimatedSize")
@@ -225,7 +225,7 @@ final class KesqueTable private[kesque] (
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
             val (lastOffset, idxRecords) = kvs.foldLeft(firstOffert, Vector[(Array[Byte], Long)]()) {
-              case ((longOffset, idxRecords), TKeyVal(keyBytes, value, _, timestamp)) =>
+              case ((longOffset, idxRecords), TKeyVal(keyBytes, value, _)) =>
                 val offset = longOffset.toInt
                 val key = Hash(keyBytes)
                 val indexRecord = (keyBytes -> longOffset)
@@ -235,7 +235,7 @@ final class KesqueTable private[kesque] (
                   case Some(prevOffset) => indexes(col).remove(keyBytes, prevOffset)
                   case None             =>
                 }
-                caches(col).put(key, TVal(value, offset, timestamp))
+                caches(col).put(key, TVal(value, offset))
                 (offset + 1, idxRecords :+ indexRecord)
             }
 
