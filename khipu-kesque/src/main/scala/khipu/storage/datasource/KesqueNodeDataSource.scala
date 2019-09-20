@@ -8,6 +8,7 @@ import kesque.Kesque
 import kesque.KesqueIndexLmdb
 import kesque.KesqueIndexRocksdb
 import khipu.Hash
+import khipu.TKeyVal
 import khipu.TVal
 import khipu.config.RocksdbConfig
 import khipu.crypto
@@ -40,7 +41,8 @@ final class KesqueNodeDataSource(
 
   info(s"Table $topic nodes $count")
 
-  def get(key: Hash): Option[Array[Byte]] = {
+  def get(key: Hash): Option[Array[Byte]] = getWithOffset(key, notCache = false).map(_.value)
+  def getWithOffset(key: Hash, notCache: Boolean): Option[TVal] = {
     try {
       readLock.lock
 
@@ -76,12 +78,14 @@ final class KesqueNodeDataSource(
             offsets = offsets.tail
           }
 
-          foundValue foreach { tval => cache.put(key, tval) }
+          if (!notCache) {
+            foundValue foreach { tval => cache.put(key, tval) }
+          }
 
           clock.elapse(System.nanoTime - start)
 
-          foundValue.map(_.value)
-        case Some(tval) => Some(tval.value)
+          foundValue
+        case Some(tval) => Some(tval)
       }
 
     } finally {
@@ -202,6 +206,16 @@ final class KesqueNodeDataSource(
       indexRecords.map(_.size).sum
     } finally {
       writeLock.unlock()
+    }
+  }
+
+  def readBatch(topic: String, fromOffset: Long, fetchMaxBytes: Int): (Long, Array[TKeyVal]) = {
+    try {
+      readLock.lock()
+
+      kesqueDb.readBatch(topic, fromOffset, fetchMaxBytes)
+    } finally {
+      readLock.unlock()
     }
   }
 

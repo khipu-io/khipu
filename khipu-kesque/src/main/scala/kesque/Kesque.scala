@@ -178,7 +178,7 @@ final class Kesque(props: Properties) {
    * @param fetchMaxBytes
    * @return (last offset read, records)
    */
-  private[kesque] def readBatch(topic: String, fromOffset: Long, fetchMaxBytes: Int): (Long, Array[TKeyVal]) = {
+  def readBatch(topic: String, fromOffset: Long, fetchMaxBytes: Int): (Long, Array[TKeyVal]) = {
     val batch = mutable.ArrayBuffer[TKeyVal]()
     val (topicPartition, result) = read(topic, fromOffset, fetchMaxBytes).head
     val recs = result.info.records.records.iterator

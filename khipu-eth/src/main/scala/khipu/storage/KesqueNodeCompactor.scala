@@ -16,12 +16,8 @@ import khipu.config.KhipuConfig
 import khipu.config.RocksdbConfig
 import khipu.domain.Account
 import khipu.rlp
-import khipu.service.ServiceBoard
 import khipu.storage.datasource.KesqueBlockDataSource
-import khipu.storage.datasource.KesqueDataSource
-import khipu.storage.datasource.KesqueDataSources
 import khipu.storage.datasource.KesqueNodeDataSource
-import khipu.storage.datasource.KesqueRocksdbDataSources
 import khipu.trie
 import khipu.trie.BranchNode
 import khipu.trie.ByteArraySerializable
@@ -35,8 +31,6 @@ import scala.collection.mutable
 object KesqueNodeCompactor {
   implicit lazy val system = ActorSystem("khipu")
   import system.dispatcher
-  //lazy val serviceBoard = ServiceBoard(system)
-  //lazy val dbConfig = serviceBoard.dbConfig
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName
@@ -63,7 +57,7 @@ object KesqueNodeCompactor {
     private def processEntity(entity: V, blockNumber: Long) = {
       entityCount += 1
       if (entityCount % 10000 == 0) {
-        println(s"[comp] got $topic entities $entityCount, at #$blockNumber")
+        log.debug(s"[comp] got $topic entities $entityCount, at #$blockNumber")
       }
 
       entityGot(entity, blockNumber)
@@ -96,8 +90,8 @@ object KesqueNodeCompactor {
       val encodedOpt = if (key.length < 32) {
         Some(key, blockNumber)
       } else {
-        nodeDataSource.get(Hash(key)) match {
-          case Some(value) =>
+        nodeDataSource.getWithOffset(Hash(key), notCache = true) match {
+          case Some(TVal(value, offset)) =>
             nodeCount += 1
             if (nodeCount % 10000 == 0) {
               val elapsed = (System.nanoTime - start) / 1000000000
@@ -105,7 +99,7 @@ object KesqueNodeCompactor {
               println(s"[comp] $topic nodes $nodeCount $speed/s, at #$blockNumber, table size ${nodeDataSource.count}")
             }
 
-            nodeGot(TKeyVal(key, value, Long.MaxValue))
+            nodeGot(TKeyVal(key, value, offset))
             Some(value, blockNumber)
 
           case None =>
@@ -121,7 +115,7 @@ object KesqueNodeCompactor {
 
   }
 
-  final class NodeWriter(topic: String, nodeDataSource: KesqueNodeDataSource, toFileNo: Int) {
+  final class NodeWriter(topic: String, nodeDataSource: KesqueNodeDataSource) {
     private val buf = new mutable.ArrayBuffer[TKeyVal]()
 
     private var _maxOffset = Long.MinValue
@@ -138,18 +132,12 @@ object KesqueNodeCompactor {
     }
 
     def flush() {
-      buf foreach {
-        case TKeyVal(key, _, mixedOffset) =>
-        //nodeDataSource.removeIndexEntry(key, mixedOffset.toInt, topic)
-      }
-
       val kvs = buf map {
-        case TKeyVal(key, value, mixedOffset) =>
-        //val (_, offset) = HashKeyValueTable.toFileNoAndOffset(mixedOffset.toInt)
-        //_maxOffset = math.max(_maxOffset, offset)
-        //TKeyVal(key, value, offset, timestamp)
+        case TKeyVal(key, value, offset) =>
+          _maxOffset = math.max(_maxOffset, offset)
+          Hash(key) -> value
       }
-      //nodeDataSource.write(kvs, topic, toFileNo)
+      //nodeDataSource.update(Nil, kvs)
 
       buf.clear()
     }
@@ -161,7 +149,6 @@ object KesqueNodeCompactor {
   private def initTablesBySelf() = {
     val khipuPath = new File(classOf[Khipu].getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile.getParentFile
     val configDir = new File(khipuPath, "src/universal/conf")
-    //val configDir = new File(khipuPath, "conf")
     val configFile = new File(configDir, "kafka.server.properties")
     val kafkaProps = {
       val props = org.apache.kafka.common.utils.Utils.loadProps(configFile.getAbsolutePath)
@@ -193,7 +180,7 @@ object KesqueNodeCompactor {
     //val blockHeaderStorage = storages.blockHeaderStorage
     //val rocksdbConfig = storages.asInstanceOf[KesqueRocksdbDataSources].rocksdbConfig
 
-    val compactor = new KesqueNodeCompactor(kesque, accountDataSource, storageDataSource, Right(rocksdbConfig), blockHeaderStorage, 8444768, 0, 1)
+    val compactor = new KesqueNodeCompactor(kesque, accountDataSource, storageDataSource, Right(rocksdbConfig), blockHeaderStorage, 8444768)
     compactor.start()
   }
 }
@@ -203,27 +190,22 @@ final class KesqueNodeCompactor(
     storageDataSource:  KesqueNodeDataSource,
     lmdbOrRocksdb:      Either[Env[ByteBuffer], RocksdbConfig],
     blockHeaderStorage: KesqueBlockDataSource,
-    blockNumber:        Long,
-    fromFileNo:         Int,
-    toFileNo:           Int
+    blockNumber:        Long
 ) {
   import KesqueNodeCompactor._
 
   private val log = Logging(system, this)
 
-  //private val targetAccountDataSource = new KesqueNodeDataSource(DbConfig.account, kesque, lmdbOrRocksdb, cacheSize = 100)
-  //private val targetStorageDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, lmdbOrRocksdb, cacheSize = 100)
-  //private val targetEvmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, lmdbOrRocksdb, cacheSize = 100)
+  private val targetAccountDataSource = new KesqueNodeDataSource(DbConfig.account + "~", kesque, lmdbOrRocksdb, cacheSize = 100)
+  private val targetStorageDataSource = new KesqueNodeDataSource(DbConfig.storage + "~", kesque, lmdbOrRocksdb, cacheSize = 100)
+  //private val targetEvmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode + "~", kesque, lmdbOrRocksdb, cacheSize = 100)
 
-  //private val storageWriter = new NodeWriter(DbConfig.storage, targetStorageDataSource, toFileNo)
-  //private val accountWriter = new NodeWriter(DbConfig.account, targetAccountDataSource, toFileNo)
+  private val storageWriter = new NodeWriter(DbConfig.storage, targetStorageDataSource)
+  private val accountWriter = new NodeWriter(DbConfig.account, targetAccountDataSource)
 
   private val storageReader = new NodeReader[DataWord](DbConfig.storage, storageDataSource)(trie.rlpDataWordSerializer) {
     override def nodeGot(kv: TKeyVal) {
-      //val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset.toInt)
-      //if (fileno == fromFileNo) {
-      //  storageWriter.write(kv)
-      //}
+      storageWriter.write(kv)
     }
   }
 
@@ -236,17 +218,14 @@ final class KesqueNodeCompactor(
     }
 
     override def nodeGot(kv: TKeyVal) {
-      //val (fileno, _) = HashKeyValueTable.toFileNoAndOffset(kv.offset.toInt)
-      //if (fileno == fromFileNo) {
-      //  accountWriter.write(kv)
-      //}
+      accountWriter.write(kv)
     }
   }
 
   def start() {
     loadSnaphot()
-    postAppend()
-    gc()
+    stopWorld(() => true)
+    //postAppend()
   }
 
   private def loadSnaphot() {
@@ -259,76 +238,61 @@ final class KesqueNodeCompactor(
       val stateRoot = header.stateRoot.bytes
       accountReader.getNode(stateRoot, blockNumber) map accountReader.processNode
     }
-    //storageWriter.flush()
-    //accountWriter.flush()
+    storageWriter.flush()
+    accountWriter.flush()
     val elapsed = (System.nanoTime - start) / 1000000000
-    println(s"[comp] all nodes loaded of #$blockNumber in $elapsed")
+    println(s"[comp] all nodes loaded of #$blockNumber in ${elapsed}s")
+  }
+
+  def stopWorld(stop: () => Boolean): Boolean = {
+    stop()
   }
 
   /**
    * should stop world during postAppend()
    */
   private def postAppend() {
-    //    val storageTask = new Thread {
-    //      override def run() {
-    //        log.info(s"[comp] post append storage from offset ${storageWriter.maxOffset + 1} ...")
-    //        // TODO topic from fromFileNo
-    //        var offset = storageWriter.maxOffset + 1
-    //        var nRead = 0
-    //        do {
-    //          val (lastOffset, recs) = accountDataSource.readBatch(DbConfig.account, offset, 4096)
-    //          recs foreach accountWriter.write
-    //          nRead = recs.length
-    //          offset = lastOffset + 1
-    //        } while (nRead > 0)
-    //
-    //        storageWriter.flush()
-    //        log.info(s"[comp] post append storage done.")
-    //      }
-    //    }
-    //
-    //    val accountTask = new Thread {
-    //      override def run() {
-    //        log.info(s"[comp] post append account from offset ${accountWriter.maxOffset + 1} ...")
-    //        // TODO topic from fromFileNo
-    //        var offset = accountWriter.maxOffset + 1
-    //        var nRead = 0
-    //        do {
-    //          val (lastOffset, recs) = accountDataSource.readBatch(DbConfig.account, offset, 4096)
-    //          recs foreach accountWriter.write
-    //          nRead = recs.length
-    //          offset = lastOffset + 1
-    //        } while (nRead > 0)
-    //
-    //        accountWriter.flush()
-    //        log.info(s"[comp] post append account done.")
-    //      }
-    //    }
-    //
-    //    storageTask.start
-    //    accountTask.start
-    //
-    //    storageTask.join
-    //    accountTask.join
-    //    log.info(s"[comp] post append done.")
-  }
+    val storageTask = new Thread {
+      override def run() {
+        log.info(s"[comp] post append storage from offset ${storageWriter.maxOffset + 1} ...")
+        // TODO topic from fromFileNo
+        var offset = storageWriter.maxOffset + 1
+        var nRead = 0
+        do {
+          val (lastOffset, recs) = accountDataSource.readBatch(DbConfig.account, offset, 4096)
+          recs foreach accountWriter.write
+          nRead = recs.length
+          offset = lastOffset + 1
+        } while (nRead > 0)
 
-  /**
-   * should stop world during gc()
-   */
-  private def gc() {
-    log.info(s"[comp] gc ...")
-    //    targetStorageDataSource.removeIndexEntries(DbConfig.storage) {
-    //      case (k, mixedOffset) =>
-    //        val (fileNo, _) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
-    //        fileNo == fromFileNo
-    //    }
-    //
-    //    targetAccountDataSource.removeIndexEntries(DbConfig.account) {
-    //      case (k, mixedOffset) =>
-    //        val (fileNo, _) = HashKeyValueTable.toFileNoAndOffset(mixedOffset)
-    //        fileNo == fromFileNo
-    //    }
-    log.info(s"[comp] gc done.")
+        storageWriter.flush()
+        log.info(s"[comp] post append storage done.")
+      }
+    }
+
+    val accountTask = new Thread {
+      override def run() {
+        log.info(s"[comp] post append account from offset ${accountWriter.maxOffset + 1} ...")
+        // TODO topic from fromFileNo
+        var offset = accountWriter.maxOffset + 1
+        var nRead = 0
+        do {
+          val (lastOffset, recs) = accountDataSource.readBatch(DbConfig.account, offset, 4096)
+          recs foreach accountWriter.write
+          nRead = recs.length
+          offset = lastOffset + 1
+        } while (nRead > 0)
+
+        accountWriter.flush()
+        log.info(s"[comp] post append account done.")
+      }
+    }
+
+    storageTask.start
+    accountTask.start
+
+    storageTask.join
+    accountTask.join
+    log.info(s"[comp] post append done.")
   }
 }
