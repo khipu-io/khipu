@@ -14,6 +14,7 @@ import khipu.DataWord
 import khipu.config.DbConfig
 import khipu.config.KhipuConfig
 import khipu.config.RocksdbConfig
+import khipu.crypto
 import khipu.domain.Account
 import khipu.rlp
 import khipu.storage.datasource.KesqueBlockDataSource
@@ -137,11 +138,12 @@ object KesqueNodeCompactor {
 
     def flush() {
       val kvs = buf map {
-        case TKeyVal(key, value, offset) =>
+        case TKeyVal(_, value, offset) =>
           _maxOffset = math.max(_maxOffset, offset)
+          val key = crypto.kec256(value)
           Hash(key) -> value
       }
-      //nodeDataSource.update(Nil, kvs)
+      nodeDataSource.update(Nil, kvs)
 
       buf.clear()
     }

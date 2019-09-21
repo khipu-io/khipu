@@ -106,7 +106,6 @@ final class KesqueNodeDataSource(
     var records = Vector[SimpleRecord]()
     toUpsert foreach {
       case kv @ (key, value) =>
-        val keyBytes = key.bytes
         val record = new SimpleRecord(null, value)
         if (firstTimestamp == Long.MinValue) {
           firstTimestamp = 0
