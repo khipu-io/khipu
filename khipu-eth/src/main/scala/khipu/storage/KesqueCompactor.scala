@@ -34,6 +34,8 @@ object KesqueCompactor {
   import system.dispatcher
   lazy val serviceBoard = ServiceBoard(system)
   lazy val dbConfig = serviceBoard.dbConfig
+  
+  private val FETCH_MAX_BYTES_IN_BACTH = 50 * 1024 * 1024 // 52428800, 50M
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName
@@ -275,8 +277,8 @@ final class KesqueCompactor(
         var offset = storageWriter.maxOffset + 1
         var nRead = 0
         do {
-          val (lastOffset, recs) = accountTable.readBatch(DbConfig.account, offset, 4096)
-          recs foreach accountWriter.write
+          val (lastOffset, recs) = storageTable.readBatch(DbConfig.account, offset, FETCH_MAX_BYTES_IN_BACTH)
+          recs foreach storageWriter.write
           nRead = recs.length
           offset = lastOffset + 1
         } while (nRead > 0)
@@ -293,7 +295,7 @@ final class KesqueCompactor(
         var offset = accountWriter.maxOffset + 1
         var nRead = 0
         do {
-          val (lastOffset, recs) = accountTable.readBatch(DbConfig.account, offset, 4096)
+          val (lastOffset, recs) = accountTable.readBatch(DbConfig.account, offset, FETCH_MAX_BYTES_IN_BACTH)
           recs foreach accountWriter.write
           nRead = recs.length
           offset = lastOffset + 1
