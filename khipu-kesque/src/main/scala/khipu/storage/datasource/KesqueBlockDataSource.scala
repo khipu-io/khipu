@@ -159,11 +159,10 @@ final class KesqueBlockDataSource(
           if (appendInfo.numMessages > 0) {
             val firstOffert = appendInfo.firstOffset.get
             val lastOffset = kvs.foldLeft(firstOffert) {
-              case ((offset), (key, value)) =>
+              case (offset, (key, value)) =>
                 if (offset != key) {
                   warn(s"key $key does not equals offset $offset during put")
                 }
-                val keyBytes = ByteBuffer.allocate(8).putLong(key).array
 
                 cache.put(key, value)
                 offset + 1
@@ -177,7 +176,6 @@ final class KesqueBlockDataSource(
           }
       }
 
-      // write index records
       count
     } finally {
       writeLock.unlock()

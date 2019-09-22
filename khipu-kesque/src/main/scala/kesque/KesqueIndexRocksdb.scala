@@ -61,8 +61,8 @@ final class KesqueIndexRocksdb(rocksdbConfig: RocksdbConfig, topic: String, useS
       val offsets = table.get(readOptions, sKey) match {
         case null => Nil
         case x =>
-          val bytes = ByteBuffer.wrap(x)
           if (useShortKey) {
+            val bytes = ByteBuffer.wrap(x)
             var data: List[Long] = Nil
             while (bytes.remaining >= 8) {
               data ::= bytes.getLong()
@@ -146,20 +146,19 @@ final class KesqueIndexRocksdb(rocksdbConfig: RocksdbConfig, topic: String, useS
       kvs foreach {
         case (key, offset) =>
           val sKey = if (useShortKey) toShortKey(key) else key
-          val data =
-            if (useShortKey) {
-              readOptions = new ReadOptions()
-              table.get(readOptions, sKey) match {
-                case null =>
-                  ByteBuffer.allocate(8).putLong(offset).array
-                case x =>
-                  val buf = ByteBuffer.allocate(x.length + 8).put(x).putLong(offset)
-                  buf.flip()
-                  buf.array
-              }
-            } else {
-              ByteBuffer.allocate(8).putLong(offset).array
+          val data = if (useShortKey) {
+            readOptions = new ReadOptions()
+            table.get(readOptions, sKey) match {
+              case null =>
+                ByteBuffer.allocate(8).putLong(offset).array
+              case x =>
+                val buf = ByteBuffer.allocate(x.length + 8).put(x).putLong(offset)
+                buf.flip()
+                buf.array
             }
+          } else {
+            ByteBuffer.allocate(8).putLong(offset).array
+          }
 
           batch.put(sKey, data)
       }
@@ -201,9 +200,9 @@ final class KesqueIndexRocksdb(rocksdbConfig: RocksdbConfig, topic: String, useS
             val buf = ByteBuffer.allocate(x.length)
             val offsets = ByteBuffer.wrap(x)
             while (offsets.remaining >= 8) {
-              val offsetx = offsets.getLong()
-              if (offsetx != offset) {
-                buf.putLong(offsetx)
+              val thisOffset = offsets.getLong()
+              if (thisOffset != offset) {
+                buf.putLong(thisOffset)
               }
             }
             buf.flip()

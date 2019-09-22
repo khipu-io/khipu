@@ -34,7 +34,7 @@ object KesqueCompactor {
   import system.dispatcher
   lazy val serviceBoard = ServiceBoard(system)
   lazy val dbConfig = serviceBoard.dbConfig
-  
+
   private val FETCH_MAX_BYTES_IN_BACTH = 50 * 1024 * 1024 // 52428800, 50M
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
