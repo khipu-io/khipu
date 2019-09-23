@@ -1,9 +1,9 @@
 package khipu.ledger
 
-import khipu.Deleted
 import khipu.Log
 import khipu.Original
 import khipu.Updated
+import khipu.Removed
 import khipu.DataWord
 import khipu.vm.Storage
 import khipu.trie.MerklePatriciaTrie
@@ -12,7 +12,7 @@ import khipu.trie.MerklePatriciaTrie
  * '''Immutable''' tried based vm storage: address -> value
  */
 object TrieStorage {
-  val DeletedValue = Deleted(null)
+  val REMOVED_VALUE = Removed(null)
 
   def apply(underlyingTrie: MerklePatriciaTrie[DataWord, DataWord]) =
     new TrieStorage(underlyingTrie, Map())
@@ -44,13 +44,13 @@ final class TrieStorage private (
         }
       case Some(Original(value)) => value
       case Some(Updated(value))  => value
-      case Some(Deleted(_))      => DataWord.Zero
+      case Some(Removed(_))      => DataWord.Zero
     }
   }
 
   def store(address: DataWord, value: DataWord): TrieStorage = {
     val updatedLogs = if (value.isZero) {
-      logs + (address -> DeletedValue)
+      logs + (address -> REMOVED_VALUE)
     } else {
       logs + (address -> Updated(value))
     }
@@ -59,7 +59,7 @@ final class TrieStorage private (
 
   def flush(): TrieStorage = {
     val flushed = this.logs.foldLeft(this.underlyingTrie) {
-      case (acc, (k, Deleted(_))) => acc - k
+      case (acc, (k, Removed(_))) => acc - k
       case (acc, (k, Updated(v))) => acc + (k -> v)
       case (acc, _)               => acc
     }

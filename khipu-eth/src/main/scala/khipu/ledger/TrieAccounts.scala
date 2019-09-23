@@ -1,8 +1,8 @@
 package khipu.ledger
 
-import khipu.Deleted
 import khipu.Log
 import khipu.Original
+import khipu.Removed
 import khipu.Updated
 import khipu.domain.Account
 import khipu.domain.Address
@@ -17,11 +17,11 @@ import khipu.trie.MerklePatriciaTrie
  *
  */
 object TrieAccounts {
-  val DELETED_VALUE = Deleted(null)
+  val REMOVED_VALUE = Removed(null)
 
   private def flush(trie: MerklePatriciaTrie[Address, Account], logs: Map[Address, Log[Account]]): MerklePatriciaTrie[Address, Account] = {
     logs.foldLeft(trie) {
-      case (accTrie, (k, Deleted(_)))  => accTrie - k
+      case (accTrie, (k, Removed(_)))  => accTrie - k
       case (accTrie, (k, Updated(v)))  => accTrie + (k -> v)
       case (accTrie, (k, Original(v))) => accTrie
     }
@@ -48,7 +48,7 @@ final class TrieAccounts private (
       }
       case Some(Original(account)) => Some(account)
       case Some(Updated(account))  => Some(account)
-      case Some(Deleted(account))  => None
+      case Some(Removed(account))  => None
     }
   }
 
@@ -58,7 +58,7 @@ final class TrieAccounts private (
   }
 
   def remove(address: Address): TrieAccounts = {
-    val updatedLogs = logs + (address -> TrieAccounts.DELETED_VALUE)
+    val updatedLogs = logs + (address -> TrieAccounts.REMOVED_VALUE)
     new TrieAccounts(underlyingTrie, updatedLogs)
   }
 

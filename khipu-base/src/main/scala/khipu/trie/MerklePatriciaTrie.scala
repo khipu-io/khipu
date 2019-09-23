@@ -2,10 +2,10 @@ package khipu.trie
 
 import java.util.Arrays
 import khipu.Changed
-import khipu.Deleted
 import khipu.Hash
 import khipu.Log
 import khipu.Original
+import khipu.Removed
 import khipu.Updated
 import khipu.crypto
 import khipu.rlp
@@ -221,7 +221,7 @@ final class MerklePatriciaTrie[K, V] private (
         val newLeafNode = LeafNode(existingKey, value)
         NodeInsertResult(
           newNode = newLeafNode,
-          changes = Vector(Deleted(node), Updated(newLeafNode))
+          changes = Vector(Removed(node), Updated(newLeafNode))
         )
       case 0 =>
         // There is no common prefix between the node which means that we need to replace this leaf node
@@ -236,7 +236,7 @@ final class MerklePatriciaTrie[K, V] private (
         val NodeInsertResult(newBranchNode: BranchNode, changes) = put(temporalBranchNode, searchKey, value)
         NodeInsertResult(
           newNode = newBranchNode,
-          changes = (changes :+ Deleted(node)) ++ maybeNewLeaf.map(Updated(_))
+          changes = (changes :+ Removed(node)) ++ maybeNewLeaf.map(Updated(_))
         )
       case ml =>
         // Partially shared prefix, we replace the leaf with an extension and a branch node
@@ -250,7 +250,7 @@ final class MerklePatriciaTrie[K, V] private (
         val newExtNode = ExtensionNode(searchKeyPrefix, newBranchNode)
         NodeInsertResult(
           newNode = newExtNode,
-          changes = (changes :+ Deleted(node)) :+ Updated(newExtNode)
+          changes = (changes :+ Removed(node)) :+ Updated(newExtNode)
         )
     }
   }
@@ -272,7 +272,7 @@ final class MerklePatriciaTrie[K, V] private (
         val NodeInsertResult(newBranchNode: BranchNode, changes) = put(temporalBranchNode, searchKey, value)
         NodeInsertResult(
           newNode = newBranchNode,
-          changes = (changes :+ Deleted(extensionNode)) ++ maybeNewLeaf.map(Updated(_))
+          changes = (changes :+ Removed(extensionNode)) ++ maybeNewLeaf.map(Updated(_))
         )
       case ml if ml == sharedKey.length =>
         // Current extension node's key is a prefix of the one being inserted, so we insert recursively on the extension's child
@@ -280,7 +280,7 @@ final class MerklePatriciaTrie[K, V] private (
         val newExtNode = ExtensionNode(sharedKey, newChild)
         NodeInsertResult(
           newNode = newExtNode,
-          changes = (changes :+ Deleted(extensionNode)) :+ Updated(newExtNode)
+          changes = (changes :+ Removed(extensionNode)) :+ Updated(newExtNode)
         )
       case ml =>
         // Partially shared prefix, we have to replace the node with an extension with the shared prefix
@@ -290,7 +290,7 @@ final class MerklePatriciaTrie[K, V] private (
         val newExtNode = ExtensionNode(sharedKeyPrefix, newBranchNode)
         NodeInsertResult(
           newNode = newExtNode,
-          changes = (changes :+ Deleted(extensionNode)) :+ Updated(newExtNode)
+          changes = (changes :+ Removed(extensionNode)) :+ Updated(newExtNode)
         )
     }
   }
@@ -302,7 +302,7 @@ final class MerklePatriciaTrie[K, V] private (
       val newBranchNode = BranchNode(children, Some(value))
       NodeInsertResult(
         newNode = newBranchNode,
-        changes = Vector(Deleted(branchNode), Updated(newBranchNode))
+        changes = Vector(Removed(branchNode), Updated(newBranchNode))
       )
     } else {
       // Non empty key, we need to insert the value in the correct branch node's child
@@ -314,7 +314,7 @@ final class MerklePatriciaTrie[K, V] private (
         val newBranchNode = branchNode.updateChild(searchKeyHead, changedChild)
         NodeInsertResult(
           newNode = newBranchNode,
-          changes = (changes :+ Deleted(branchNode)) :+ Updated(newBranchNode)
+          changes = (changes :+ Removed(branchNode)) :+ Updated(newBranchNode)
         )
       } else {
         // The associated child is empty, we just replace it with a leaf
@@ -322,7 +322,7 @@ final class MerklePatriciaTrie[K, V] private (
         val newBranchNode = branchNode.updateChild(searchKeyHead, newLeafNode)
         NodeInsertResult(
           newNode = newBranchNode,
-          changes = Vector(Deleted(branchNode), Updated(newLeafNode), Updated(newBranchNode))
+          changes = Vector(Removed(branchNode), Updated(newLeafNode), Updated(newBranchNode))
         )
       }
     }
@@ -342,7 +342,7 @@ final class MerklePatriciaTrie[K, V] private (
     case (BranchNode(children, _), true) =>
       // We need to remove old node and fix it because we removed the value
       val fixedNode = fix(BranchNode(children, None), Vector())
-      NodeRemoveResult(hasChanged = true, newNode = Some(fixedNode), changes = Vector(Deleted(node), Updated(fixedNode)))
+      NodeRemoveResult(hasChanged = true, newNode = Some(fixedNode), changes = Vector(Removed(node), Updated(fixedNode)))
 
     case (branchNode @ BranchNode(children, optStoredValue), false) =>
       // We might be trying to remove a node that's inside one of the 16 mapped nibbles
@@ -363,7 +363,7 @@ final class MerklePatriciaTrie[K, V] private (
             NodeRemoveResult(
               hasChanged = true,
               newNode = Some(fixedNode),
-              changes = (changes :+ Deleted(node)) :+ Updated(fixedNode)
+              changes = (changes :+ Removed(node)) :+ Updated(fixedNode)
             )
 
           // No removal made on children, so we return without any change
@@ -384,7 +384,7 @@ final class MerklePatriciaTrie[K, V] private (
     val LeafNode(existingKey, _) = leafNode
     if (Arrays.equals(existingKey, searchKey)) {
       // We found the node to delete
-      NodeRemoveResult(hasChanged = true, newNode = None, changes = Vector(Deleted(leafNode)))
+      NodeRemoveResult(hasChanged = true, newNode = None, changes = Vector(Removed(leafNode)))
     } else {
       NodeRemoveResult(hasChanged = false, newNode = None)
     }
@@ -405,7 +405,7 @@ final class MerklePatriciaTrie[K, V] private (
             NodeRemoveResult(
               hasChanged = true,
               newNode = Some(fixedNode),
-              changes = (changes :+ Deleted(extensionNode)) :+ Updated(fixedNode)
+              changes = (changes :+ Removed(extensionNode)) :+ Updated(fixedNode)
             )
           } getOrElse {
             throw MPTException("A trie with newRoot extension should have at least 2 values stored")
@@ -501,15 +501,15 @@ final class MerklePatriciaTrie[K, V] private (
     val rootCapped = newRoot.map(_.capped).getOrElse(Array.emptyByteArray)
 
     val orderlyDedeplucated = changes.foldLeft(Map[Hash, Changed[Node]]()) {
-      case (acc, nodeToRemove @ Deleted(node)) => acc + (Hash(node.hash) -> nodeToRemove)
+      case (acc, nodeToRemove @ Removed(node)) => acc + (Hash(node.hash) -> nodeToRemove)
       case (acc, nodeToUpdate @ Updated(node)) => acc + (Hash(node.hash) -> nodeToUpdate)
     }
 
     val (toRemove, toUpdate) = orderlyDedeplucated.foldLeft(Map[Hash, Log[Array[Byte]]](), Map[Hash, Log[Array[Byte]]]()) {
-      case ((toRemove, toUpdate), (hash, Deleted(node))) =>
+      case ((toRemove, toUpdate), (hash, Removed(node))) =>
         val nCapped = node.capped
         if (nCapped.length == 32 || hash == previousRootHash) {
-          (toRemove + (hash -> Deleted(Array.emptyByteArray)), toUpdate)
+          (toRemove + (hash -> Removed(Array.emptyByteArray)), toUpdate)
         } else {
           (toRemove, toUpdate)
         }
@@ -542,7 +542,7 @@ final class MerklePatriciaTrie[K, V] private (
             case None =>
               throw MPTNodeMissingException(s"Node not found ${khipu.toHexString(nodeId)}, trie is inconsistent", id, nodeStorage)
           }
-        case Some(Deleted(_)) =>
+        case Some(Removed(_)) =>
           throw MPTNodeMissingException(s"Node has been deleted ${khipu.toHexString(nodeId)}, trie is inconsistent", id, nodeStorage)
       }
     }
@@ -557,7 +557,7 @@ final class MerklePatriciaTrie[K, V] private (
 
   def changes: Map[Hash, Option[Array[Byte]]] = {
     nodeLogs.collect {
-      case (k, Deleted(_)) => k -> None
+      case (k, Removed(_)) => k -> None
       case (k, Updated(v)) => k -> Some(v)
     }
   }

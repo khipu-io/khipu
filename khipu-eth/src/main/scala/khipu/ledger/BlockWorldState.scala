@@ -1,9 +1,9 @@
 package khipu.ledger
 
 import akka.util.ByteString
-import khipu.Deleted
 import khipu.Hash
 import khipu.Original
+import khipu.Removed
 import khipu.Updated
 import khipu.DataWord
 import khipu.crypto
@@ -374,7 +374,7 @@ final class BlockWorldState private (
         later.trieAccounts.logs.get(address).map {
           case Updated(Account(_, _, stateRoot, codeHash)) => this.trieAccounts += (address -> valueMerged.withStateRoot(stateRoot).withCodeHash(codeHash))
           case Original(_)                                 => this.trieAccounts += (address -> valueMerged)
-          case Deleted(_)                                  => this.trieAccounts -= address
+          case Removed(_)                                  => this.trieAccounts -= address
         }
 
         address
