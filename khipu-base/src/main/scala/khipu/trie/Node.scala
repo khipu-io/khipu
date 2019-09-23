@@ -15,8 +15,8 @@ object Node {
   import khipu.rlp.RLPImplicitConversions._
   import khipu.rlp.RLPImplicits._
 
-  private[trie] val ListSize: Byte = 17
-  private val PairSize: Byte = 2
+  private[trie] val LIST_SIZE: Byte = 17
+  private[trie] val PAIR_SIZE: Byte = 2
 
   object nodeEnc extends RLPEncoder[Node] {
     override def encode(obj: Node): RLPEncodeable = obj match {
@@ -48,7 +48,7 @@ object Node {
       case RLPList(xs @ _*) =>
         val items = xs.toArray
         items.length match {
-          case ListSize =>
+          case LIST_SIZE =>
             val childrenLength = items.length - 1
             val parsedChildren = Array.ofDim[Option[Either[Array[Byte], Node]]](childrenLength)
             val last = items(items.length - 1)
@@ -79,7 +79,7 @@ object Node {
               terminator
             )
 
-          case PairSize =>
+          case PAIR_SIZE =>
             HexPrefix.decode(items(0)) match {
               case (key, true) =>
                 LeafNode(key, items(1))
@@ -142,7 +142,7 @@ object BranchNode {
    * @return a new BranchNode.
    */
   def withValueOnly(terminator: Array[Byte]): BranchNode = {
-    BranchNode(Array.fill(Node.ListSize - 1)(None), Some(terminator))
+    BranchNode(Array.fill(Node.LIST_SIZE - 1)(None), Some(terminator))
   }
 
   /**
@@ -156,7 +156,7 @@ object BranchNode {
    * @return a new BranchNode.
    */
   def withSingleChild(position: Byte, child: Node, terminator: Option[Array[Byte]]): BranchNode = {
-    val children = Array.fill[Option[Either[Array[Byte], Node]]](Node.ListSize - 1)(None)
+    val children = Array.fill[Option[Either[Array[Byte], Node]]](Node.LIST_SIZE - 1)(None)
     val childCapped = child.capped
     children(position) = Some(if (childCapped.length == 32) Left(childCapped) else Right(child))
     BranchNode(children, terminator)
@@ -172,7 +172,7 @@ object BranchNode {
    * @return a new BranchNode.
    */
   def withSingleChild(position: Byte, child: Either[Array[Byte], Node], terminator: Option[Array[Byte]]): BranchNode = {
-    val children = Array.fill[Option[Either[Array[Byte], Node]]](Node.ListSize - 1)(None)
+    val children = Array.fill[Option[Either[Array[Byte], Node]]](Node.LIST_SIZE - 1)(None)
     children(position) = Some(child)
     BranchNode(children, terminator)
   }
