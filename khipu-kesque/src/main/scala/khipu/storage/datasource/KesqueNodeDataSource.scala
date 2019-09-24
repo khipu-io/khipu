@@ -228,6 +228,8 @@ final class KesqueNodeDataSource(
     }
   }
 
+  private def alreadExists(key: Hash) = get(key).isDefined
+
   def count = kesqueDb.getLogEndOffset(topic)
 
   def cacheHitRate = cache.hitRate

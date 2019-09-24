@@ -186,7 +186,7 @@ object KesqueNodeCompactor {
     //val blockHeaderStorage = storages.blockHeaderStorage
     //val rocksdbConfig = storages.asInstanceOf[KesqueRocksdbDataSources].rocksdbConfig
 
-    val compactor = new KesqueNodeCompactor(kesque, accountDataSource, storageDataSource, Right(rocksdbConfig), blockHeaderStorage, 8444768)
+    val compactor = new KesqueNodeCompactor(kesque, accountDataSource, storageDataSource, Right(rocksdbConfig), blockHeaderStorage, 8445282)
     compactor.start()
   }
 }
@@ -230,8 +230,8 @@ final class KesqueNodeCompactor(
 
   def start() {
     //loadSnaphot()
-    stopWorld(() => true)
-    postAppend()
+    //stopWorld(() => true)
+    //postAppend()
   }
 
   private def loadSnaphot() {

@@ -157,145 +157,125 @@ final class MerklePatriciaTrie[K, V] private (
   override def put(key: K, value: V): This = {
     val keyNibbles = HexPrefix.bytesToNibbles(kSerializer.toBytes(key))
 
-    rootHashOpt map { rootId =>
+    val NodeInsertResult(newRoot, changes) = rootHashOpt map { rootId =>
       val root = getNode(rootId)
-      val NodeInsertResult(newRoot, changes) = put(root, keyNibbles, vSerializer.toBytes(value))
-      new MerklePatriciaTrie(
-        Some(newRoot.hash),
-        nodeStorage,
-        updateNodesToLogs(prevRootHash = Hash(rootHash), newRoot = Some(newRoot), changes = changes)
-      )(kSerializer, vSerializer)
-
+      put(root, keyNibbles, vSerializer.toBytes(value))
     } getOrElse {
-
       val newRoot = LeafNode(keyNibbles, vSerializer.toBytes(value))
-      new MerklePatriciaTrie(
-        Some(newRoot.hash),
-        nodeStorage,
-        updateNodesToLogs(Hash(rootHash), Some(newRoot), Vector(Updated(newRoot)))
-      )(kSerializer, vSerializer)
-
+      NodeInsertResult(newRoot, Vector(Updated(newRoot)))
     }
+
+    new MerklePatriciaTrie(
+      Some(newRoot.hash),
+      nodeStorage,
+      updateNodesToLogs(Hash(rootHash), Some(newRoot), changes)
+    )(kSerializer, vSerializer)
   }
 
-  private def put(node: Node, searchKey: Array[Byte], value: Array[Byte]): NodeInsertResult = node match {
-    case leafNode: LeafNode           => putInLeafNode(leafNode, searchKey, value)
-    case extensionNode: ExtensionNode => putInExtensionNode(extensionNode, searchKey, value)
-    case branchNode: BranchNode       => putInBranchNode(branchNode, searchKey, value)
+  private def put(node: Node, searchKey: Array[Byte], value: Array[Byte]): NodeInsertResult = {
+    node match {
+      case leafNode: LeafNode           => putInLeafNode(leafNode, searchKey, value)
+      case extensionNode: ExtensionNode => putInExtensionNode(extensionNode, searchKey, value)
+      case branchNode: BranchNode       => putInBranchNode(branchNode, searchKey, value)
+    }
   }
 
   private def putInLeafNode(node: LeafNode, searchKey: Array[Byte], value: Array[Byte]): NodeInsertResult = {
     val LeafNode(existingKey, storedValue) = node
+
     val ml = matchingLength(existingKey, searchKey)
     if (ml == 0) {
-      // There is no common prefix between the node which means that we need to replace this leaf node
+      // there is no common prefix between the node which means that we need to replace this leaf node
       val (temporalBranchNode, maybeNewLeaf) = if (existingKey.length == 0) {
-        // This node has no key so it should be stored as branch's value
+        // this node has no key so it should be stored as branch's value
         (BranchNode.withValueOnly(storedValue), None)
       } else {
-        // The leaf should be put inside one of new branch nibbles
+        // the leaf should be put inside one of new branch nibbles
         val newLeafNode = LeafNode(BytesUtil.tail(existingKey), storedValue)
         (BranchNode.withSingleChild(existingKey(0), newLeafNode, None), Some(newLeafNode))
       }
-      val NodeInsertResult(newBranchNode: BranchNode, changes) = put(temporalBranchNode, searchKey, value)
-      NodeInsertResult(
-        newNode = newBranchNode,
-        changes = (changes :+ Removed(node)) ++ maybeNewLeaf.map(Updated(_))
-      )
+      val NodeInsertResult(newBranchNode, changes) = put(temporalBranchNode, searchKey, value)
+
+      NodeInsertResult(newBranchNode, (changes :+ Removed(node)) ++ maybeNewLeaf.map(Updated(_)))
     } else if (ml == existingKey.length && ml == searchKey.length) {
-      // We are trying to insert a leaf node that has the same key as this one but different value so we need to
-      // replace it
+      // we are trying to insert a leaf node that has the same key as this one but different value
+      // so we need to replace it
       val newLeafNode = LeafNode(existingKey, value)
-      NodeInsertResult(
-        newNode = newLeafNode,
-        changes = Vector(Removed(node), Updated(newLeafNode))
-      )
+
+      NodeInsertResult(newLeafNode, Vector(Removed(node), Updated(newLeafNode)))
     } else {
-      // Partially shared prefix, we replace the leaf with an extension and a branch node
+      // partially shared prefix, we replace the leaf with an extension and a branch node
       val (searchKeyPrefix, searchKeySuffix) = BytesUtil.split(searchKey, ml)
       val temporalNode = if (ml == existingKey.length) {
         BranchNode.withValueOnly(storedValue)
       } else {
         LeafNode(BytesUtil.drop(existingKey, ml), storedValue)
       }
-      val NodeInsertResult(newBranchNode: BranchNode, changes) = put(temporalNode, searchKeySuffix, value)
+      val NodeInsertResult(newBranchNode, changes) = put(temporalNode, searchKeySuffix, value)
       val newExtNode = ExtensionNode(searchKeyPrefix, newBranchNode)
-      NodeInsertResult(
-        newNode = newExtNode,
-        changes = (changes :+ Removed(node)) :+ Updated(newExtNode)
-      )
+
+      NodeInsertResult(newExtNode, (changes :+ Removed(node)) :+ Updated(newExtNode))
     }
   }
 
   private def putInExtensionNode(extensionNode: ExtensionNode, searchKey: Array[Byte], value: Array[Byte]): NodeInsertResult = {
     val ExtensionNode(sharedKey, next) = extensionNode
+
     val ml = matchingLength(sharedKey, searchKey)
     if (ml == 0) {
-      // There is no common prefix with the node which means we have to replace it for a branch node
+      // there is no common prefix with the node which means we have to replace it for a branch node
       val sharedKeyHead = sharedKey(0)
       val (temporalBranchNode, maybeNewLeaf) = if (sharedKey.length == 1) {
-        // Direct extension, we just replace the extension with a branch
+        // direct extension, we just replace the extension with a branch
         (BranchNode.withSingleChild(sharedKeyHead, next, None), None)
       } else {
-        // The new branch node will have an extension that replaces current one
+        // the new branch node will have an extension that replaces current one
         val newExtNode = ExtensionNode(BytesUtil.tail(sharedKey), next)
         (BranchNode.withSingleChild(sharedKeyHead, newExtNode, None), Some(newExtNode))
       }
-      val NodeInsertResult(newBranchNode: BranchNode, changes) = put(temporalBranchNode, searchKey, value)
-      NodeInsertResult(
-        newNode = newBranchNode,
-        changes = (changes :+ Removed(extensionNode)) ++ maybeNewLeaf.map(Updated(_))
-      )
+      val NodeInsertResult(newBranchNode, changes) = put(temporalBranchNode, searchKey, value)
+
+      NodeInsertResult(newBranchNode, (changes :+ Removed(extensionNode)) ++ maybeNewLeaf.map(Updated(_)))
     } else if (ml == sharedKey.length) {
-      // Current extension node's key is a prefix of the one being inserted, so we insert recursively on the extension's child
-      val NodeInsertResult(newChild: BranchNode, changes) = put(getNextNode(extensionNode), BytesUtil.drop(searchKey, ml), value)
-      val newExtNode = ExtensionNode(sharedKey, newChild)
-      NodeInsertResult(
-        newNode = newExtNode,
-        changes = (changes :+ Removed(extensionNode)) :+ Updated(newExtNode)
-      )
+      // current extension node's key is a prefix of the one being inserted, so we insert recursively on the extension's child
+      val NodeInsertResult(newChildBranchNode, changes) = put(getNextNode(extensionNode), BytesUtil.drop(searchKey, ml), value)
+      val newExtNode = ExtensionNode(sharedKey, newChildBranchNode)
+
+      NodeInsertResult(newExtNode, (changes :+ Removed(extensionNode)) :+ Updated(newExtNode))
     } else {
-      // Partially shared prefix, we have to replace the node with an extension with the shared prefix
+      // partially shared prefix, we have to replace the node with an extension with the shared prefix
       val (sharedKeyPrefix, sharedKeySuffix) = BytesUtil.split(sharedKey, ml)
       val temporalExtensionNode = ExtensionNode(sharedKeySuffix, next)
-      val NodeInsertResult(newBranchNode: BranchNode, changes) = put(temporalExtensionNode, BytesUtil.drop(searchKey, ml), value)
+      val NodeInsertResult(newBranchNode, changes) = put(temporalExtensionNode, BytesUtil.drop(searchKey, ml), value)
       val newExtNode = ExtensionNode(sharedKeyPrefix, newBranchNode)
-      NodeInsertResult(
-        newNode = newExtNode,
-        changes = (changes :+ Removed(extensionNode)) :+ Updated(newExtNode)
-      )
+
+      NodeInsertResult(newExtNode, (changes :+ Removed(extensionNode)) :+ Updated(newExtNode))
     }
   }
 
   private def putInBranchNode(branchNode: BranchNode, searchKey: Array[Byte], value: Array[Byte]): NodeInsertResult = {
     val BranchNode(children, _) = branchNode
     if (searchKey.isEmpty) {
-      // The key is empty, the branch node should now be a terminator node with the new value asociated with it
+      // the key is empty, the branch node should now be a terminator node with the new value asociated with it
       val newBranchNode = BranchNode(children, Some(value))
-      NodeInsertResult(
-        newNode = newBranchNode,
-        changes = Vector(Removed(branchNode), Updated(newBranchNode))
-      )
+
+      NodeInsertResult(newBranchNode, Vector(Removed(branchNode), Updated(newBranchNode)))
     } else {
-      // Non empty key, we need to insert the value in the correct branch node's child
+      // non empty key, we need to insert the value in the correct branch node's child
       val searchKeyHead = searchKey(0).toInt
       val searchKeyTail = BytesUtil.tail(searchKey)
       if (children(searchKeyHead).isDefined) {
-        // The associated child is not empty, we recursively insert in that child
+        // the associated child is not empty, we recursively insert in that child
         val NodeInsertResult(changedChild, changes) = put(getChild(branchNode, searchKeyHead).get, searchKeyTail, value)
         val newBranchNode = branchNode.updateChild(searchKeyHead, changedChild)
-        NodeInsertResult(
-          newNode = newBranchNode,
-          changes = (changes :+ Removed(branchNode)) :+ Updated(newBranchNode)
-        )
+
+        NodeInsertResult(newBranchNode, (changes :+ Removed(branchNode)) :+ Updated(newBranchNode))
       } else {
-        // The associated child is empty, we just replace it with a leaf
+        // the associated child is empty, we just replace it with a leaf
         val newLeafNode = LeafNode(searchKeyTail, value)
         val newBranchNode = branchNode.updateChild(searchKeyHead, newLeafNode)
-        NodeInsertResult(
-          newNode = newBranchNode,
-          changes = Vector(Removed(branchNode), Updated(newLeafNode), Updated(newBranchNode))
-        )
+
+        NodeInsertResult(newBranchNode, Vector(Removed(branchNode), Updated(newLeafNode), Updated(newBranchNode)))
       }
     }
   }
@@ -310,6 +290,7 @@ final class MerklePatriciaTrie[K, V] private (
   override def remove(key: K): This = {
     rootHashOpt map { rootId =>
       val keyNibbles = HexPrefix.bytesToNibbles(bytes = kSerializer.toBytes(key))
+
       val root = getNode(rootId)
       remove(root, keyNibbles) match {
         case NodeRemoveResult(true, Some(newRoot), changes) =>
@@ -341,23 +322,24 @@ final class MerklePatriciaTrie[K, V] private (
 
   private def removeFromBranchNode(node: BranchNode, searchKey: Array[Byte]): NodeRemoveResult = {
     (node, searchKey.isEmpty) match {
-      // They key matches a branch node but it's value doesn't match the key
-      case (BranchNode(_, None), true) => NodeRemoveResult(hasChanged = false, newNode = None)
-      // We want to delete Branch node value
+      // they key matches a branch node but it's value doesn't match the key
+      case (BranchNode(_, None), true) =>
+        // we want to delete Branch node value
+        NodeRemoveResult(hasChanged = false, newNode = None)
 
       case (BranchNode(children, _), true) =>
-        // We need to remove old node and fix it because we removed the value
+        // we need to remove old node and fix it because we removed the value
         val fixedNode = fix(BranchNode(children, None), Vector())
         NodeRemoveResult(hasChanged = true, newNode = Some(fixedNode), changes = Vector(Removed(node), Updated(fixedNode)))
 
       case (branchNode @ BranchNode(children, optStoredValue), false) =>
-        // We might be trying to remove a node that's inside one of the 16 mapped nibbles
+        // we might be trying to remove a node that's inside one of the 16 mapped nibbles
         val searchKeyHead = searchKey(0)
         getChild(branchNode, searchKeyHead) map { child =>
-          // Child has been found so we try to remove it
+          // child has been found so we try to remove it
           remove(child, BytesUtil.tail(searchKey)) match {
             case NodeRemoveResult(true, maybeNewChild, changes) =>
-              // Something changed in a child so we need to fix
+              // something changed in a child so we need to fix
               val nodeToFix = maybeNewChild map { newChild =>
                 branchNode.updateChild(searchKeyHead, newChild)
               } getOrElse {
@@ -372,7 +354,7 @@ final class MerklePatriciaTrie[K, V] private (
                 changes = (changes :+ Removed(node)) :+ Updated(fixedNode)
               )
 
-            // No removal made on children, so we return without any change
+            // no removal made on children, so we return without any change
             case NodeRemoveResult(false, _, changes) =>
               NodeRemoveResult(
                 hasChanged = false,
@@ -381,7 +363,7 @@ final class MerklePatriciaTrie[K, V] private (
               )
           }
         } getOrElse {
-          // Child not found in this branch node, so key is not present
+          // child not found in this branch node, so key is not present
           NodeRemoveResult(hasChanged = false, newNode = None)
         }
     }
@@ -389,8 +371,9 @@ final class MerklePatriciaTrie[K, V] private (
 
   private def removeFromLeafNode(leafNode: LeafNode, searchKey: Array[Byte]): NodeRemoveResult = {
     val LeafNode(existingKey, _) = leafNode
+
     if (java.util.Arrays.equals(existingKey, searchKey)) {
-      // We found the node to delete
+      // we found the node to delete
       NodeRemoveResult(hasChanged = true, newNode = None, changes = Vector(Removed(leafNode)))
     } else {
       NodeRemoveResult(hasChanged = false, newNode = None)
@@ -399,16 +382,18 @@ final class MerklePatriciaTrie[K, V] private (
 
   private def removeFromExtensionNode(extensionNode: ExtensionNode, searchKey: Array[Byte]): NodeRemoveResult = {
     val ExtensionNode(sharedKey, _) = extensionNode
+
     val ml = matchingLength(sharedKey, searchKey)
     if (ml == sharedKey.length) {
-      // A child node of this extension is removed, so move forward
+      // a child node of this extension is removed, so move forward
       remove(getNextNode(extensionNode), BytesUtil.drop(searchKey, ml)) match {
         case NodeRemoveResult(true, maybeNewChild, changes) =>
-          // If we changed the child, we need to fix this extension node
+          // if we changed the child, we need to fix this extension node
           maybeNewChild map { newChild =>
             val toFix = ExtensionNode(sharedKey, newChild)
             val nodesToUpdate = changes.collect { case Updated(node) => node }
             val fixedNode = fix(toFix, nodesToUpdate)
+
             NodeRemoveResult(
               hasChanged = true,
               newNode = Some(fixedNode),
@@ -470,7 +455,7 @@ final class MerklePatriciaTrie[K, V] private (
       case extNode @ ExtensionNode(sharedKey, next) =>
         val nextNode = next match {
           case Left(nextHash) =>
-            // If the node is not in the extension node then it might be a node to be inserted at the end of this remove
+            // if the node is not in the extension node then it might be a node to be inserted at the end of this remove
             // so we search in this list too
             notStoredYet.find(n => java.util.Arrays.equals(n.hash, nextHash)).getOrElse(
               getNextNode(extNode) // We search for the node in the db
@@ -479,11 +464,11 @@ final class MerklePatriciaTrie[K, V] private (
         }
 
         nextNode match {
-          // Compact Two extensions into one
+          // compact Two extensions into one
           case ExtensionNode(subSharedKey, subNext) => ExtensionNode(BytesUtil.concat(sharedKey, subSharedKey), subNext)
-          // Compact the extension and the leaf into the same leaf node
+          // compact the extension and the leaf into the same leaf node
           case LeafNode(subRemainingKey, subValue)  => LeafNode(BytesUtil.concat(sharedKey, subRemainingKey), subValue)
-          // It's ok
+          // it's ok
           case _: BranchNode                        => node
         }
 
