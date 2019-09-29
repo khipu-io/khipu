@@ -1,39 +1,31 @@
 package khipu.storage.datasource
 
-import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.server.LogAppendResult
 import kafka.utils.Logging
 import kesque.Kesque
-import kesque.KesqueIndexLmdb
-import kesque.KesqueIndexRocksdb
+import kesque.KesqueIndex
 import khipu.Hash
 import khipu.TKeyVal
 import khipu.TVal
-import khipu.config.RocksdbConfig
 import khipu.crypto
 import khipu.util.FIFOCache
 import org.apache.kafka.common.record.CompressionType
 import org.apache.kafka.common.record.DefaultRecord
 import org.apache.kafka.common.record.DefaultRecordBatch
 import org.apache.kafka.common.record.SimpleRecord
-import org.lmdbjava.Env
 
 final class KesqueNodeDataSource(
     val topic:       String,
     kesqueDb:        Kesque,
-    lmdbOrRocksdb:   Either[Env[ByteBuffer], RocksdbConfig],
+    index:           KesqueIndex,
     cacheSize:       Int,
-    fetchMaxBytes:   Int                                    = kesque.DEFAULT_FETCH_MAX_BYTES,
-    compressionType: CompressionType                        = CompressionType.NONE
+    fetchMaxBytes:   Int             = kesque.DEFAULT_FETCH_MAX_BYTES,
+    compressionType: CompressionType = CompressionType.NONE
 ) extends NodeDataSource with Logging {
   type This = KesqueNodeDataSource
 
   private val cache = new FIFOCache[Hash, TVal](cacheSize)
-  private val index = lmdbOrRocksdb match {
-    case Left(lmdbEnv)        => new KesqueIndexLmdb(lmdbEnv, topic)
-    case Right(rocksdbConfig) => new KesqueIndexRocksdb(rocksdbConfig, topic, useShortKey = true)
-  }
 
   private val lock = new ReentrantReadWriteLock()
   private val readLock = lock.readLock
@@ -106,31 +98,38 @@ final class KesqueNodeDataSource(
     var records = Vector[SimpleRecord]()
     toUpsert foreach {
       case kv @ (key, value) =>
-        val record = new SimpleRecord(null, value)
-        if (firstTimestamp == Long.MinValue) {
-          firstTimestamp = 0
-        }
-        val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
-        //println(s"$newSize, $estimatedSize")
-        if (estimatedSize < fetchMaxBytes) {
-          tkvs :+= kv
-          records :+= record
+        getWithOffset(key, false) match {
+          case Some(TVal(value, offset)) =>
+            // already exists, added refer count?
+            ()
+            
+          case None =>
+            val record = new SimpleRecord(null, value)
+            if (firstTimestamp == Long.MinValue) {
+              firstTimestamp = 0
+            }
+            val (newSize, estimatedSize) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
+            //println(s"$newSize, $estimatedSize")
+            if (estimatedSize < fetchMaxBytes) {
+              tkvs :+= kv
+              records :+= record
 
-          size = newSize
-          offsetDelta += 1
-        } else {
-          batchedRecords :+= (tkvs, records)
-          tkvs = Vector[(Hash, Array[Byte])]()
-          records = Vector[SimpleRecord]()
+              size = newSize
+              offsetDelta += 1
+            } else {
+              batchedRecords :+= (tkvs, records)
+              tkvs = Vector[(Hash, Array[Byte])]()
+              records = Vector[SimpleRecord]()
 
-          tkvs :+= kv
-          records :+= record
+              tkvs :+= kv
+              records :+= record
 
-          size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
-          offsetDelta = 0
-          val (firstSize, _) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
-          size = firstSize
-          offsetDelta += 1
+              size = DefaultRecordBatch.RECORD_BATCH_OVERHEAD
+              offsetDelta = 0
+              val (firstSize, _) = estimateSizeInBytes(size, firstTimestamp, offsetDelta, record)
+              size = firstSize
+              offsetDelta += 1
+            }
         }
     }
 

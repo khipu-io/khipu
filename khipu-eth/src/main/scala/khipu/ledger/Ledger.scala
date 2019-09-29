@@ -347,7 +347,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val start = System.nanoTime
     blockchain.storages.accountNodeDataSource.clock.start()
     blockchain.storages.storageNodeDataSource.clock.start()
-    blockchain.storages.evmcodeDataSource.clock.start()
+    blockchain.storages.evmcodeNodeDataSource.clock.start()
     blockchain.storages.blockHeaderDataSource.clock.start()
     blockchain.storages.blockBodyDataSource.clock.start()
     blockchain.storages.accountNodeDataSource.resetCacheHitRate()
@@ -360,11 +360,11 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
     Future.sequence(fs) map { rs =>
       val dsGetElapsed1 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
-        blockchain.storages.evmcodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
+        blockchain.storages.evmcodeNodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
 
       blockchain.storages.accountNodeDataSource.clock.start()
       blockchain.storages.storageNodeDataSource.clock.start()
-      blockchain.storages.evmcodeDataSource.clock.start()
+      blockchain.storages.evmcodeNodeDataSource.clock.start()
       blockchain.storages.blockHeaderDataSource.clock.start()
       blockchain.storages.blockBodyDataSource.clock.start()
 
@@ -436,7 +436,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       }
 
       val dsGetElapsed2 = blockchain.storages.accountNodeDataSource.clock.elasped + blockchain.storages.storageNodeDataSource.clock.elasped +
-        blockchain.storages.evmcodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
+        blockchain.storages.evmcodeNodeDataSource.clock.elasped + blockchain.storages.blockHeaderDataSource.clock.elasped + blockchain.storages.blockBodyDataSource.clock.elasped
 
       val totalElasped = elapsed + reExecutedElapsed
       val dbReadTimePerc = if (totalElasped != 0) {

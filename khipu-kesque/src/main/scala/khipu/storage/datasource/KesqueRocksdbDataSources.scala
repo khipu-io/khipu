@@ -1,5 +1,6 @@
 package khipu.storage.datasource
 
+import kesque.KesqueIndexRocksdb
 import khipu.config.DbConfig
 import khipu.config.RocksdbConfig
 
@@ -14,9 +15,9 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with RocksdbSharedDataS
   // account trie node size evalution: account value - 4x256bytes ~ 288 + 1024
   // storage trie node size evalution: storage valye - 256bytes ~ 288 + 256 
 
-  lazy val accountNodeDataSource = new KesqueNodeDataSource(DbConfig.account, kesque, Right(rocksdbConfig), cacheSize = cacheCfg.cacheSize)
-  lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, Right(rocksdbConfig), cacheSize = cacheCfg.cacheSize)
-  lazy val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Right(rocksdbConfig), cacheSize = 10000)
+  lazy val accountNodeDataSource = new KesqueNodeDataSource(DbConfig.account, kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.account, useShortKey = true), cacheSize = cacheCfg.cacheSize)
+  lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.storage, useShortKey = true), cacheSize = cacheCfg.cacheSize)
+  lazy val evmcodeNodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.evmcode, useShortKey = true), cacheSize = 10000)
 
   lazy val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque, cacheSize = 1000)
   lazy val blockBodyDataSource = new KesqueBlockDataSource(DbConfig.body, kesque, cacheSize = 1000)
@@ -60,7 +61,7 @@ trait KesqueRocksdbDataSources extends KesqueDataSources with RocksdbSharedDataS
 
     accountNodeDataSource.stop()
     storageNodeDataSource.stop()
-    evmcodeDataSource.stop()
+    evmcodeNodeDataSource.stop()
     blockNumberDataSource.stop()
     blockHeaderDataSource.stop()
     blockBodyDataSource.stop()

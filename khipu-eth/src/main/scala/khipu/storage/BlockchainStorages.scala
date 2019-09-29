@@ -6,9 +6,10 @@ import khipu.storage.datasource.NodeDataSource
 
 trait BlockchainStorages {
   // -- data source
+
   def accountNodeDataSource: NodeDataSource
   def storageNodeDataSource: NodeDataSource
-  def evmcodeDataSource: NodeDataSource
+  def evmcodeNodeDataSource: NodeDataSource
 
   def blockNumberDataSource: KeyValueDataSource
 
@@ -20,9 +21,10 @@ trait BlockchainStorages {
   def transactionDataSource: KeyValueDataSource
 
   // -- storage
+
   def accountNodeStorage: NodeStorage
   def storageNodeStorage: NodeStorage
-  def evmcodeStorage: NodeStorage
+  def evmcodeNodeStorage: NodeStorage
 
   def blockNumberStorage: BlockNumberStorage
 
@@ -34,6 +36,7 @@ trait BlockchainStorages {
   def transactionStorage: TransactionStorage
 
   // -- others
+
   def blockNumbers: BlockNumbers
 
   def unconfirmedDepth: Int

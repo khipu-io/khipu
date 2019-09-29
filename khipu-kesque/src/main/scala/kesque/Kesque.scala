@@ -80,8 +80,8 @@ final class Kesque(props: Properties) {
     topicToTable.getOrElseUpdate(topics.mkString(","), new HashKeyValueTable(topics, this, true, cacheSize, fetchMaxBytes, compressionType))
   }
 
-  def getKesqueTable(topic: String, lmdbOrRocksdb: Either[Env[ByteBuffer], RocksdbConfig], cacheSize: Int, fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE) = {
-    topicToKesqueTable.getOrElseUpdate(topic, new KesqueNodeDataSource(topic, this, lmdbOrRocksdb, cacheSize, fetchMaxBytes, compressionType))
+  def getKesqueTable(topic: String, index: KesqueIndex, cacheSize: Int, fetchMaxBytes: Int = 4096, compressionType: CompressionType = CompressionType.NONE) = {
+    topicToKesqueTable.getOrElseUpdate(topic, new KesqueNodeDataSource(topic, this, index, cacheSize, fetchMaxBytes, compressionType))
   }
 
   def read(topic: String, fetchOffset: Long, fetchMaxBytes: Int) = {

@@ -37,7 +37,7 @@ trait LmdbDataSources extends LmdbSharedDataSources with DataSources {
 
   lazy val accountNodeDataSource = new LmdbNodeDataSource(DbConfig.account, lmdbEnv, cacheConf.cacheSize)
   lazy val storageNodeDataSource = new LmdbNodeDataSource(DbConfig.storage, lmdbEnv, cacheConf.cacheSize)
-  lazy val evmcodeDataSource = new LmdbNodeDataSource(DbConfig.evmcode, lmdbEnv, cacheSize = 10000)
+  lazy val evmcodeNodeDataSource = new LmdbNodeDataSource(DbConfig.evmcode, lmdbEnv, cacheSize = 10000)
 
   lazy val blockHeaderDataSource = new LmdbBlockDataSource(DbConfig.header, lmdbEnv, cacheSize = 1000)
   lazy val blockBodyDataSource = new LmdbBlockDataSource(DbConfig.body, lmdbEnv, cacheSize = 1000)

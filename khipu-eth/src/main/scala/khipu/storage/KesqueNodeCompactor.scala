@@ -6,6 +6,7 @@ import akka.event.Logging
 import java.io.File
 import java.nio.ByteBuffer
 import kesque.Kesque
+import kesque.KesqueIndexRocksdb
 import khipu.Hash
 import khipu.Khipu
 import khipu.TKeyVal
@@ -168,9 +169,9 @@ object KesqueNodeCompactor {
     println(s"kafka.server.properties: $configFile, datadir: $datadir")
     val rocksdbConfig = new RocksdbConfig(datadir, config.getConfig("db").getConfig("rocksdb"))
 
-    val accountDataSource = new KesqueNodeDataSource(DbConfig.account, kesque, Right(rocksdbConfig), cacheSize = 1000)
-    val storageDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, Right(rocksdbConfig), cacheSize = 1000)
-    val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Right(rocksdbConfig), cacheSize = 1000)
+    val accountDataSource = new KesqueNodeDataSource(DbConfig.account, kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.account, useShortKey = true), cacheSize = 1000)
+    val storageDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.storage, useShortKey = true), cacheSize = 1000)
+    val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.evmcode, useShortKey = true), cacheSize = 1000)
     val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque, cacheSize = 1000)
 
     (kesque, accountDataSource, storageDataSource, blockHeaderDataSource, rocksdbConfig)
@@ -186,7 +187,7 @@ object KesqueNodeCompactor {
     //val blockHeaderStorage = storages.blockHeaderStorage
     //val rocksdbConfig = storages.asInstanceOf[KesqueRocksdbDataSources].rocksdbConfig
 
-    val compactor = new KesqueNodeCompactor(kesque, accountDataSource, storageDataSource, Right(rocksdbConfig), blockHeaderStorage, 8445282)
+    val compactor = new KesqueNodeCompactor(kesque, accountDataSource, storageDataSource, rocksdbConfig, blockHeaderStorage, 8445282)
     compactor.start()
   }
 }
@@ -194,7 +195,7 @@ final class KesqueNodeCompactor(
     kesque:             Kesque,
     accountDataSource:  KesqueNodeDataSource,
     storageDataSource:  KesqueNodeDataSource,
-    lmdbOrRocksdb:      Either[Env[ByteBuffer], RocksdbConfig],
+    rocksdbConfig:      RocksdbConfig,
     blockHeaderStorage: KesqueBlockDataSource,
     blockNumber:        Long
 ) {
@@ -202,9 +203,9 @@ final class KesqueNodeCompactor(
 
   private val log = Logging(system, this)
 
-  private val targetAccountDataSource = new KesqueNodeDataSource(DbConfig.account + "~", kesque, lmdbOrRocksdb, cacheSize = 100)
-  private val targetStorageDataSource = new KesqueNodeDataSource(DbConfig.storage + "~", kesque, lmdbOrRocksdb, cacheSize = 100)
-  //private val targetEvmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode + "~", kesque, lmdbOrRocksdb, cacheSize = 100)
+  private val targetAccountDataSource = new KesqueNodeDataSource(DbConfig.account + "~", kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.account + "~", useShortKey = true), cacheSize = 100)
+  private val targetStorageDataSource = new KesqueNodeDataSource(DbConfig.storage + "~", kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.storage + "~", useShortKey = true), cacheSize = 100)
+  private val targetEvmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode + "~", kesque, new KesqueIndexRocksdb(rocksdbConfig, DbConfig.evmcode + "~", useShortKey = true), cacheSize = 100)
 
   private val storageWriter = new NodeWriter(DbConfig.storage, targetStorageDataSource)
   private val accountWriter = new NodeWriter(DbConfig.account, targetAccountDataSource)

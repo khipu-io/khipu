@@ -10,7 +10,7 @@ object Storages {
 
     lazy val accountNodeStorage = new NodeStorage(accountNodeDataSource, unconfirmedDepth)
     lazy val storageNodeStorage = new NodeStorage(storageNodeDataSource, unconfirmedDepth)
-    lazy val evmcodeStorage = new NodeStorage(evmcodeDataSource, unconfirmedDepth)
+    lazy val evmcodeNodeStorage = new NodeStorage(evmcodeNodeDataSource, unconfirmedDepth)
 
     lazy val blockNumberStorage = new BlockNumberStorage(blockNumberDataSource, unconfirmedDepth)
 
@@ -46,7 +46,7 @@ trait Storages extends BlockchainStorages {
   def swithToWithUnconfirmed() {
     accountNodeStorage.swithToWithUnconfirmed()
     storageNodeStorage.swithToWithUnconfirmed()
-    evmcodeStorage.swithToWithUnconfirmed()
+    evmcodeNodeStorage.swithToWithUnconfirmed()
 
     blockNumberStorage.swithToWithUnconfirmed()
 
@@ -63,7 +63,7 @@ trait Storages extends BlockchainStorages {
   def clearUnconfirmed() {
     accountNodeStorage.clearUnconfirmed()
     storageNodeStorage.clearUnconfirmed()
-    evmcodeStorage.clearUnconfirmed()
+    evmcodeNodeStorage.clearUnconfirmed()
 
     blockNumberStorage.clearUnconfirmed()
 

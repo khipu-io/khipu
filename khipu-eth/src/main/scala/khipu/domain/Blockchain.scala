@@ -171,7 +171,7 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
 
   private val accountNodeStorage = storages.accountNodeStorage
   private val storageNodeStorage = storages.storageNodeStorage
-  private val evmcodeStorage = storages.evmcodeStorage
+  private val evmcodeNodeStorage = storages.evmcodeNodeStorage
 
   private val blockHeaderStorage = storages.blockHeaderStorage
   private val blockBodyStorage = storages.blockBodyStorage
@@ -204,7 +204,7 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
     receiptsStorage.get(blockNumber)
 
   def getEvmcodeByHash(hash: Hash): Option[ByteString] =
-    evmcodeStorage.get(hash).map(ByteString(_))
+    evmcodeNodeStorage.get(hash).map(ByteString(_))
 
   def getTotalDifficultyByHash(hash: Hash): Option[DataWord] =
     blockNumbers.get(hash) flatMap totalDifficultyStorage.get
@@ -259,10 +259,10 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
   }
 
   def saveEvmcode(hash: Hash, evmCode: ByteString) =
-    evmcodeStorage.put(hash, evmCode.toArray)
+    evmcodeNodeStorage.put(hash, evmCode.toArray)
 
   def saveEvmcode_batched(kvs: Iterable[(Hash, ByteString)]) =
-    evmcodeStorage.update(Nil, kvs.map(x => x._1 -> x._2.toArray))
+    evmcodeNodeStorage.update(Nil, kvs.map(x => x._1 -> x._2.toArray))
 
   def saveTotalDifficulty(blockHash: Hash, td: DataWord) =
     blockNumbers.get(blockHash) foreach { blockNumber =>
@@ -303,7 +303,7 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
       this,
       accountNodeStorage,
       storageNodeStorage,
-      evmcodeStorage,
+      evmcodeNodeStorage,
       accountStartNonce,
       stateRootHash
     )
@@ -314,7 +314,7 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
       this,
       ReadOnlyNodeStorage(accountNodeStorage),
       ReadOnlyNodeStorage(storageNodeStorage),
-      evmcodeStorage,
+      evmcodeNodeStorage,
       accountStartNonce,
       stateRootHash
     )

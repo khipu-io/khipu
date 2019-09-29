@@ -126,7 +126,7 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
   private val blockHeaderStorage = storages.blockHeaderStorage
   private val accountNodeStorage = storages.accountNodeStorage
   private val storageNodeStorage = storages.storageNodeStorage
-  private val evmcodeStorage = storages.evmcodeStorage
+  private val evmcodeNodeStorage = storages.evmcodeNodeStorage
 
   private val storageReader = new NodeReader[DataWord](DbConfig.storage, storageNodeStorage)(trie.rlpDataWordSerializer) {
     override def nodeGot(k: Array[Byte], v: Array[Byte]) {
@@ -143,7 +143,7 @@ class DataChecker(storages: DefaultStorages, blockNumber: Long, stateRoot: Optio
         storageReader.getNode(account.stateRoot.bytes, blocknumber) map storageReader.processNode
       }
       if (account.codeHash != Account.EMPTY_CODE_HASH) {
-        evmcodeStorage.get(account.codeHash) match {
+        evmcodeNodeStorage.get(account.codeHash) match {
           case None => log.error(s"evmcode not found ${account.codeHash}, trie is inconsistent")
           case _    =>
         }

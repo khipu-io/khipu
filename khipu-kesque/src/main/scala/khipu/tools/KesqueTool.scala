@@ -3,6 +3,8 @@ package khipu.tools
 import java.io.File
 import java.nio.ByteBuffer
 import kesque.Kesque
+import kesque.KesqueIndexLmdb
+import kesque.KesqueIndexRocksdb
 import khipu.Hash
 import khipu.config.RocksdbConfig
 import khipu.crypto
@@ -57,8 +59,11 @@ class KesqueTool() {
     override val minWriteBufferNumberToMerge = 1
   }
 
+  lazy val lmdbIndex = new KesqueIndexLmdb(lmdbEnv, topic)
+  lazy val rocksdbIndex = new KesqueIndexRocksdb(rocksdbConfig, topic, useShortKey = true)
+
   def test(total: Int) = {
-    val table = kesque.getKesqueTable(topic, Right(rocksdbConfig), cacheSize = 10000, fetchMaxBytes = 4096)
+    val table = kesque.getKesqueTable(topic, rocksdbIndex, cacheSize = 10000, fetchMaxBytes = 4096)
 
     val keys = write(table, total)
     read(table, keys)

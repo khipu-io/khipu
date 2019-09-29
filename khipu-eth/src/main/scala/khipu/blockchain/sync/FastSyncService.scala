@@ -908,8 +908,8 @@ trait FastSyncService { _: SyncService =>
 
     private def saveEvmcodes(kvs: Iterable[(Hash, ByteString)]) {
       val start = System.nanoTime
-      saveNodes(evmcodeStorage, kvs.map(x => x._1 -> x._2.toArray))
-      log.debug(s"saveEvmcodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
+      saveNodes(evmcodeNodeStorage, kvs.map(x => x._1 -> x._2.toArray))
+      log.debug(s"saveEvmcodeNodes ${kvs.size} in ${(System.nanoTime - start) / 1000000}ms")
     }
 
     private def saveNodes(storage: SimpleMap[Hash, Array[Byte]], kvs: Iterable[(Hash, Array[Byte])]) {

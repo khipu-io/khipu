@@ -1,6 +1,7 @@
 package khipu.storage.datasource
 
 import java.io.File
+import kesque.KesqueIndexLmdb
 import khipu.config.DbConfig
 import khipu.config.LmdbConfig
 import org.lmdbjava.Env
@@ -29,9 +30,9 @@ trait KesqueLmdbDataSources extends KesqueDataSources with LmdbSharedDataSources
   // account trie node size evalution: account value - 4x256bytes ~ 288 + 1024
   // storage trie node size evalution: storage valye - 256bytes ~ 288 + 256 
 
-  lazy val accountNodeDataSource = new KesqueNodeDataSource(DbConfig.account, kesque, Left(lmdbEnv), cacheSize = cacheCfg.cacheSize)
-  lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, Left(lmdbEnv), cacheSize = cacheCfg.cacheSize)
-  lazy val evmcodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, Left(lmdbEnv), cacheSize = 10000)
+  lazy val accountNodeDataSource = new KesqueNodeDataSource(DbConfig.account, kesque, new KesqueIndexLmdb(lmdbEnv, DbConfig.account), cacheSize = cacheCfg.cacheSize)
+  lazy val storageNodeDataSource = new KesqueNodeDataSource(DbConfig.storage, kesque, new KesqueIndexLmdb(lmdbEnv, DbConfig.storage), cacheSize = cacheCfg.cacheSize)
+  lazy val evmcodeNodeDataSource = new KesqueNodeDataSource(DbConfig.evmcode, kesque, new KesqueIndexLmdb(lmdbEnv, DbConfig.evmcode), cacheSize = 10000)
 
   lazy val blockHeaderDataSource = new KesqueBlockDataSource(DbConfig.header, kesque, cacheSize = 1000)
   lazy val blockBodyDataSource = new KesqueBlockDataSource(DbConfig.body, kesque, cacheSize = 1000)
@@ -60,7 +61,7 @@ trait KesqueLmdbDataSources extends KesqueDataSources with LmdbSharedDataSources
   //
   //  lazy val accountNodeDataSource = new KesqueDataSource(accountTable, DbConfig.account)
   //  lazy val storageNodeDataSource = new KesqueDataSource(storageTable, DbConfig.storage)
-  //  lazy val evmCodeDataSource = new KesqueDataSource(evmcodeTable, DbConfig.evmcode)
+  //  lazy val evmCodeNodeDataSource = new KesqueDataSource(evmcodeTable, DbConfig.evmcode)
   //
   //  lazy val blockHeaderDataSource = new KesqueDataSource(blockTable, DbConfig.header)
   //  lazy val blockBodyDataSource = new KesqueDataSource(blockTable, DbConfig.body)

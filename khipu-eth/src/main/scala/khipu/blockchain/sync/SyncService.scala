@@ -91,7 +91,7 @@ final class SyncService() extends FastSyncService with RegularSyncService with H
   protected val appStateStorage = storages.appStateStorage
   protected val accountNodeStorage = storages.accountNodeStorage
   protected val storageNodeStorage = storages.storageNodeStorage
-  protected val evmcodeStorage = storages.evmcodeStorage
+  protected val evmcodeNodeStorage = storages.evmcodeNodeStorage
   protected val blockHeaderStorage = storages.blockHeaderStorage
 
   protected val mediator = DistributedPubSub(context.system).mediator
