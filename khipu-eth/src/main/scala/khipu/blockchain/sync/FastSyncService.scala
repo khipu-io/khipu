@@ -47,7 +47,8 @@ import scala.util.Success
  *
  */
 object FastSyncService {
-  case object RetryStart
+  case object RetryStartTask
+  case object RetryStartTick
 
   private case object BlockHeadersTimeout
   private case object TargetBlockTimeout
@@ -124,11 +125,11 @@ trait FastSyncService { _: SyncService =>
   }
 
   private def fastSyncBehavior: Receive = peerUpdateBehavior orElse ommersBehavior orElse stopBehavior orElse {
-    case RetryStart => startFastSync()
+    case RetryStartTick => startFastSync()
   }
 
   private def scheduleStartRetry(interval: FiniteDuration) = {
-    context.system.scheduler.scheduleOnce(interval, self, RetryStart)
+    timers.startSingleTimer(RetryStartTask, RetryStartTick, interval)
   }
 
   private def startFastSyncFromScratch() = {
@@ -313,8 +314,8 @@ trait FastSyncService { _: SyncService =>
 
     log.info(s"[fast] sync to target block header: \n${syncState.targetBlockHeader}")
 
-    timers.startPeriodicTimer(ProcessSyncingTask, ProcessSyncingTick, syncRetryInterval)
-    timers.startPeriodicTimer(ReportSyncStateTask, ReportSyncStateTick, persistStateSnapshotInterval)
+    timers.startTimerWithFixedDelay(ProcessSyncingTask, ProcessSyncingTick, syncRetryInterval)
+    timers.startTimerWithFixedDelay(ReportSyncStateTask, ReportSyncStateTick, persistStateSnapshotInterval)
 
     reportState
     reportStatus()

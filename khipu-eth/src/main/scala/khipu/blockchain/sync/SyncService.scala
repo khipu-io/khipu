@@ -7,7 +7,6 @@ import akka.actor.ActorSystem
 import akka.actor.PoisonPill
 import akka.actor.Props
 import akka.actor.Timers
-import akka.cluster.client.ClusterClientReceptionist
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.singleton.ClusterSingletonManager
 import akka.cluster.singleton.ClusterSingletonManagerSettings
@@ -58,7 +57,6 @@ object SyncService {
         settings = settings
       ), name = proxyName
     )
-    ClusterClientReceptionist(system).registerService(proxy)
     proxy
   }
 
@@ -102,7 +100,7 @@ final class SyncService() extends FastSyncService with RegularSyncService with H
   protected def peerManager = serviceBoard.peerManage
   protected def pendingTransactionsService = PendingTransactionsService.proxy(context.system)
 
-  timers.startPeriodicTimer(SuspendPeerTask, SuspendPeerTick, 5.seconds)
+  timers.startTimerWithFixedDelay(SuspendPeerTask, SuspendPeerTick, 5.seconds)
 
   override def postStop() {
     super.postStop()

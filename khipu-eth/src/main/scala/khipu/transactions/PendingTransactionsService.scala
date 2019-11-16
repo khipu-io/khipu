@@ -1,7 +1,6 @@
 package khipu.transactions
 
 import akka.actor.{ Actor, ActorRef, ActorLogging, Props, ActorSystem, PoisonPill }
-import akka.cluster.client.ClusterClientReceptionist
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Publish
 import akka.cluster.singleton.ClusterSingletonManager
@@ -50,7 +49,6 @@ object PendingTransactionsService {
         settings = settings
       ), name = proxyName
     )
-    ClusterClientReceptionist(system).registerService(proxy)
     proxy
   }
 

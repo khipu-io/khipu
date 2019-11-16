@@ -117,8 +117,6 @@ object Khipu {
   def startOutgoing_test(uri: URI) {
     log.info(s"uri: $uri")
 
-    import serviceBoard.materializer
-
     val peer = new OutgoingPeer(Peer.peerId(uri).get, uri)
     val authHandshake = AuthHandshake(serviceBoard.nodeKey, serviceBoard.secureRandom)
     val handshake = new EtcHandshake(serviceBoard.nodeStatus, serviceBoard.blockchain, serviceBoard.storages.appStateStorage, serviceBoard.peerConfig, serviceBoard.forkResolverOpt)
@@ -146,8 +144,6 @@ object Khipu {
   }
 
   def startIncomingServer() {
-    import serviceBoard.materializer
-
     val authHandshake = AuthHandshake(serviceBoard.nodeKey, serviceBoard.secureRandom)
     val handshake = new EtcHandshake(serviceBoard.nodeStatus, serviceBoard.blockchain, serviceBoard.storages.appStateStorage, serviceBoard.peerConfig, serviceBoard.forkResolverOpt)
     RLPx.startIncoming(

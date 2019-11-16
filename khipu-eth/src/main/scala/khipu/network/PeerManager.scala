@@ -2,11 +2,14 @@ package khipu.network
 
 import akka.actor.Actor
 import akka.actor.ActorLogging
+import akka.actor.ActorSystem
 import akka.actor.OneForOneStrategy
 import akka.actor.Props
 import akka.actor.SupervisorStrategy
+import akka.actor.Timers
 import akka.pattern.ask
 import akka.pattern.pipe
+import akka.stream.Materializer
 import akka.util.Timeout
 import java.net.URI
 import khipu.network.PeerEntity.Status.Handshaked
@@ -32,8 +35,11 @@ object PeerManager {
   final case class DropNode(peerId: String)
 
   final case class SendMessage(peerId: String, message: MessageSerializable)
+
+  final case object UpdateNodesTask
+  final case object UpdateNodesTick
 }
-class PeerManager(peerConfig: PeerConfiguration) extends Actor with ActorLogging {
+class PeerManager(peerConfig: PeerConfiguration) extends Actor with Timers with ActorLogging {
   import context.dispatcher
   import PeerManager._
 
@@ -49,8 +55,6 @@ class PeerManager(peerConfig: PeerConfiguration) extends Actor with ActorLogging
   private val serviceBoard = ServiceBoard(context.system)
   private def nodeDiscovery = NodeDiscoveryService.proxy(context.system)
 
-  private def scheduler = context.system.scheduler
-
   private def reportIntervalThreshold = if (peersHandshaked.size >= 5 || peersHandshaked.size == peerConfig.maxPeers) 16 else 1
   private var reportIntervalCount = 0
 
@@ -58,18 +62,12 @@ class PeerManager(peerConfig: PeerConfiguration) extends Actor with ActorLogging
     case _ => SupervisorStrategy.Restart
   }
 
-  val schedulers = List(
-    scheduler.schedule(peerConfig.updateNodesInitialDelay, peerConfig.updateNodesInterval) {
-      if (nodeDiscovery ne null) { // we are not sure whether nodeDiscovery started
-        nodeDiscovery ! NodeDiscoveryService.GetDiscoveredNodes
-      }
-    }
-  )
+  timers.startTimerWithFixedDelay(UpdateNodesTask, UpdateNodesTick, peerConfig.updateNodesInterval)
 
   //knownNodesService ! KnownNodesService.GetKnownNodes
 
   override def postStop() {
-    schedulers foreach (_.cancel)
+    timers.cancel(UpdateNodesTask)
     super.postStop()
     log.info("[peer] PeerManager stopped")
   }
@@ -157,6 +155,11 @@ class PeerManager(peerConfig: PeerConfiguration) extends Actor with ActorLogging
     case SendMessage(peerId, message) =>
       peersHandshaked.get(peerId) foreach { _.entity ! PeerEntity.MessageToPeer(peerId, message) }
 
+    case UpdateNodesTick =>
+      if (nodeDiscovery ne null) { // we are not sure whether nodeDiscovery started
+        nodeDiscovery ! NodeDiscoveryService.GetDiscoveredNodes
+      }
+
     case PeerEntity.PeerEntityStopped(peerId) =>
       log.debug(s"[peer] PeerEntityStopped: $peerId")
       peers -= peerId
@@ -170,8 +173,6 @@ class PeerManager(peerConfig: PeerConfiguration) extends Actor with ActorLogging
 
       val peer = new OutgoingPeer(peerId, uri)
       peersGoingToConnect += (peerId -> peer)
-
-      import serviceBoard.materializer
 
       val authHandshake = AuthHandshake(serviceBoard.nodeKey, serviceBoard.secureRandom)
       val handshake = new EtcHandshake(serviceBoard.nodeStatus, serviceBoard.blockchain, serviceBoard.storages.appStateStorage, peerConfig, serviceBoard.forkResolverOpt)

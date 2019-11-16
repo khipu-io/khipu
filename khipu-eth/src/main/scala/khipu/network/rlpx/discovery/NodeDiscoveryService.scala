@@ -7,7 +7,6 @@ import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.actor.PoisonPill
 import akka.actor.Timers
-import akka.cluster.client.ClusterClientReceptionist
 import akka.cluster.singleton.ClusterSingletonManager
 import akka.cluster.singleton.ClusterSingletonManagerSettings
 import akka.cluster.singleton.ClusterSingletonProxy
@@ -105,7 +104,6 @@ object NodeDiscoveryService {
         settings = settings
       ), name = proxyName
     )
-    ClusterClientReceptionist(system).registerService(proxy)
     proxy
   }
 
@@ -247,7 +245,7 @@ class NodeDiscoveryService(
       nodeStatus = nodeStatus.copy(discoveryStatus = ServerStatus.Listening(local))
       context become (udpBehavior(socket) orElse businessBehavior(socket))
 
-      timers.startPeriodicTimer(ScanTask, ScanTick, discoveryConfig.scanInterval)
+      timers.startTimerWithFixedDelay(ScanTask, ScanTick, discoveryConfig.scanInterval)
   }
 
   def udpBehavior(socket: ActorRef): Receive = {

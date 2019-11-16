@@ -71,7 +71,7 @@ final class NodeEntity() extends Actor with Stash with Timers with ActorLogging 
 
   private var lastActiveTime = LocalDateTime.now()
 
-  timers.startPeriodicTimer(ActiveCheckTickKey, ActiveCheckTick, 5.minutes)
+  timers.startTimerWithFixedDelay(ActiveCheckTickKey, ActiveCheckTick, 5.minutes)
 
   override def postStop() {
     log.debug(s"${self.path.name} stopped")

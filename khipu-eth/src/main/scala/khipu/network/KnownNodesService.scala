@@ -1,7 +1,6 @@
 package khipu.network
 
-import akka.actor.{ Actor, ActorLogging, Props, Scheduler, ActorSystem, ActorRef, PoisonPill }
-import akka.cluster.client.ClusterClientReceptionist
+import akka.actor.{ Actor, ActorLogging, Props, Scheduler, ActorSystem, ActorRef, PoisonPill, Timers }
 import akka.cluster.singleton.ClusterSingletonManager
 import akka.cluster.singleton.ClusterSingletonManagerSettings
 import akka.cluster.singleton.ClusterSingletonProxy
@@ -44,7 +43,6 @@ object KnownNodesService {
         settings = settings
       ), name = proxyName
     )
-    ClusterClientReceptionist(system).registerService(proxy)
     proxy
   }
 
@@ -55,7 +53,8 @@ object KnownNodesService {
   final case class KnownNodes(nodes: Set[URI])
   case object GetKnownNodes
 
-  private case object PersistChanges
+  private case object PersistChangesTask
+  private case object PersistChangesTick
 
   object KnownNodesServiceConfig {
     def apply(etcClientConfig: Config): KnownNodesServiceConfig = {
@@ -69,21 +68,17 @@ object KnownNodesService {
   final case class KnownNodesServiceConfig(persistInterval: FiniteDuration, maxPersistedNodes: Int)
 }
 class KnownNodesService(
-  config:               KnownNodesService.KnownNodesServiceConfig,
-  knownNodesStorage:    KnownNodesStorage,
-  externalSchedulerOpt: Option[Scheduler]                         = None
-)
-    extends Actor with ActorLogging {
-
+    config:               KnownNodesService.KnownNodesServiceConfig,
+    knownNodesStorage:    KnownNodesStorage,
+    externalSchedulerOpt: Option[Scheduler]                         = None
+) extends Actor with Timers with ActorLogging {
   import KnownNodesService._
-
-  private def scheduler = externalSchedulerOpt getOrElse context.system.scheduler
 
   private var knownNodes: Set[URI] = knownNodesStorage.getKnownNodes
   private var toAdd: Set[URI] = Set.empty
   private var toRemove: Set[URI] = Set.empty
 
-  scheduler.schedule(config.persistInterval, config.persistInterval, self, PersistChanges)
+  timers.startTimerWithFixedDelay(PersistChangesTask, PersistChangesTick, config.persistInterval)
 
   override def receive: Receive = {
     case AddKnownNode(uri) =>
@@ -103,7 +98,7 @@ class KnownNodesService(
     case GetKnownNodes =>
       sender() ! KnownNodes(knownNodes)
 
-    case PersistChanges =>
+    case PersistChangesTick =>
       persistChanges()
   }
 

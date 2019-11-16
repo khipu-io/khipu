@@ -4,9 +4,8 @@ import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{ MalformedRequestContentRejection, RejectionHandler, Route }
+import akka.http.scaladsl.server.{ MalformedRequestContentRejection, RejectionHandler }
 import akka.http.scaladsl.server.Directives._
-import akka.stream.ActorMaterializer
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 import khipu.jsonrpc.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
@@ -28,8 +27,7 @@ object JsonRpcHttpServer {
 
 }
 // curl localhost:8546 -H 'Content-Type: application/json' -X POST --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":[5000000, true],"id":1}' 
-class JsonRpcHttpServer(jsonRpcController: JsonRpcController, config: JsonRpcHttpServerConfig)(implicit val system: ActorSystem) extends Json4sSupport {
-
+class JsonRpcHttpServer(jsonRpcController: JsonRpcController, config: JsonRpcHttpServerConfig)(implicit system: ActorSystem) extends Json4sSupport {
   private val log = Logging(system, this.getClass)
 
   implicit val serialization = native.Serialization
@@ -44,7 +42,7 @@ class JsonRpcHttpServer(jsonRpcController: JsonRpcController, config: JsonRpcHtt
         complete((StatusCodes.BadRequest, JsonRpcResponse("2.0", None, Some(JsonRpcErrors.ParseError), JInt(0))))
     }.result()
 
-  val route: Route = cors(corsSettings) {
+  val route = cors(corsSettings) {
     (pathEndOrSingleSlash & post) {
       entity(as[JsonRpcRequest]) { request =>
         handleRequest(request)
@@ -55,7 +53,6 @@ class JsonRpcHttpServer(jsonRpcController: JsonRpcController, config: JsonRpcHtt
   }
 
   def run() {
-    implicit val materializer = ActorMaterializer()
 
     val bindingResultF = Http(system).bindAndHandle(route, config.interface, config.port)
 

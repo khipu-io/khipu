@@ -2,7 +2,6 @@ package khipu.network.rlpx
 
 import akka.actor.ActorSystem
 import akka.io.Inet.SocketOption
-import akka.stream.Materializer
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.stream.scaladsl.Tcp
@@ -32,8 +31,7 @@ object RLPx {
     socketOptions:   immutable.Traversable[SocketOption] = Nil,
     halfClose:       Boolean                             = false,
     idleTimeout:     Duration                            = Duration.Inf
-  )(system: ActorSystem)(implicit mat: Materializer) {
-    implicit val _s = system
+  )(implicit system: ActorSystem) {
 
     // TODO limit max incoming connections
     val connectionSink = Sink.foreach[Tcp.IncomingConnection] { incomingConn =>
@@ -63,8 +61,7 @@ object RLPx {
     protocolVersion: Message.Version,
     authHandshake:   AuthHandshake,
     handshake:       EtcHandshake
-  )(system: ActorSystem)(implicit mat: Materializer) {
-    implicit val _s = system
+  )(implicit system: ActorSystem) {
     val remoteAddr: InetSocketAddress = new InetSocketAddress(peer.uri.get.getHost, peer.uri.get.getPort)
     val tcpFlow = Tcp().outgoingConnection(remoteAddr)
     val outgoingLayer = BluePrint(peer, messageDecoder, protocolVersion, authHandshake, handshake)

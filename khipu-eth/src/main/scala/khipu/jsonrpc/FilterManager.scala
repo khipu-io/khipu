@@ -1,6 +1,6 @@
 package khipu.jsonrpc
 
-import akka.actor.{ Actor, Cancellable, Props, Scheduler }
+import akka.actor.{ Actor, Cancellable, Props, Scheduler, Timers }
 import akka.pattern.{ ask, pipe }
 import akka.util.ByteString
 import akka.util.Timeout
@@ -81,7 +81,7 @@ object FilterManager {
   final case class BlockFilterLogs(blockHashes: Seq[Hash]) extends FilterLogs
   final case class PendingTransactionFilterLogs(txHashes: Seq[Hash]) extends FilterLogs
 
-  private case class FilterTimeout(id: DataWord)
+  final case class FilterTimeout(id: DataWord)
 }
 class FilterManager(
     blockchain:      Blockchain,
@@ -90,14 +90,12 @@ class FilterManager(
     keyStore:        KeyStore.I,
     filterConfig:    FilterConfig,
     txPoolConfig:    TxPoolConfig
-) extends Actor {
+) extends Actor with Timers {
 
   import FilterManager._
   import context.system
 
   def pendingTransactionsService = PendingTransactionsService.proxy(system)
-
-  def scheduler: Scheduler = system.scheduler
 
   val maxBlockHashesChanges = 256
 
@@ -107,7 +105,7 @@ class FilterManager(
 
   var lastCheckTimestamps: Map[DataWord, Long] = Map.empty
 
-  var filterTimeouts: Map[DataWord, Cancellable] = Map.empty
+  var filterTimeouts: Map[DataWord, DataWord] = Map.empty
 
   implicit val timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
 
@@ -125,9 +123,9 @@ class FilterManager(
   }
 
   private def resetTimeout(id: DataWord) {
-    filterTimeouts.get(id).foreach(_.cancel())
-    val timeoutCancellable = scheduler.scheduleOnce(filterConfig.filterTimeout, self, FilterTimeout(id))
-    filterTimeouts += (id -> timeoutCancellable)
+    filterTimeouts.get(id).foreach(timers.cancel)
+    val timeoutCancellable = timers.startSingleTimer(id, FilterTimeout(id), filterConfig.filterTimeout)
+    filterTimeouts += (id -> id)
   }
 
   private def addFilterAndSendResponse(filter: Filter): Unit = {
@@ -142,7 +140,7 @@ class FilterManager(
     filters -= id
     lastCheckBlocks -= id
     lastCheckTimestamps -= id
-    filterTimeouts.get(id).foreach(_.cancel())
+    filterTimeouts.get(id).foreach(timers.cancel)
     filterTimeouts -= id
     sender() ! UninstallFilterResponse()
   }

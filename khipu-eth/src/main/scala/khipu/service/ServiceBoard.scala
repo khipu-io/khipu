@@ -6,7 +6,6 @@ import akka.actor.ExtensionId
 import akka.actor.ExtensionIdProvider
 import akka.cluster.Cluster
 import akka.event.Logging
-import akka.stream.ActorMaterializer
 import java.io.File
 import java.io.PrintWriter
 import java.security.SecureRandom
@@ -77,8 +76,6 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
    * Returns true if this member is not tagged with the role configured for the mediator.
    */
   def isTerminated: Boolean = Cluster(system).isTerminated || !role.forall(Cluster(system).selfRoles.contains)
-
-  implicit val materializer = ActorMaterializer()(system)
 
   val config = KhipuConfig.config
   val dbConfig = new DbConfig(config.getConfig("db"))
