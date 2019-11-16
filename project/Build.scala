@@ -110,8 +110,8 @@ object Build extends sbt.Build {
 
 object Dependencies {
 
-  private val AKKA_VERSION = "2.5.23"
-  private val AKKA_HTTP_VERSION = "10.1.9"
+  private val AKKA_VERSION = "2.6.0"
+  private val AKKA_HTTP_VERSION = "10.1.10"
   private val SLF4J_VERSION = "1.7.24"
   private val CIRCE_VERSION = "0.7.0"
 
@@ -125,7 +125,6 @@ object Dependencies {
     "com.typesafe.akka" %% "akka-slf4j" % AKKA_VERSION,
     "com.typesafe.akka" %% "akka-testkit" % AKKA_VERSION % Test,
     "com.typesafe.akka" %% "akka-multi-node-testkit" % AKKA_VERSION % Test,
-    "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.50-M2" % Runtime,
     "org.iq80.leveldb" % "leveldb" % "0.10",
     "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8" % Runtime
   )
@@ -133,9 +132,14 @@ object Dependencies {
   val akka_http = Seq(
     "com.typesafe.akka" %% "akka-http-core" % AKKA_HTTP_VERSION,
     "com.typesafe.akka" %% "akka-http" % AKKA_HTTP_VERSION,
-    "com.typesafe.akka" %% "akka-http-spray-json" % AKKA_HTTP_VERSION,
-    "com.lightbend.akka" %% "akka-management-cluster-http" % "0.6"
+    "com.typesafe.akka" %% "akka-http-spray-json" % AKKA_HTTP_VERSION
   )
+
+  val akka_management = Seq(
+    "com.lightbend.akka.management" %% "akka-management" % "1.0.4",
+    "com.lightbend.akka.management" %% "akka-management-cluster-http" % "1.0.4"
+  )
+
 
   val lmdb = Seq("org.lmdbjava" % "lmdbjava" % "0.7.0") // akka-distributed-data also includes this lib
 
