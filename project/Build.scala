@@ -145,13 +145,6 @@ object Dependencies {
 
   val rocksdb = Seq("org.rocksdb" % "rocksdbjni" % "6.2.2")
 
-  val circe = Seq(
-    "io.circe" %% "circe-core" % CIRCE_VERSION,
-    "io.circe" %% "circe-generic" % CIRCE_VERSION,
-    "io.circe" %% "circe-parser" % CIRCE_VERSION,
-    "io.circe" %% "circe-generic-extras" % CIRCE_VERSION
-  )
-
   val kafka = Seq(
     "org.apache.kafka" % "kafka-clients" % "2.0.0",
     "org.apache.kafka" %% "kafka" % "2.0.0"
