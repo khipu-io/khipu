@@ -250,19 +250,14 @@ class NodeDiscoveryService(
 
   def udpBehavior(socket: ActorRef): Receive = {
     case Udp.Received(data, remote) =>
-      log.debug(s"DiscoveryService received data from $remote")
-
       val msgReceivedTry = for {
         packet <- Packet.decodePacket(data)
         message <- Packet.extractMessage(packet)
       } yield MessageReceived(message, remote, packet)
 
       msgReceivedTry match {
-        case Success(msg) =>
-          log.debug(s"[disc] Received ${msg.message} from $remote")
-          receiveMessage(socket, msg)
-        case Failure(ex) =>
-          log.debug(s"[disc] Unable to decode discovery packet from ${remote}", ex)
+        case Success(msg) => receiveMessage(socket, msg)
+        case Failure(ex)  => log.debug(s"[disc] Unable to decode discovery packet from ${remote}", ex)
       }
 
     case Udp.Unbind =>
@@ -289,31 +284,29 @@ class NodeDiscoveryService(
 
   private def receiveMessage(socket: ActorRef, msg: MessageReceived) {
     msg match {
-      case MessageReceived(Ping(_version, _from, _to, _timestamp), from, packet) =>
-        val to = Endpoint(packet.nodeId, from.getPort, from.getPort)
-        sendMessage(socket, Pong(to, packet.mdc, expirationTimestamp), from)
+      case MessageReceived(Ping(version, _from, _to, _timestamp), from, packet) =>
+        if (version == VERSION) {
+          val node = Node(packet.nodeId, from, System.currentTimeMillis)
+          addToNodes(node, from, socket)
+
+          val to = Endpoint(packet.nodeId, from.getPort, from.getPort)
+          sendMessage(socket, Pong(to, packet.mdc, expirationTimestamp), from)
+        }
 
       case MessageReceived(Pong(_to, _token, _timestamp), from, packet) =>
-        val pongNode = Node(packet.nodeId, from, System.currentTimeMillis)
-        log.debug(s"[disc] Pong from ${pongNode.uri}")
+        log.debug(s"[disc] Received Pong from $from")
 
-        if (this.nodes.size < discoveryConfig.nodesLimit) {
-          this.nodes += (pongNode.id -> pongNode)
-          sendMessage(socket, FindNode(ByteString(nodeStatus.nodeId), expirationTimestamp), from)
-        } else {
-          val (earliestNode, _) = this.nodes.minBy { case (_, node) => node.addTimestamp }
-          this.nodes -= earliestNode
-          this.nodes += (pongNode.id -> pongNode)
-        }
+        val node = Node(packet.nodeId, from, System.currentTimeMillis)
+        addToNodes(node, from, socket)
 
       case MessageReceived(FindNode(_target, _expires), from, packet) =>
         sendMessage(socket, Neighbours(Nil, expirationTimestamp), from)
 
       case MessageReceived(Neighbours(_nodes, _expires), from, packet) =>
+        log.debug(s"[disc] Received neighbours ${_nodes.size} from $from")
+
         val toPings = _nodes.filterNot(n => this.nodes.contains(n.nodeId))
           .take(discoveryConfig.nodesLimit - this.nodes.size)
-
-        log.debug(s"[disc] Received neighbours ${_nodes.size}, will ping new known ${toPings.size}")
 
         toPings foreach { n =>
           sendPing(socket, n.nodeId, n.endpoint.udpAddress)
@@ -331,9 +324,7 @@ class NodeDiscoveryService(
 
         val from = Endpoint(ByteString(address.getAddress.getAddress), address.getPort, tcpPort)
         val to = Endpoint(toNodeId, toAddr.getPort, toAddr.getPort)
-        sendMessage(socket, Ping(Version, from, to, expirationTimestamp), toAddr)
-
-        log.debug(s"Sent ping to ${toAddr}")
+        sendMessage(socket, Ping(VERSION, from, to, expirationTimestamp), toAddr)
 
       case ServerStatus.NotListening =>
         log.warning("[disc] UDP server not running. Not sending ping message.")
@@ -350,6 +341,17 @@ class NodeDiscoveryService(
 
       case ServerStatus.NotListening =>
         log.warning(s"[disc] UDP server not running. Not sending message $message.")
+    }
+  }
+
+  private def addToNodes(node: Node, from: InetSocketAddress, socket: ActorRef) {
+    if (this.nodes.size < discoveryConfig.nodesLimit) {
+      this.nodes += (node.id -> node)
+      sendMessage(socket, FindNode(ByteString(nodeStatus.nodeId), expirationTimestamp), from)
+    } else {
+      val (earliestNode, _) = this.nodes.minBy { case (_, node) => node.addTimestamp }
+      this.nodes -= earliestNode
+      this.nodes += (node.id -> node)
     }
   }
 

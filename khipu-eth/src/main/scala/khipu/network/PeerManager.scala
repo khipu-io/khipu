@@ -2,14 +2,12 @@ package khipu.network
 
 import akka.actor.Actor
 import akka.actor.ActorLogging
-import akka.actor.ActorSystem
 import akka.actor.OneForOneStrategy
 import akka.actor.Props
 import akka.actor.SupervisorStrategy
 import akka.actor.Timers
 import akka.pattern.ask
 import akka.pattern.pipe
-import akka.stream.Materializer
 import akka.util.Timeout
 import java.net.URI
 import khipu.network.PeerEntity.Status.Handshaked

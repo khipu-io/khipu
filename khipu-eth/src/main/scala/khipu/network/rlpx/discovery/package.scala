@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 
 package object discovery {
 
-  val Version = 4
+  val VERSION = 4
 
   sealed trait Message {
     def packetType: Byte
