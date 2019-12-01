@@ -17,6 +17,7 @@ sealed trait ServerStatus
 
 final case class NodeStatus(
     key:             AsymmetricCipherKeyPair,
+    id:              Array[Byte],
     serverStatus:    ServerStatus,
     discoveryStatus: ServerStatus
 ) {

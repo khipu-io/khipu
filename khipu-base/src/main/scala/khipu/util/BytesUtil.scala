@@ -108,7 +108,7 @@ object BytesUtil {
     ByteString(bytes)
   }
 
-  def bytesToIp(bytesIp: ByteString): String = {
+  def bytesToIp(bytesIp: Array[Byte]): String = {
     val sb = new StringBuilder()
     sb.append(bytesIp(0) & 0xFF)
     sb.append(".")

@@ -86,8 +86,8 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
   val nodeKey = loadAsymmetricCipherKeyPair(nodeKeyFile, secureRandom)
   log.info(s"nodeKey at $nodeKeyFile: $nodeKey")
 
-  val nodeId = khipu.toHexString(nodeKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ.getEncoded(false).drop(1))
-  log.info(s"nodeId is $nodeId")
+  val nodeId = nodeKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ.getEncoded(false).drop(1)
+  log.info(s"nodeId is ${khipu.toHexString(nodeId)}")
 
   val messageDecoder = MessageDecoder
   val protocolVersion = Versions.PV63
@@ -162,6 +162,7 @@ class ServiceBoardExtension(system: ExtendedActorSystem) extends Extension {
 
   val nodeStatus = NodeStatus(
     key = nodeKey,
+    id = nodeId,
     serverStatus = ServerStatus.Listening(networkConfig.Server.listenAddress),
     discoveryStatus = ServerStatus.Listening(discoveryConfig.listenAddress)
   )

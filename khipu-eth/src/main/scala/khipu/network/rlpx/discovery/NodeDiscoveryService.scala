@@ -18,16 +18,13 @@ import java.net.{ InetSocketAddress, URI }
 import java.util.Arrays
 import khipu.NodeStatus
 import khipu.ServerStatus
-import khipu.crypto
-import khipu.crypto.ECDSASignature
-import khipu.rlp
 import khipu.rlp.RLPEncoder
 import khipu.storage.KnownNodesStorage
-import org.spongycastle.crypto.AsymmetricCipherKeyPair
-import org.spongycastle.util.BigIntegers
+import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 import scala.util.Failure
+import scala.util.Random
 import scala.util.Success
-import scala.util.Try
 
 /**
  * Full cone NAT:
@@ -109,97 +106,27 @@ object NodeDiscoveryService {
 
   def proxy(system: ActorSystem) = system.actorSelection(proxyPath)
 
-  object Node {
-    def fromUri(uri: URI): Node = {
-      val nodeId = ByteString(khipu.hexDecode(uri.getUserInfo))
-      Node(nodeId, new InetSocketAddress(uri.getHost, uri.getPort), System.currentTimeMillis)
-    }
-  }
-  final case class Node(id: ByteString, remoteAddress: InetSocketAddress, addTimestamp: Long) {
-    val uri = new URI(s"enode://${khipu.toHexString(id)}@${remoteAddress.getAddress.getHostAddress}:${remoteAddress.getPort}")
-  }
-
   case object GetDiscoveredNodes
   final case class DiscoveredNodes(nodes: Iterable[Node])
 
-  private case object ScanTask
-  private case object ScanTick
   case object Start
 
+  private sealed trait ScanTick {
+    def round: Int
+    def prevScanned: Set[ByteString]
+  }
+
+  private case object DiscoveryTask
+  private case object DiscoveryRoundTask
+  private case class DiscoveryRoundTick(round: Int, prevScanned: Set[ByteString]) extends ScanTick
+
+  private case object RefreshTask
+  private case object RefreshRoundTask
+  private case class RefreshRoundTick(round: Int, prevScanned: Set[ByteString]) extends ScanTick
+
+  private final case class PingTimeout(nodeId: ByteString)
+
   final case class MessageReceived(message: Message, from: InetSocketAddress, packet: Packet)
-
-  object Packet {
-    private val MdcLength = 32
-    private val PacketTypeByteIndex = MdcLength + ECDSASignature.EncodedLength
-    private val DataOffset = PacketTypeByteIndex + 1
-
-    def decodePacket(input: ByteString): Try[Packet] = {
-      if (input.length < 98) {
-        Failure(new RuntimeException("Bad message"))
-      } else {
-        Try(Packet(input)) match {
-          case x @ Success(packet) =>
-            if (Arrays.equals(packet.mdc.toArray, crypto.kec256(input.drop(32)))) {
-              x
-            } else {
-              Failure(new RuntimeException("MDC check failed"))
-            }
-          case e: Failure[_] =>
-            e
-        }
-      }
-    }
-
-    def extractMessage(packet: Packet): Try[Message] = Try {
-      packet.packetType match {
-        case Ping.packetType       => rlp.decode[Ping](packet.data.toArray[Byte])
-        case Pong.packetType       => rlp.decode[Pong](packet.data.toArray[Byte])
-        case FindNode.packetType   => rlp.decode[FindNode](packet.data.toArray[Byte])
-        case Neighbours.packetType => rlp.decode[Neighbours](packet.data.toArray[Byte])
-        case _                     => throw new RuntimeException(s"Unknown packet type ${packet.packetType}")
-      }
-    }
-
-    def encodePacket[M <: Message](msg: M, keyPair: AsymmetricCipherKeyPair)(implicit rlpEnc: RLPEncoder[M]): ByteString = {
-      val encodedData = rlp.encode(msg)
-
-      val payload = Array(msg.packetType) ++ encodedData
-      val forSig = crypto.kec256(payload)
-      val signature = ECDSASignature.sign(forSig, keyPair, None)
-
-      val sigBytes =
-        BigIntegers.asUnsignedByteArray(32, signature.r) ++
-          BigIntegers.asUnsignedByteArray(32, signature.s) ++
-          Array[Byte]((signature.v - 27).toByte)
-
-      val forSha = sigBytes ++ Array(msg.packetType) ++ encodedData
-      val mdc = crypto.kec256(forSha)
-
-      ByteString(mdc ++ sigBytes ++ Array(msg.packetType) ++ encodedData)
-    }
-  }
-  final case class Packet(wire: ByteString) {
-    import Packet._
-
-    val mdc: ByteString = wire.take(MdcLength)
-
-    val signature: ECDSASignature = {
-      val signatureBytes = wire.drop(MdcLength).take(ECDSASignature.EncodedLength)
-      val r = signatureBytes.take(ECDSASignature.RLength)
-      val s = signatureBytes.drop(ECDSASignature.RLength).take(ECDSASignature.SLength)
-      val v = ByteString(Array[Byte]((signatureBytes(ECDSASignature.EncodedLength - 1) + 27).toByte))
-
-      ECDSASignature(r, s, v)
-    }
-
-    val nodeId: ByteString = {
-      val msgHash = crypto.kec256(wire.drop(MdcLength + ECDSASignature.EncodedLength))
-      ECDSASignature.recoverPublicKey(signature, msgHash, None).map(ByteString.apply)
-    }.get
-
-    val packetType: Byte = wire(PacketTypeByteIndex)
-    val data: ByteString = wire.drop(DataOffset)
-  }
 }
 
 /**
@@ -210,18 +137,29 @@ class NodeDiscoveryService(
     knownNodesStorage:      KnownNodesStorage,
     private var nodeStatus: NodeStatus
 ) extends Actor with Timers with ActorLogging {
+  import Node.State
   import NodeDiscoveryService._
   import context.system
 
-  private var nodes: Map[ByteString, Node] = {
-    val uris = discoveryConfig.bootstrapNodes.map(new URI(_)) ++
-      Set()
-    //(if (discoveryConfig.discoveryEnabled) knownNodesStorage.getKnownNodes() else Set.empty)
+  private val pingTimeout = 15000.milliseconds
 
-    uris.map { uri =>
-      val node = Node.fromUri(uri)
-      node.id -> node
+  private var socket: ActorRef = _
+
+  // TODO if want to add homeNode to kRoutingTable, should specify the correct out ip address in DiscoveryConfig
+  private val kRoutingTable = new KRoutingTable(nodeStatus.id, None)
+
+  private var idToNode: Map[ByteString, Node] = {
+    val uris = discoveryConfig.bootstrapNodes.map(new URI(_)) ++ Set()
+    //(if (discoveryConfig.discoveryEnabled) knownNodesStorage.getKnownNodes() else Set())
+
+    val nodes = uris.map { uri =>
+      val node = Node(uri)
+      ByteString(node.id) -> node
     }.toMap
+
+    nodes.values foreach kRoutingTable.tryAddNode
+
+    nodes
   }
 
   self ! Start
@@ -240,23 +178,24 @@ class NodeDiscoveryService(
 
     case Udp.Bound(local) =>
       log.info(s"[disc] DiscoveryService UDP bound at $local")
-      val socket = sender()
+      socket = sender()
 
       nodeStatus = nodeStatus.copy(discoveryStatus = ServerStatus.Listening(local))
-      context become (udpBehavior(socket) orElse businessBehavior(socket))
+      context become (udpBehavior orElse businessBehavior)
 
-      timers.startTimerWithFixedDelay(ScanTask, ScanTick, discoveryConfig.scanInterval)
+      timers.startTimerWithFixedDelay(DiscoveryTask, DiscoveryRoundTick(1, Set()), KademliaOptions.DISCOVER_CYCLE.second)
+      timers.startTimerWithFixedDelay(RefreshTask, RefreshRoundTick(1, Set()), KademliaOptions.BUCKET_REFRESH.millisecond)
   }
 
-  def udpBehavior(socket: ActorRef): Receive = {
+  def udpBehavior: Receive = {
     case Udp.Received(data, remote) =>
-      val msgReceivedTry = for {
+      val msgReceived = for {
         packet <- Packet.decodePacket(data)
         message <- Packet.extractMessage(packet)
       } yield MessageReceived(message, remote, packet)
 
-      msgReceivedTry match {
-        case Success(msg) => receiveMessage(socket, msg)
+      msgReceived match {
+        case Success(msg) => receivedMessage(msg)
         case Failure(ex)  => log.debug(s"[disc] Unable to decode discovery packet from ${remote}", ex)
       }
 
@@ -270,90 +209,250 @@ class NodeDiscoveryService(
       context become idleBehavior
   }
 
-  def businessBehavior(socket: ActorRef): Receive = {
-    case ScanTick           => scan(socket)
-    case GetDiscoveredNodes => sender() ! DiscoveredNodes(this.nodes.values)
+  def businessBehavior: Receive = {
+    case x: DiscoveryRoundTick => scan(kRoutingTable.homeNodeId, x)
+    case x: RefreshRoundTick   => scan(getRandomNodeId, x)
+
+    case GetDiscoveredNodes =>
+      sender() ! DiscoveredNodes(kRoutingTable.getAllNodes.asScala.map(_.node))
+
+    case PingTimeout(nodeId) =>
+      idToNode.get(nodeId) foreach { node =>
+        node.waitForPong = None
+        node.pingTrials -= 1
+        if (node.pingTrials > 0) {
+          sendPing(node.id, node.udpAddress)
+        } else {
+          node.state match {
+            case State.Discovered     => changeState(node, State.Dead)
+            case State.EvictCandidate => changeState(node, State.NonActive)
+            case _                    =>
+          }
+        }
+      }
   }
 
-  private def scan(socket: ActorRef) {
-    this.nodes.values.toSeq
-      .sortBy(_.addTimestamp) // take scanMaxNodes most recent nodes
-      .takeRight(discoveryConfig.scanMaxNodes)
-      .foreach { node => sendPing(socket, node.id, node.remoteAddress) }
+  private def scan(targetId: Array[Byte], scanTick: ScanTick) {
+    if (scanTick.round == 1) {
+      log.debug(s"[disc] Scanning $scanTick $kRoutingTable")
+      timers.cancel(DiscoveryRoundTask)
+      timers.cancel(RefreshRoundTask)
+    } else {
+      log.debug(s"[disc] Scanning $scanTick")
+    }
+
+    val closest = kRoutingTable.getClosestNodes(targetId)
+    var scanned = Map[ByteString, Node]()
+    val itr = closest.iterator
+    while (itr.hasNext && scanned.size < KademliaOptions.ALPHA) {
+      val node = itr.next
+      val nodeId = ByteString(node.id)
+      if (!scanned.contains(nodeId) && !scanTick.prevScanned.contains(nodeId)) {
+        scanned += (nodeId -> node)
+      }
+    }
+
+    scanned foreach {
+      case (nodeId, node) => sendMessage(FindNode(nodeId, expirationTimestamp), node.udpAddress)
+    }
+
+    if (scanTick.round < KademliaOptions.MAX_STEPS) {
+      scanTick match {
+        case DiscoveryRoundTick(round, prevScanned) =>
+          timers.startSingleTimer(DiscoveryRoundTask, DiscoveryRoundTick(round + 1, prevScanned ++ scanned.keys), (KademliaOptions.ALPHA * 50).milliseconds)
+        case RefreshRoundTick(round, prevScanned) =>
+          timers.startSingleTimer(RefreshRoundTask, RefreshRoundTick(round + 1, prevScanned ++ scanned.keys), (KademliaOptions.ALPHA * 50).milliseconds)
+      }
+    }
   }
 
-  private def receiveMessage(socket: ActorRef, msg: MessageReceived) {
+  def getRandomNodeId: Array[Byte] = {
+    val gen = new Random()
+    val id = Array.ofDim[Byte](32)
+    gen.nextBytes(id)
+    id
+  }
+
+  private def receivedMessage(msg: MessageReceived) {
     msg match {
-      case MessageReceived(Ping(version, _from, _to, _timestamp), from, packet) =>
-        if (version == VERSION) {
-          val node = Node(packet.nodeId, from, System.currentTimeMillis)
-          addToNodes(node, from, socket)
+      case MessageReceived(Ping(_version, _from, _to, _expiration), from, packet) =>
+        log.debug(s"[disc] Received Ping from $from")
 
-          val to = Endpoint(packet.nodeId, from.getPort, from.getPort)
-          sendMessage(socket, Pong(to, packet.mdc, expirationTimestamp), from)
+        if (_version == VERSION) {
+          if (!java.util.Arrays.equals(packet.nodeId, kRoutingTable.homeNodeId)) {
+            val node = idToNode.get(ByteString(packet.nodeId)) match {
+              case Some(n) => n
+              case None =>
+                val n = Node(packet.nodeId, from, from)
+                nodeDiscovered(n)
+                n
+            }
+
+            val to = Endpoint(packet.nodeId, from.getPort, from.getPort)
+            sendMessage(Pong(to, packet.mdc, expirationTimestamp), from)
+          }
         }
 
-      case MessageReceived(Pong(_to, _token, _timestamp), from, packet) =>
+      case MessageReceived(Pong(_to, _pingHash, _expiration), from, packet) =>
         log.debug(s"[disc] Received Pong from $from")
 
-        val node = Node(packet.nodeId, from, System.currentTimeMillis)
-        addToNodes(node, from, socket)
+        val nodeId = ByteString(packet.nodeId)
+        idToNode.get(nodeId) match {
+          case Some(node) =>
+            node.waitForPong match {
+              case Some(pingHash) =>
+                // TODO check the pingHash?
+                timers.cancel(PingTimeout(nodeId))
+                node.pingTrials = 3
+                node.waitForPong = None
+                changeState(node, State.Alive)
+              case _ =>
+            }
+          case None =>
+            // if we received Pong from this node, usually means we've sent Ping
+            // to it, or it should have been addToNode(node). So here should not
+            // been reached.
+            val node = Node(packet.nodeId, from, from)
+            nodeDiscovered(node)
+        }
 
-      case MessageReceived(FindNode(_target, _expires), from, packet) =>
-        sendMessage(socket, Neighbours(Nil, expirationTimestamp), from)
+      case MessageReceived(FindNode(_target, _expiration), from, packet) =>
+        log.debug(s"[disc] Received FindNode from $from")
 
-      case MessageReceived(Neighbours(_nodes, _expires), from, packet) =>
-        log.debug(s"[disc] Received neighbours ${_nodes.size} from $from")
+        val closest = kRoutingTable.getClosestNodes(_target.toArray)
+        //if (publicHomeNode != null) {
+        //    if (closest.size() == KademliaOptions.BUCKET_SIZE) closest.remove(closest.size() - 1);
+        //    closest.add(publicHomeNode);
+        //} 
+        val neighbours = closest.asScala.map { n =>
+          Neighbour(Endpoint(n.tcpAddress.getAddress.getAddress, n.udpAddress.getPort, n.tcpAddress.getPort), n.id)
+        }
+        sendMessage(Neighbours(neighbours, expirationTimestamp), from)
 
-        val toPings = _nodes.filterNot(n => this.nodes.contains(n.nodeId))
-          .take(discoveryConfig.nodesLimit - this.nodes.size)
+      case MessageReceived(Neighbours(_nodes, _expiration), from, packet) =>
+        log.debug(s"[disc] Received Neighbours ${_nodes.size} from $from")
 
-        toPings foreach { n =>
-          sendPing(socket, n.nodeId, n.endpoint.udpAddress)
+        _nodes foreach { n =>
+          idToNode.get(ByteString(n.nodeId)) match {
+            case Some(node) =>
+              node.tcpAddress = n.endpoint.tcpAddress
+              node
+            case None =>
+              val node = Node(n.nodeId, n.endpoint.udpAddress, n.endpoint.tcpAddress)
+              nodeDiscovered(node)
+              node
+          }
         }
     }
   }
 
-  private def sendPing(socket: ActorRef, toNodeId: ByteString, toAddr: InetSocketAddress) {
+  /**
+   * @return ping hash - mdc of ping packet
+   */
+  private def sendPing(toNodeId: Array[Byte], toAddr: InetSocketAddress): Option[ByteString] = {
     nodeStatus.discoveryStatus match {
       case ServerStatus.Listening(address) =>
+
         val tcpPort = nodeStatus.serverStatus match {
           case ServerStatus.Listening(addr) => addr.getPort
           case _                            => 0
         }
 
-        val from = Endpoint(ByteString(address.getAddress.getAddress), address.getPort, tcpPort)
+        val from = Endpoint(address.getAddress.getAddress, address.getPort, tcpPort)
         val to = Endpoint(toNodeId, toAddr.getPort, toAddr.getPort)
-        sendMessage(socket, Ping(VERSION, from, to, expirationTimestamp), toAddr)
+        val mdc = sendMessage(Ping(VERSION, from, to, expirationTimestamp), toAddr)
+
+        val nodeId = ByteString(toNodeId)
+        timers.cancel(PingTimeout(nodeId))
+        timers.startSingleTimer(PingTimeout(nodeId), PingTimeout(nodeId), pingTimeout)
+        mdc
 
       case ServerStatus.NotListening =>
         log.warning("[disc] UDP server not running. Not sending ping message.")
+        None
     }
   }
 
-  private def sendMessage[M <: Message](socket: ActorRef, message: M, to: InetSocketAddress)(implicit rlpEnc: RLPEncoder[M]) {
+  /**
+   * @return packed mdc
+   */
+  private def sendMessage[M <: Message](message: M, to: InetSocketAddress)(implicit rlpEnc: RLPEncoder[M]): Option[ByteString] = {
     nodeStatus.discoveryStatus match {
       case ServerStatus.Listening(_) =>
-        val packet = Packet.encodePacket(message, nodeStatus.key)
+        val (mdc, packet) = Packet.encodePacket(message, nodeStatus.key)
         socket ! Udp.Send(packet, to)
 
         log.debug(s"Send ${message} to $to")
+        Some(mdc)
 
       case ServerStatus.NotListening =>
         log.warning(s"[disc] UDP server not running. Not sending message $message.")
+        None
     }
   }
 
-  private def addToNodes(node: Node, from: InetSocketAddress, socket: ActorRef) {
-    if (this.nodes.size < discoveryConfig.nodesLimit) {
-      this.nodes += (node.id -> node)
-      sendMessage(socket, FindNode(ByteString(nodeStatus.nodeId), expirationTimestamp), from)
+  private def nodeDiscovered(node: Node) {
+    if (this.idToNode.size < discoveryConfig.nodesLimit) {
+      this.idToNode += (ByteString(node.id) -> node)
+      changeState(node, State.Discovered)
     } else {
-      val (earliestNode, _) = this.nodes.minBy { case (_, node) => node.addTimestamp }
-      this.nodes -= earliestNode
-      this.nodes += (node.id -> node)
+      val (earliestNode, _) = this.idToNode.minBy { case (_, node) => node.addTimestamp }
+      this.idToNode -= earliestNode
+      this.idToNode += (ByteString(node.id) -> node)
+      changeState(node, State.Discovered)
     }
   }
 
   private def expirationTimestamp = discoveryConfig.messageExpiration.toSeconds + System.currentTimeMillis / 1000
+
+  // Manages state transfers
+  private def changeState(node: Node, newState: Node.State) {
+    var toState = newState
+    (newState, node.state) match {
+      case (State.Discovered, _) =>
+        // will wait for Pong to assume this alive
+        val pingHash = sendPing(node.id, node.udpAddress)
+        node.waitForPong = pingHash
+
+      //if (!node.isDiscoveryNode()) {
+      case (State.Alive, _) =>
+        kRoutingTable.tryAddNode(node) match {
+          case Some(evictCandidate) =>
+            if (evictCandidate.state != State.EvictCandidate) {
+              evictCandidate.replaceCandicate = Some(node)
+              changeState(evictCandidate, State.EvictCandidate)
+            }
+          case None =>
+            toState = State.Active
+        }
+        log.debug(s"[disc] ${node.udpAddress} change to Alive, $kRoutingTable")
+
+      case (State.Active, State.Alive) =>
+        // new node won the challenge
+        kRoutingTable.tryAddNode(node)
+
+      case (State.Active, State.EvictCandidate) => // nothing to do here the node is already in the table
+      case (State.Active, _)                    => // wrong state transition
+
+      case (State.NonActive, State.EvictCandidate) =>
+        // lost the challenge, removing ourselves from the table
+        kRoutingTable.dropNode(node)
+        // Congratulate the winner
+        node.replaceCandicate foreach { changeState(_, State.Active) }
+        node.replaceCandicate = None
+        log.debug(s"[disc] ${node.udpAddress} changed from EvictCandidate to NonActive, $kRoutingTable")
+
+      case (State.NonActive, State.Alive) => // ok the old node was better, nothing to do here
+      case (State.NonActive, _)           => // wrong state transition
+      //}
+
+      case (State.EvictCandidate, _) =>
+        // trying to survive, sending ping and waiting for pong
+        sendPing(node.id, node.udpAddress)
+
+      case (_, _) =>
+    }
+    node.state = toState
+  }
+
 }
