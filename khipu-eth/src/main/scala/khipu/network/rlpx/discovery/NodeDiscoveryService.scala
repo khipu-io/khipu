@@ -148,19 +148,7 @@ class NodeDiscoveryService(
   // TODO if want to add homeNode to kRoutingTable, should specify the correct out ip address in DiscoveryConfig
   private val kRoutingTable = new KRoutingTable(nodeStatus.id, None)
 
-  private var idToNode: Map[ByteString, Node] = {
-    val uris = discoveryConfig.bootstrapNodes.map(new URI(_)) ++ Set()
-    //(if (discoveryConfig.discoveryEnabled) knownNodesStorage.getKnownNodes() else Set())
-
-    val nodes = uris.map { uri =>
-      val node = Node(uri)
-      ByteString(node.id) -> node
-    }.toMap
-
-    nodes.values foreach kRoutingTable.tryAddNode
-
-    nodes
-  }
+  private var idToNode = Map[ByteString, Node]()
 
   self ! Start
 
@@ -182,6 +170,8 @@ class NodeDiscoveryService(
 
       nodeStatus = nodeStatus.copy(discoveryStatus = ServerStatus.Listening(local))
       context become (udpBehavior orElse businessBehavior)
+
+      initKnownNodes()
 
       timers.startTimerWithFixedDelay(DiscoveryTask, DiscoveryRoundTick(1, Set()), KademliaOptions.DISCOVER_CYCLE.second)
       timers.startTimerWithFixedDelay(RefreshTask, RefreshRoundTick(1, Set()), KademliaOptions.BUCKET_REFRESH.millisecond)
@@ -219,8 +209,8 @@ class NodeDiscoveryService(
     case PingTimeout(nodeId) =>
       idToNode.get(nodeId) foreach { node =>
         node.waitForPong = None
-        node.pingTrials -= 1
-        if (node.pingTrials > 0) {
+        node.pingTrials += 1
+        if (node.pingTrials < 3) {
           sendPing(node.id, node.udpAddress)
         } else {
           node.state match {
@@ -230,6 +220,16 @@ class NodeDiscoveryService(
           }
         }
       }
+  }
+
+  private def initKnownNodes() {
+    val uris = discoveryConfig.bootstrapNodes.map(new URI(_)) ++ Set()
+    //(if (discoveryConfig.discoveryEnabled) knownNodesStorage.getKnownNodes() else Set())
+
+    val nodes = uris.map(Node(_))
+
+    nodes foreach nodeDiscovered
+    //nodes foreach kRoutingTable.tryAddNode
   }
 
   private def scan(targetId: Array[Byte], scanTick: ScanTick) {
@@ -276,21 +276,22 @@ class NodeDiscoveryService(
   private def receivedMessage(msg: MessageReceived) {
     msg match {
       case MessageReceived(Ping(_version, _from, _to, _expiration), from, packet) =>
-        log.debug(s"[disc] Received Ping from $from")
+        log.debug(s"[disc] Received Ping version ${_version} from ${khipu.toHexString(packet.nodeId)}@$from ")
 
         if (_version == VERSION) {
           if (!java.util.Arrays.equals(packet.nodeId, kRoutingTable.homeNodeId)) {
-            val node = idToNode.get(ByteString(packet.nodeId)) match {
-              case Some(n) => n
-              case None =>
-                val n = Node(packet.nodeId, from, from)
-                nodeDiscovered(n)
-                n
+            idToNode.get(ByteString(packet.nodeId)) match {
+              case None => nodeDiscovered(Node(packet.nodeId, from, from))
+              case _    =>
             }
 
             val to = Endpoint(packet.nodeId, from.getPort, from.getPort)
             sendMessage(Pong(to, packet.mdc, expirationTimestamp), from)
+          } else {
+            log.debug(s"${khipu.toHexString(packet.nodeId)} is same as homenode: ${khipu.toHexString(kRoutingTable.homeNodeId)}")
           }
+        } else {
+          log.debug(s"[disc] Received Ping unmatched version ${_version} from ${khipu.toHexString(packet.nodeId)}@$from ")
         }
 
       case MessageReceived(Pong(_to, _pingHash, _expiration), from, packet) =>
@@ -303,7 +304,7 @@ class NodeDiscoveryService(
               case Some(pingHash) =>
                 // TODO check the pingHash?
                 timers.cancel(PingTimeout(nodeId))
-                node.pingTrials = 3
+                node.pingTrials = 0
                 node.waitForPong = None
                 changeState(node, State.Alive)
               case _ =>

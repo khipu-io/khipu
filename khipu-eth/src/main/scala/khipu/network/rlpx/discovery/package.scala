@@ -285,7 +285,7 @@ package object discovery {
     var waitForPong: Option[ByteString] = None
     var waitForNeighbors = false
     var pingSent = 0L
-    var pingTrials = 3
+    var pingTrials = 0
 
     override def equals(o: Any) = {
       o match {
