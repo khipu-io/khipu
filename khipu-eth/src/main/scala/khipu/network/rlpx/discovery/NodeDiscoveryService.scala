@@ -204,7 +204,10 @@ class NodeDiscoveryService(
     case x: RefreshRoundTick   => scan(getRandomNodeId, x)
 
     case GetDiscoveredNodes =>
-      sender() ! DiscoveredNodes(kRoutingTable.getAllNodes.asScala.map(_.node))
+      val usefulNodes = idToNode.collect {
+        case (id, node) if node.state.isConnectable => node
+      }
+      sender() ! DiscoveredNodes(usefulNodes)
 
     case PingTimeout(nodeId) =>
       idToNode.get(nodeId) foreach { node =>

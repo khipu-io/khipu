@@ -219,7 +219,10 @@ package object discovery {
   }
 
   object Node {
-    trait State
+    trait State {
+      // if it's connectable as peer for sync
+      def isConnectable: Boolean
+    }
     object State {
       /**
        * The new node was just discovered either by receiving it with Neighbours
@@ -228,12 +231,12 @@ package object discovery {
        * If the Pong is received the node becomes {@link #Alive}
        * If the Pong was timed out the node becomes {@link #Dead}
        */
-      case object Discovered extends State
+      case object Discovered extends State { val isConnectable = false }
       /**
        * The node didn't send the Pong message back withing acceptable timeout
        * This is the final state
        */
-      case object Dead extends State
+      case object Dead extends State { val isConnectable = false }
       /**
        * The node responded with Pong and is now the candidate for inclusion to the table
        * If the table has bucket space for this node it is added to table and becomes {@link #Active}
@@ -241,26 +244,26 @@ package object discovery {
        *     if it wins then old node is dropped, and this node is added and becomes {@link #Active}
        *     else this node becomes {@link #NonActive}
        */
-      case object Alive extends State
+      case object Alive extends State { val isConnectable = true }
       /**
        * The node is included in the table. It may become {@link #EvictCandidate} if a new node
        * wants to become Active but the table bucket is full.
        */
-      case object Active extends State
+      case object Active extends State { val isConnectable = true }
       /**
        * This node is in the table but is currently challenging with a new Node candidate
        * to survive in the table bucket
        * If it wins then returns back to {@link #Active} state, else is evicted from the table
        * and becomes {@link #NonActive}
        */
-      case object EvictCandidate extends State
+      case object EvictCandidate extends State { val isConnectable = true }
       /**
        * Veteran. It was Alive and even Active but is now retired due to loosing the challenge
        * with another Node.
        * For no this is the final state
        * It's an option for future to return veterans back to the table
        */
-      case object NonActive extends State
+      case object NonActive extends State { val isConnectable = false }
     }
 
     def apply(id: Array[Byte], udpAddress: InetSocketAddress, tcpAddress: InetSocketAddress) = {
