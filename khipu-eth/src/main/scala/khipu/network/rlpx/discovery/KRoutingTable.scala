@@ -174,7 +174,7 @@ object NodeEntry {
    * so on ...
    * ---------------------------------------------------------------------------
    */
-  def bucketDistance(ownerId: Array[Byte], targetId: Array[Byte]): Int = {
+  def distance_ori(ownerId: Array[Byte], targetId: Array[Byte]): Int = {
     val length = math.min(ownerId.length, targetId.length)
     var pos = 0
     var i = 0
@@ -199,6 +199,32 @@ object NodeEntry {
     KademliaOptions.ID_LENGTH_IN_BITS - pos
   }
 
+  def distance(ownerId: Array[Byte], targetId: Array[Byte]): Int = {
+    val length = math.min(ownerId.length, targetId.length)
+    var count = 0 // count of 0 bits
+    var i = 0
+    var break = false
+    while (i < length && !break) {
+      val xor = ((ownerId(i) ^ targetId(i)) & 0xFF).toByte
+      if (xor == 0) {
+        count += 8
+      } else {
+        var p = 7
+        while (p >= 0 && ((xor >> p) & 0x01) == 0) {
+          if (((xor >> p) & 0x01) == 0) {
+            count += 1
+          }
+          p -= 1
+        }
+      }
+
+      i += 1
+    }
+
+    // id_length_in_bits (length * 8) - pos
+    count
+  }
+
   private def bucketId(bucketDistance: Int): Int = {
     val id = bucketDistance - 1
     // if we are puting a node into it's own routing table, the bucket ID will 
@@ -208,12 +234,12 @@ object NodeEntry {
 
   def apply(node: Node): NodeEntry = {
     val ownerId = node.id.toArray
-    val bId = bucketId(bucketDistance(ownerId, node.id.toArray))
+    val bId = bucketId(distance(ownerId, node.id.toArray))
     NodeEntry(ownerId, node, node.toString, bId, System.currentTimeMillis)
   }
 
   def apply(ownerId: Array[Byte], node: Node): NodeEntry = {
-    val bId = bucketId(bucketDistance(ownerId, node.id.toArray))
+    val bId = bucketId(distance(ownerId, node.id.toArray))
     NodeEntry(ownerId, node, node.toString, bId, System.currentTimeMillis)
   }
 }
@@ -294,8 +320,8 @@ object TimeComparator extends Ordering[NodeEntry] {
 
 final class DistanceComparator(targetId: Array[Byte]) extends Ordering[NodeEntry] {
   override def compare(e1: NodeEntry, e2: NodeEntry): Int = {
-    val d1 = NodeEntry.bucketDistance(targetId, e1.node.id.toArray)
-    val d2 = NodeEntry.bucketDistance(targetId, e2.node.id.toArray)
+    val d1 = NodeEntry.distance(targetId, e1.node.id.toArray)
+    val d2 = NodeEntry.distance(targetId, e2.node.id.toArray)
 
     if (d1 > d2) {
       1
