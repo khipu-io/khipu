@@ -186,7 +186,7 @@ class NodeDiscoveryService(
 
       msgReceived match {
         case Success(msg) => receivedMessage(msg)
-        case Failure(ex)  => log.debug(s"[disc] Unable to decode discovery packet from ${remote}", ex)
+        case Failure(ex)  => log.debug(s"[disc] Unable to decode discovery packet from ${remote}: ${ex.getMessage}")
       }
 
     case Udp.Unbind =>
@@ -278,7 +278,7 @@ class NodeDiscoveryService(
       case MessageReceived(Ping(_version, _from, _to, _expiration), from, packet) =>
         log.debug(s"[disc] Received Ping version ${_version} from ${khipu.toHexString(packet.nodeId)}@$from ")
 
-        if (_version == VERSION) {
+        if (_version >= VERSION) {
           if (!java.util.Arrays.equals(packet.nodeId, kRoutingTable.homeNodeId)) {
             idToNode.get(ByteString(packet.nodeId)) match {
               case None => nodeDiscovered(Node(packet.nodeId, from, from))
@@ -380,10 +380,10 @@ class NodeDiscoveryService(
   private def sendMessage[M <: Message](message: M, to: InetSocketAddress)(implicit rlpEnc: RLPEncoder[M]): Option[ByteString] = {
     nodeStatus.discoveryStatus match {
       case ServerStatus.Listening(_) =>
+        log.debug(s"Send ${message} to $to")
+
         val (mdc, packet) = Packet.encodePacket(message, nodeStatus.key)
         socket ! Udp.Send(packet, to)
-
-        log.debug(s"Send ${message} to $to")
         Some(mdc)
 
       case ServerStatus.NotListening =>

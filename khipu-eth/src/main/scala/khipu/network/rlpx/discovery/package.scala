@@ -79,7 +79,7 @@ package object discovery {
       override def decode(rlp: RLPEncodeable): Pong = rlp match {
         case RLPList(to, pingHash, expiration, _*) =>
           Pong(Endpoint.rlpEncDec.decode(to), pingHash, expiration)
-        case _ => throw new RuntimeException("Cannot decode Pong")
+        case x => throw new RuntimeException(s"Cannot decode Pong: $x")
       }
     }
   }
@@ -99,7 +99,7 @@ package object discovery {
       override def decode(rlp: RLPEncodeable): FindNode = rlp match {
         case RLPList(target, expiration, _*) =>
           FindNode(target, expiration)
-        case _ => throw new RuntimeException("Cannot decode FindNode")
+        case x => throw new RuntimeException(s"Cannot decode FindNode: $x")
       }
     }
   }
@@ -119,7 +119,7 @@ package object discovery {
       override def decode(rlp: RLPEncodeable): Neighbours = rlp match {
         case RLPList(nodes: RLPList, expiration, _*) =>
           Neighbours(nodes.items.map(Neighbour.rlpEncDec.decode), expiration)
-        case _ => throw new RuntimeException("Cannot decode Neighbours")
+        case x => throw new RuntimeException(s"Cannot decode Neighbours: $x")
       }
     }
   }
@@ -131,16 +131,15 @@ package object discovery {
     implicit val rlpEncDec = new RLPEncoder[Neighbour] with RLPDecoder[Neighbour] {
       override def encode(obj: Neighbour): RLPEncodeable = {
         import obj._
-        RLPList(endpoint, nodeId)
+        RLPList(endpoint.address, endpoint.udpPort, endpoint.tcpPort, nodeId)
       }
 
       override def decode(rlp: RLPEncodeable): Neighbour = rlp match {
         case RLPList(address, port, nodeId) =>
           Neighbour(Endpoint(address, port, port), nodeId)
-        case RLPList(address, udpPort, tcpPort, nodeId) =>
+        case RLPList(address, udpPort, tcpPort, nodeId, _*) =>
           Neighbour(Endpoint(address, udpPort, tcpPort), nodeId)
-        case _ =>
-          throw new RuntimeException("Cannot decode Neighbour")
+        case x => throw new RuntimeException(s"Cannot decode Neighbour: $x")
       }
     }
   }
