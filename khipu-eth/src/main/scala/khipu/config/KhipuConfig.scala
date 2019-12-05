@@ -116,7 +116,6 @@ object KhipuConfig {
     val blockchainOnlyPeersPoolSize = syncConfig.getInt("fastsync-block-chain-only-peers-pool")
 
     val syncRequestTimeout = syncConfig.getDuration("sync-request-timeout").toMillis.millis
-    val reimportFromBlockNumber = syncConfig.getLong("reimport-from-block-number")
   }
 }
 

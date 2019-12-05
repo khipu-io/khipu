@@ -100,14 +100,10 @@ trait RegularSyncService { _: SyncService =>
     self ! ResumeRegularSyncTick
   }
 
-  private var lookbackFromBlock: Option[Long] = if (reimportFromBlockNumber > 0) Some(reimportFromBlockNumber) else None // for debugging/reimporting a specified block
   private def requestHeaders() {
     bestPeer match {
       case Some(peer) =>
-        val nextBlockNumber = lookbackFromBlock match {
-          case None                          => storages.bestBlockNumber + 1
-          case Some(reimportFromBlockNumber) => reimportFromBlockNumber
-        }
+        val nextBlockNumber = storages.bestBlockNumber + 1
 
         log.debug(s"Request block headers beginning at $nextBlockNumber via best peer $peer")
 
@@ -264,8 +260,7 @@ trait RegularSyncService { _: SyncService =>
           }
 
         case None =>
-          log.info(s"[warn] Received block header ${headers.head.number} without parent from ${peer.id}, trying to lookback to ${headers.head.number - 1}")
-          lookbackFromBlock = Some(firstHeader.number - 1)
+          log.info(s"[warn] Received block header ${headers.head.number} without parent from ${peer.id}")
           blockPeerAndResumeWithAnotherOne(peer, s"Got block header ${headers.head.number} that does not have parent")
       }
     } else {
@@ -361,7 +356,6 @@ trait RegularSyncService { _: SyncService =>
 
         case Success((_, Some(error))) =>
           log.info(s"[warn] Before execution validate error: $error, in block ${error.blockNumber} from ${peer.id}, will sync from another peer")
-          lookbackFromBlock = Some(error.blockNumber - 1)
           blockPeerAndResumeWithAnotherOne(peer, s"Validate blocks before execution error: $error, in block ${error.blockNumber}")
 
         case Failure(e) =>
@@ -391,9 +385,6 @@ trait RegularSyncService { _: SyncService =>
           case (parentTotalDifficulty, newBlocks, Vector()) =>
             executeAndInsertBlock(block, parentTotalDifficulty, isBatch) map {
               case Right(newBlock) =>
-                // reset lookbackFromBlock only when executeAndInsertBlock success
-                lookbackFromBlock = None
-
                 // check blockHashToDelete
                 //blockchain.getBlockHeaderByNumber(block.header.number).map(_.hash).filter(_ != block.header.hash) foreach blockchain.removeBlock
 
