@@ -34,9 +34,9 @@ object PrecompiledContracts {
     case Rip160Addr                           => Some(Ripemp160)
     case IdAddr                               => Some(Identity)
     case ModExpAddr if config.eip198          => Some(ModExp)
-    case AltBN128AddAddr if config.eip213     => Some(BN128Add)
-    case AltBN128MulAddr if config.eip213     => Some(BN128Mul)
-    case AltBN128PairingAddr if config.eip212 => Some(BN128Pairing)
+    case AltBN128AddAddr if config.eip213     => Some(new BN128Add(config.feeSchedule.G_bn128add))
+    case AltBN128MulAddr if config.eip213     => Some(new BN128Mul(config.feeSchedule.G_bn128mul))
+    case AltBN128PairingAddr if config.eip212 => Some(new BN128Pairing(config.feeSchedule.G_bn128pairing_base, config.feeSchedule.G_bn128pairing_pairing))
     case BLAKE2BFAddr if config.eip152        => Some(BLAKE2BF)
     case _                                    => None
   }
@@ -258,9 +258,9 @@ object PrecompiledContracts {
    * resulting point (x', y'), where x and y encoded as 32-byte left-padded integers<br/>
    *
    */
-  object BN128Add extends PrecompiledContract {
+  final class BN128Add(baseGas: Long) extends PrecompiledContract {
     def gas(input: ByteString): Long = {
-      500
+      baseGas
     }
 
     def exec(_input: ByteString): (Boolean, ByteString) = {
@@ -304,9 +304,9 @@ object PrecompiledContracts {
    * resulting point (x', y'), where x and y encoded as 32-byte left-padded integers<br/>
    *
    */
-  object BN128Mul extends PrecompiledContract {
+  final class BN128Mul(baseGas: Long) extends PrecompiledContract {
     def gas(input: ByteString): Long = {
-      40000
+      baseGas
     }
 
     def exec(_input: ByteString): (Boolean, ByteString) = {
@@ -348,14 +348,14 @@ object PrecompiledContracts {
    * pairing product which is either 0 or 1, encoded as 32-byte left-padded integer <br/>
    *
    */
-  object BN128Pairing extends PrecompiledContract {
+  final class BN128Pairing(baseGas: Long, pairingGas: Long) extends PrecompiledContract {
     private val PAIR_SIZE = 192
 
     def gas(input: ByteString): Long = {
       if (input == null) {
-        100000
+        baseGas
       } else {
-        100000 + 80000 * (input.length / PAIR_SIZE)
+        baseGas + pairingGas * (input.length / PAIR_SIZE)
       }
     }
 

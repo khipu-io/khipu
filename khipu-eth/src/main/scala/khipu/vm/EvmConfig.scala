@@ -169,6 +169,7 @@ object EvmConfig {
    * </ul>
    */
   val IstanbulConfig = PetersburgConfig.copy(
+    feeSchedule = FeeSchedule.PostEIP1108FeeSchedule,
     eip152 = true,
     eip1108 = true,
     eip1344 = true,
@@ -333,6 +334,10 @@ object FeeSchedule {
     override val G_extcodesize = 20
     override val G_extcodecopy = 20
     override val G_extcodehash = 400
+    override val G_bn128add = 500
+    override val G_bn128mul = 40000
+    override val G_bn128pairing_base = 100000
+    override val G_bn128pairing_pairing = 80000
   }
 
   object HomesteadFeeSchedule extends HomesteadFeeSchedule
@@ -353,6 +358,14 @@ object FeeSchedule {
   object PostEIP160FeeSchedule extends PostEIP160FeeSchedule
   class PostEIP160FeeSchedule extends PostEIP150FeeSchedule {
     override val G_expbyte = 50
+  }
+
+  object PostEIP1108FeeSchedule extends PostEIP1108FeeSchedule
+  class PostEIP1108FeeSchedule extends PostEIP160FeeSchedule {
+    override val G_bn128add = 150
+    override val G_bn128mul = 6000
+    override val G_bn128pairing_base = 45000
+    override val G_bn128pairing_pairing = 34000
   }
 }
 trait FeeSchedule {
@@ -394,4 +407,8 @@ trait FeeSchedule {
   def G_extcodesize: Long
   def G_extcodecopy: Long
   def G_extcodehash: Long
+  def G_bn128add: Long
+  def G_bn128mul: Long
+  def G_bn128pairing_base: Long
+  def G_bn128pairing_pairing: Long
 }
