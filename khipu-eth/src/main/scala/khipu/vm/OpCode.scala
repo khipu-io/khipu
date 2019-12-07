@@ -159,19 +159,27 @@ object OpCodes {
     SELFDESTRUCT
   )
 
-  val HomesteadOpCodes: List[OpCode[_]] = FrontierOpCodes ++ List(DELEGATECALL)
+  val HomesteadOpCodes: List[OpCode[_]] = FrontierOpCodes ++ List(
+    DELEGATECALL
+  )
+
   val ByzantiumOpCodes: List[OpCode[_]] = HomesteadOpCodes ++ List(
     REVERT,
     RETURNDATASIZE,
     RETURNDATACOPY,
     STATICCALL
   )
+
   val ConstantinopleCodes: List[OpCode[_]] = ByzantiumOpCodes ++ List(
     SHL,
     SHR,
     SAR,
     CREATE2,
     EXTCODEHASH
+  )
+
+  val IstanbulCodes: List[OpCode[_]] = ConstantinopleCodes ++ List(
+    CHAINID
   )
 }
 
@@ -668,6 +676,17 @@ case object BLOCKHASH extends OpCode[Int](0x40, 1, 1) with ConstGas[Int] {
   }
 }
 
+case object CHAINID extends OpCode[Unit](0x46, 0, 1) with ConstGas[Unit] {
+  protected def constGasFn(s: FeeSchedule) = s.G_base
+  protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
+
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
+    val chainId = state.config.chainId
+    state.stack.push(chainId)
+    state.step()
+  }
+}
+
 case object POP extends OpCode[Unit](0x50, 1, 0) with ConstGas[Unit] {
   protected def constGasFn(s: FeeSchedule) = s.G_base
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
@@ -1064,7 +1083,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
               callerAddr = state.env.ownerAddr,
               ownerAddr = newAddress,
               value = endowment,
-              program = Program(initCode),
+              program = Program(initCode, state.config),
               input = ByteString(),
               callDepth = state.env.callDepth + 1
             )
@@ -1290,7 +1309,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
             ownerAddr = owner,
             callerAddr = caller,
             value = value,
-            program = Program(code.toArray),
+            program = Program(code.toArray, state.config),
             input = input,
             callDepth = state.env.callDepth + 1
           )

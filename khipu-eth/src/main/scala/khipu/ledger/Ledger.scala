@@ -677,11 +677,11 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
           worldAtCheckpoint
         }
         log.debug(s"newContractAddress: $newContractAddress")
-        (world, newContractAddress, Program(stx.tx.payload.toArray), ByteString())
+        (world, newContractAddress, Program(stx.tx.payload.toArray, evmCfg), ByteString())
       } else {
         val txReceivingAddress = stx.tx.receivingAddress.get
         log.debug(s"txReceivingAddress: $txReceivingAddress")
-        (worldAtCheckpoint, txReceivingAddress, Program(world.getCode(txReceivingAddress).toArray), stx.tx.payload)
+        (worldAtCheckpoint, txReceivingAddress, Program(world.getCode(txReceivingAddress).toArray, evmCfg), stx.tx.payload)
       }
 
     val worldAfterTransfer = worldBeforeTransfer.transfer(senderAddress, recipientAddress, stx.tx.value)

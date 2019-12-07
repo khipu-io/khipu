@@ -18,14 +18,14 @@ object EvmConfig {
    */
   def forBlock(blockNumber: Long, blockchainConfig: BlockchainConfig): EvmConfig = {
     val transitionBlockToConfig = Map(
-      blockchainConfig.frontierBlockNumber -> FrontierConfig,
-      blockchainConfig.homesteadBlockNumber -> HomesteadConfig,
-      blockchainConfig.eip150BlockNumber -> PostEIP150Config,
-      blockchainConfig.eip170BlockNumber -> PostEIP170Config,
-      blockchainConfig.eip161PatchBlockNumber -> EIP161PatchConfig,
-      blockchainConfig.eip161PatchBlockNumber + 1 -> PostEIP161PatchConfig,
-      blockchainConfig.byzantiumBlockNumber -> ByzantiumConfig,
-      blockchainConfig.petersburgConfigBlockNumber -> PetersburgConfig
+      blockchainConfig.frontierBlockNumber -> new FrontierConfig(blockchainConfig),
+      blockchainConfig.homesteadBlockNumber -> new HomesteadConfig(blockchainConfig),
+      blockchainConfig.eip150BlockNumber -> new PostEIP150Config(blockchainConfig),
+      blockchainConfig.eip170BlockNumber -> new PostEIP170Config(blockchainConfig),
+      blockchainConfig.eip161PatchBlockNumber -> new EIP161PatchConfig(blockchainConfig),
+      blockchainConfig.eip161PatchBlockNumber + 1 -> new PostEIP161PatchConfig(blockchainConfig),
+      blockchainConfig.byzantiumBlockNumber -> new ByzantiumConfig(blockchainConfig),
+      blockchainConfig.petersburgConfigBlockNumber -> new PetersburgConfig(blockchainConfig)
     )
 
     // highest transition block that is less/equal to `blockNumber`
@@ -35,83 +35,85 @@ object EvmConfig {
       ._2
   }
 
-  val FrontierConfig = EvmConfig(
-    feeSchedule = FeeSchedule.FrontierFeeSchedule,
-    opCodes = OpCodes.FrontierOpCodes,
-    exceptionalFailedCodeDeposit = false,
-    subGasCapDivisor = None,
-    chargeSelfDestructForNewAccount = false,
-    maxContractSize = Int.MaxValue,
-    eip161 = false,
-    eip161Patch = false,
-    eip140 = false,
-    eip213 = false,
-    eip212 = false,
-    eip198 = false,
-    eip658 = false,
-    eip145 = false,
-    eip1014 = false,
-    eip1052 = false,
-    eip1283 = false,
-    eip152 = false,
-    eip1108 = false,
-    eip1344 = false,
-    eip1884 = false,
-    eip2028 = false,
-    eip2200 = false
-  )
+  class FrontierConfig(blockchainConfig: BlockchainConfig) extends EvmConfig {
+    override val chainId = DataWord(blockchainConfig.chainId)
+    override val feeSchedule = new FeeSchedule.FrontierFeeSchedule()
+    override val opCodes = OpCodes.FrontierOpCodes
+    override val exceptionalFailedCodeDeposit = false
+    override val subGasCapDivisor = None
+    override val chargeSelfDestructForNewAccount = false
+    override val maxContractSize = Int.MaxValue
+    override val eip161 = false
+    override val eip161Patch = false
+    override val eip140 = false
+    override val eip213 = false
+    override val eip212 = false
+    override val eip198 = false
+    override val eip658 = false
+    override val eip145 = false
+    override val eip1014 = false
+    override val eip1052 = false
+    override val eip1283 = false
+    override val eip152 = false
+    override val eip1108 = false
+    override val eip1344 = false
+    override val eip1884 = false
+    override val eip2028 = false
+    override val eip2200 = false
+  }
 
-  val HomesteadConfig = EvmConfig(
-    feeSchedule = FeeSchedule.HomesteadFeeSchedule,
-    opCodes = OpCodes.HomesteadOpCodes,
-    exceptionalFailedCodeDeposit = true,
-    subGasCapDivisor = None,
-    chargeSelfDestructForNewAccount = false,
-    maxContractSize = Int.MaxValue,
-    eip161 = false,
-    eip161Patch = false,
-    eip140 = false,
-    eip213 = false,
-    eip212 = false,
-    eip198 = false,
-    eip658 = false,
-    eip145 = false,
-    eip1014 = false,
-    eip1052 = false,
-    eip1283 = false,
-    eip152 = false,
-    eip1108 = false,
-    eip1344 = false,
-    eip1884 = false,
-    eip2028 = false,
-    eip2200 = false
-  )
+  class HomesteadConfig(blockchainConfig: BlockchainConfig) extends EvmConfig {
+    override val chainId = DataWord(blockchainConfig.chainId)
+    override val feeSchedule = new FeeSchedule.HomesteadFeeSchedule()
+    override val opCodes = OpCodes.HomesteadOpCodes
+    override val exceptionalFailedCodeDeposit = true
+    override val subGasCapDivisor: Option[Long] = None
+    override val chargeSelfDestructForNewAccount = false
+    override val maxContractSize = Int.MaxValue
+    override val eip161 = false
+    override val eip161Patch = false
+    override val eip140 = false
+    override val eip213 = false
+    override val eip212 = false
+    override val eip198 = false
+    override val eip658 = false
+    override val eip145 = false
+    override val eip1014 = false
+    override val eip1052 = false
+    override val eip1283 = false
+    override val eip152 = false
+    override val eip1108 = false
+    override val eip1344 = false
+    override val eip1884 = false
+    override val eip2028 = false
+    override val eip2200 = false
+  }
 
-  val PostEIP150Config = HomesteadConfig.copy(
-    feeSchedule = FeeSchedule.PostEIP150FeeSchedule,
-    subGasCapDivisor = Some(64),
-    chargeSelfDestructForNewAccount = true
-  )
+  class PostEIP150Config(blockchainConfig: BlockchainConfig) extends HomesteadConfig(blockchainConfig) {
+    override val feeSchedule = new FeeSchedule.PostEIP150FeeSchedule()
+    override val subGasCapDivisor = Some(64L)
+    override val chargeSelfDestructForNewAccount = true
+  }
 
-  val PostEIP160Config = PostEIP150Config.copy(
-    feeSchedule = FeeSchedule.PostEIP160FeeSchedule
-  )
+  class PostEIP160Config(blockchainConfig: BlockchainConfig) extends PostEIP150Config(blockchainConfig) {
+    override val feeSchedule = new FeeSchedule.PostEIP160FeeSchedule()
+  }
 
-  val PostEIP161Config = PostEIP160Config.copy(
-    eip161 = true
-  )
+  class PostEIP161Config(blockchainConfig: BlockchainConfig) extends PostEIP160Config(blockchainConfig) {
+    override val eip161 = true
+  }
 
-  val PostEIP170Config = PostEIP161Config.copy(
-    maxContractSize = 0x6000
-  )
+  class PostEIP170Config(blockchainConfig: BlockchainConfig) extends PostEIP161Config(blockchainConfig) {
+    override val maxContractSize = 0x6000
+  }
 
-  val EIP161PatchConfig = PostEIP170Config.copy(
-    eip161Patch = true
-  )
+  class EIP161PatchConfig(blockchainConfig: BlockchainConfig) extends PostEIP170Config(blockchainConfig) {
+    override val eip161Patch = true
+  }
 
-  val PostEIP161PatchConfig = EIP161PatchConfig.copy(
-    eip161Patch = false
-  )
+  class PostEIP161PatchConfig(blockchainConfig: BlockchainConfig) extends EIP161PatchConfig(blockchainConfig) {
+    override val eip161Patch = false
+  }
 
   /**
    * EIPs included in the Hard Fork:
@@ -124,22 +126,22 @@ object EvmConfig {
    *     214 - New opcode STATICCALL</li>
    *     658 - Embedding transaction return data in receipts</li>
    */
-  val ByzantiumConfig = PostEIP161PatchConfig.copy(
-    opCodes = OpCodes.ByzantiumOpCodes,
-    eip140 = true,
-    eip213 = true,
-    eip212 = true,
-    eip198 = true,
-    eip658 = true
-  )
+  class ByzantiumConfig(blockchainConfig: BlockchainConfig) extends PostEIP161PatchConfig(blockchainConfig) {
+    override val opCodes = OpCodes.ByzantiumOpCodes
+    override val eip140 = true
+    override val eip213 = true
+    override val eip212 = true
+    override val eip198 = true
+    override val eip658 = true
+  }
 
-  val ConstantinopleConfig = ByzantiumConfig.copy(
-    opCodes = OpCodes.ConstantinopleCodes,
-    eip145 = true,
-    eip1014 = true,
-    eip1052 = true,
-    eip1283 = true
-  )
+  class ConstantinopleConfig(blockchainConfig: BlockchainConfig) extends ByzantiumConfig(blockchainConfig) {
+    override val opCodes = OpCodes.ConstantinopleCodes
+    override val eip145 = true
+    override val eip1014 = true
+    override val eip1052 = true
+    override val eip1283 = true
+  }
 
   /**
    * A version of Constantinople Hard Fork after removing eip-1283.
@@ -152,9 +154,9 @@ object EvmConfig {
    *     <li>1052 - EXTCODEHASH opcode</li>
    * </ul>
    */
-  val PetersburgConfig = ConstantinopleConfig.copy(
-    eip1283 = false
-  )
+  class PetersburgConfig(blockchainConfig: BlockchainConfig) extends ConstantinopleConfig(blockchainConfig) {
+    override val eip1283 = false
+  }
 
   /**
    *
@@ -168,44 +170,48 @@ object EvmConfig {
    * <li>EIP-2200: Rebalance net-metered SSTORE gas cost with consideration of SLOAD gas cost change</li>
    * </ul>
    */
-  val IstanbulConfig = PetersburgConfig.copy(
-    feeSchedule = FeeSchedule.PostEIP1108FeeSchedule,
-    eip152 = true,
-    eip1108 = true,
-    eip1344 = true,
-    eip1884 = true,
-    eip2028 = true,
-    eip2200 = true
-  )
+  class IstanbulConfig(blockchainConfig: BlockchainConfig) extends PetersburgConfig(blockchainConfig) {
+    override val opCodes = OpCodes.IstanbulCodes
+    override val feeSchedule = new FeeSchedule.PostEIP1108FeeSchedule()
+    override val eip152 = true
+    override val eip1108 = true
+    override val eip1344 = true
+    override val eip1884 = true
+    override val eip2028 = true
+    override val eip2200 = true
+  }
 
 }
 
-final case class EvmConfig(
-    feeSchedule:                     FeeSchedule,
-    opCodes:                         List[OpCode[_]],
-    exceptionalFailedCodeDeposit:    Boolean,
-    subGasCapDivisor:                Option[Long],
-    chargeSelfDestructForNewAccount: Boolean,
-    maxContractSize:                 Int,
-    eip161:                          Boolean,
-    eip161Patch:                     Boolean,
-    eip140:                          Boolean,
-    eip213:                          Boolean, // replaced eip196
-    eip212:                          Boolean, // replaced eip197
-    eip198:                          Boolean,
-    eip658:                          Boolean,
-    eip145:                          Boolean,
-    eip1014:                         Boolean,
-    eip1052:                         Boolean,
-    eip1283:                         Boolean,
-    eip152:                          Boolean,
-    eip1108:                         Boolean,
-    eip1344:                         Boolean,
-    eip1884:                         Boolean,
-    eip2028:                         Boolean,
-    eip2200:                         Boolean
-) {
+trait EvmConfig {
   import EvmConfig._
+
+  def chainId: DataWord
+  def feeSchedule: FeeSchedule
+  def opCodes: List[OpCode[_]]
+  def exceptionalFailedCodeDeposit: Boolean
+  def subGasCapDivisor: Option[Long]
+  def chargeSelfDestructForNewAccount: Boolean
+  def maxContractSize: Int
+  def eip161: Boolean
+  def eip161Patch: Boolean
+  def eip140: Boolean
+  def eip213: Boolean // replaced eip196
+  def eip212: Boolean // replaced eip197
+  def eip198: Boolean
+  def eip658: Boolean
+  def eip145: Boolean
+  def eip1014: Boolean
+  def eip1052: Boolean
+  def eip1283: Boolean
+  def eip152: Boolean
+  def eip1108: Boolean
+  def eip1344: Boolean
+  def eip1884: Boolean
+  def eip2028: Boolean
+  def eip2200: Boolean
+
+  // --- common methods etc
 
   private val byteToOpCode = {
     val ops = Array.ofDim[OpCode[_]](256)
@@ -294,7 +300,6 @@ final case class EvmConfig(
 }
 
 object FeeSchedule {
-  object FrontierFeeSchedule extends FrontierFeeSchedule
   class FrontierFeeSchedule extends FeeSchedule {
     override val G_zero = 0
     override val G_base = 2
@@ -340,12 +345,10 @@ object FeeSchedule {
     override val G_bn128pairing_pairing = 80000
   }
 
-  object HomesteadFeeSchedule extends HomesteadFeeSchedule
   class HomesteadFeeSchedule extends FrontierFeeSchedule {
     override val G_txcreate = 32000
   }
 
-  object PostEIP150FeeSchedule extends PostEIP150FeeSchedule
   class PostEIP150FeeSchedule extends HomesteadFeeSchedule {
     override val G_sload = 200
     override val G_call = 700
@@ -355,12 +358,10 @@ object FeeSchedule {
     override val G_extcodecopy = 700
   }
 
-  object PostEIP160FeeSchedule extends PostEIP160FeeSchedule
   class PostEIP160FeeSchedule extends PostEIP150FeeSchedule {
     override val G_expbyte = 50
   }
 
-  object PostEIP1108FeeSchedule extends PostEIP1108FeeSchedule
   class PostEIP1108FeeSchedule extends PostEIP160FeeSchedule {
     override val G_bn128add = 150
     override val G_bn128mul = 6000

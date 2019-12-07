@@ -746,8 +746,8 @@ class EthService(
     gasLimit.flatMap { gl =>
       val tx = Transaction(DataWord.Zero, req.tx.gasPrice, gl, toAddress, req.tx.value, req.tx.data)
       val fakeSignature = ECDSASignature(BigInteger.ZERO, BigInteger.ZERO, 0.toByte)
-      // TODO chainId
-      val stx = SignedTransaction(tx, fakeSignature, None, fromAddress)
+      val chainId = blockchainConfig.chainId
+      val stx = SignedTransaction(tx, fakeSignature, Some(chainId), fromAddress)
 
       resolveBlock(req.block).map {
         case ResolvedBlock(block, _) =>

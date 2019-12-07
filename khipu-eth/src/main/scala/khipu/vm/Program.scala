@@ -10,7 +10,7 @@ import khipu.util.collection.IntSet
  *
  * @param code the EVM bytecode as bytes
  */
-final case class Program(code: Array[Byte]) {
+final case class Program(code: Array[Byte], evmConfig: EvmConfig) {
   val length = code.length
 
   lazy val codeHash = Hash(crypto.kec256(code))
@@ -38,7 +38,7 @@ final case class Program(code: Array[Byte]) {
     while (pos < length) {
       val byte = code(pos)
       // we only need to check PushOp and JUMPDEST, and they are both present in Frontier
-      EvmConfig.FrontierConfig.getOpCode(byte) match {
+      evmConfig.getOpCode(byte) match {
         case Some(JUMPDEST) =>
           res += pos
           pos += 1
