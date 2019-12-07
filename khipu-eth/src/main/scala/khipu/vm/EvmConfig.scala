@@ -368,6 +368,12 @@ object FeeSchedule {
     override val G_bn128pairing_base = 45000
     override val G_bn128pairing_pairing = 34000
   }
+
+  class PostEIP1884FeeSchedule extends PostEIP1108FeeSchedule {
+    override val G_sload = 800
+    override val G_balance = 700
+    override val G_extcodehash = 700
+  }
 }
 trait FeeSchedule {
   def G_zero: Long

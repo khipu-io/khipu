@@ -687,6 +687,17 @@ case object CHAINID extends OpCode[Unit](0x46, 0, 1) with ConstGas[Unit] {
   }
 }
 
+case object SELFBALANCE extends OpCode[Unit](0x47, 0, 1) with ConstGas[Unit] {
+  protected def constGasFn(s: FeeSchedule) = s.G_low
+  protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
+
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
+    val balance = state.ownBalance
+    state.stack.push(balance)
+    state.step()
+  } 
+}
+
 case object POP extends OpCode[Unit](0x50, 1, 0) with ConstGas[Unit] {
   protected def constGasFn(s: FeeSchedule) = s.G_base
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
