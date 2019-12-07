@@ -18,7 +18,7 @@ object Build extends sbt.Build {
   lazy val khipu_base = Project("khipu-base", file("khipu-base"))
     .settings(basicSettings: _*)
     .settings(noPublishing: _*)
-    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.spongycastle ++ Dependencies.scrypto)
+    .settings(libraryDependencies ++= Dependencies.basic ++ Dependencies.akka ++ Dependencies.spongycastle ++ Dependencies.scrypto ++ Dependencies.bouncycastle)
     .settings(libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value)
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
 
@@ -149,6 +149,8 @@ object Dependencies {
     "org.apache.kafka" % "kafka-clients" % "2.0.0",
     "org.apache.kafka" %% "kafka" % "2.0.0"
   )
+
+  val bouncycastle = Seq("org.bouncycastle" % "bcprov-jdk15on" % "1.62")
 
   val spongycastle = Seq("com.madgag.spongycastle" % "core" % "1.58.0.0")
 

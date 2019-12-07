@@ -52,7 +52,13 @@ object EvmConfig {
     eip145 = false,
     eip1014 = false,
     eip1052 = false,
-    eip1283 = false
+    eip1283 = false,
+    eip152 = false,
+    eip1108 = false,
+    eip1344 = false,
+    eip1884 = false,
+    eip2028 = false,
+    eip2200 = false
   )
 
   val HomesteadConfig = EvmConfig(
@@ -72,7 +78,13 @@ object EvmConfig {
     eip145 = false,
     eip1014 = false,
     eip1052 = false,
-    eip1283 = false
+    eip1283 = false,
+    eip152 = false,
+    eip1108 = false,
+    eip1344 = false,
+    eip1884 = false,
+    eip2028 = false,
+    eip2200 = false
   )
 
   val PostEIP150Config = HomesteadConfig.copy(
@@ -144,6 +156,27 @@ object EvmConfig {
     eip1283 = false
   )
 
+  /**
+   *
+   * EIPs included in the Hard Fork: https://eips.ethereum.org/EIPS/eip-1679
+   * <ul>
+   * <li>EIP-152: Add Blake2 compression function F precompile</li>
+   * <li>EIP-1108: Reduce alt_bn128 precompile gas costs</li>
+   * <li>EIP-1344: Add ChainID opcode</li>
+   * <li>EIP-1884: Repricing for trie-size-dependent opcodes</li>
+   * <li>EIP-2028: Calldata gas cost reduction</li>
+   * <li>EIP-2200: Rebalance net-metered SSTORE gas cost with consideration of SLOAD gas cost change</li>
+   * </ul>
+   */
+  val IstanbulConfig = PetersburgConfig.copy(
+    eip152 = true,
+    eip1108 = true,
+    eip1344 = true,
+    eip1884 = true,
+    eip2028 = true,
+    eip2200 = true
+  )
+
 }
 
 final case class EvmConfig(
@@ -163,7 +196,13 @@ final case class EvmConfig(
     eip145:                          Boolean,
     eip1014:                         Boolean,
     eip1052:                         Boolean,
-    eip1283:                         Boolean
+    eip1283:                         Boolean,
+    eip152:                          Boolean,
+    eip1108:                         Boolean,
+    eip1344:                         Boolean,
+    eip1884:                         Boolean,
+    eip2028:                         Boolean,
+    eip2200:                         Boolean
 ) {
   import EvmConfig._
 

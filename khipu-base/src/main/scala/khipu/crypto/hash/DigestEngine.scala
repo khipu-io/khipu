@@ -1,6 +1,6 @@
 package khipu.crypto.hash
 
-import java.security.MessageDigest;
+import java.security.MessageDigest
 
 /**
  * <p>This class is a template which can be used to implement hash

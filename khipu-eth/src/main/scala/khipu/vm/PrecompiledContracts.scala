@@ -4,6 +4,7 @@ import akka.util.ByteString
 import khipu.DataWord
 import khipu.crypto
 import khipu.crypto.ECDSASignature
+import khipu.crypto.hash.Blake2bf
 import khipu.crypto.zksnark.BN128Fp
 import khipu.crypto.zksnark.BN128G1
 import khipu.crypto.zksnark.BN128G2
@@ -15,6 +16,8 @@ import java.math.BigInteger
 import scala.util.Try
 
 object PrecompiledContracts {
+  private val MAX_VALUE_BIGINT = BigInteger.valueOf(Long.MaxValue)
+
   val EcDsaRecAddr = Address(1)
   val Sha256Addr = Address(2)
   val Rip160Addr = Address(3)
@@ -23,6 +26,7 @@ object PrecompiledContracts {
   val AltBN128AddAddr = Address(6)
   val AltBN128MulAddr = Address(7)
   val AltBN128PairingAddr = Address(8)
+  val BLAKE2BFAddr = Address(9)
 
   def getContractForAddress(address: Address, config: EvmConfig): Option[PrecompiledContract] = address match {
     case EcDsaRecAddr                         => Some(ECRecovery)
@@ -33,6 +37,7 @@ object PrecompiledContracts {
     case AltBN128AddAddr if config.eip213     => Some(BN128Add)
     case AltBN128MulAddr if config.eip213     => Some(BN128Mul)
     case AltBN128PairingAddr if config.eip212 => Some(BN128Pairing)
+    case BLAKE2BFAddr if config.eip152        => Some(BLAKE2BF)
     case _                                    => None
   }
 
@@ -166,10 +171,14 @@ object PrecompiledContracts {
 
       // use big numbers to stay safe in case of overflow
       val gas = BigInteger.valueOf(multComplexity)
-        .multiply(BigInteger.valueOf(Math.max(adjExpLen, 1)))
+        .multiply(BigInteger.valueOf(math.max(adjExpLen, 1)))
         .divide(GQUAD_DIVISOR)
 
-      if (BigIntUtil.isLessThan(gas, BigInteger.valueOf(Long.MaxValue))) gas.longValue else Long.MaxValue
+      if (BigIntUtil.isLessThan(gas, MAX_VALUE_BIGINT)) {
+        gas.longValue
+      } else {
+        Long.MaxValue
+      }
     }
 
     def exec(_input: ByteString): (Boolean, ByteString) = {
@@ -264,12 +273,16 @@ object PrecompiledContracts {
       val y2 = BytesUtil.parseWord(input, 3)
 
       val p1 = BN128Fp.create(x1, y1)
-      if (p1 == null)
+
+      if (p1 == null) {
         return (false, ByteString())
+      }
 
       val p2 = BN128Fp.create(x2, y2)
-      if (p2 == null)
+
+      if (p2 == null) {
         return (false, ByteString())
+      }
 
       val res = p1.add(p2).toEthNotation()
 
@@ -305,8 +318,10 @@ object PrecompiledContracts {
       val s = BytesUtil.parseWord(input, 2)
 
       val p = BN128Fp.create(x, y)
-      if (p == null)
+
+      if (p == null) {
         return (false, ByteString())
+      }
 
       val res = p.mul(BigIntUtil.toBI(s)).toEthNotation()
 
@@ -359,8 +374,9 @@ object PrecompiledContracts {
         val pair = decodePair(input, offset)
 
         // fail if decoding has failed
-        if (pair == null)
+        if (pair == null) {
           return (false, ByteString())
+        }
 
         check.addPair(pair._1, pair._2)
         offset += PAIR_SIZE
@@ -379,7 +395,9 @@ object PrecompiledContracts {
       val p1 = BN128G1.create(x, y)
 
       // fail if point is invalid
-      if (p1 == null) return null
+      if (p1 == null) {
+        return null
+      }
 
       // (b, a)
       val b = BytesUtil.parseWord(in, offset, 2)
@@ -392,9 +410,59 @@ object PrecompiledContracts {
       val p2 = BN128G2.create(a, b, c, d)
 
       // fail if point is invalid
-      if (p2 == null) return null
+      if (p2 == null) {
+        return null
+      }
 
       (p1, p2)
     }
   }
+
+  object BLAKE2BF extends PrecompiledContract {
+
+    def gas(input: ByteString): Long = {
+      if (input.size != Blake2bf.MESSAGE_LENGTH_BYTES) {
+        // Input is malformed, we can't read the number of rounds.
+        // Precompile can't be executed so we set its price to 0.
+        return 0L
+      }
+      if ((input(212) & 0xFE) != 0) {
+        // Input is malformed, F value can be only 0 or 1
+        return 0L
+      }
+
+      val roundsBytes = java.util.Arrays.copyOfRange(input.toArray, 0, 4)
+      val rounds = new BigInteger(1, roundsBytes)
+      if (BigIntUtil.isLessThan(rounds, MAX_VALUE_BIGINT)) {
+        rounds.longValue
+      } else {
+        Long.MaxValue
+      }
+    }
+
+    def exec(_input: ByteString): (Boolean, ByteString) = {
+      val input = if (_input == null) ByteString() else _input
+      if (input.size != Blake2bf.MESSAGE_LENGTH_BYTES) {
+        //LOG.trace("Incorrect input length.  Expected {} and got {}", MESSAGE_LENGTH_BYTES, input.size())
+        return (false, ByteString())
+      }
+      if ((input(212) & 0xFE) != 0) {
+        //LOG.trace("Incorrect finalization flag, expected 0 or 1 and got {}", input.get(212))
+        return (false, ByteString())
+      }
+
+      (true, ByteString(blake2bf(input)))
+    }
+
+    private def blake2bf(input: ByteString): Array[Byte] = {
+      val digest = new Blake2bf()
+      var i = 0
+      while (i < input.size) {
+        digest.update(input(i))
+        i += 1
+      }
+      digest.digest()
+    }
+  }
+
 }
