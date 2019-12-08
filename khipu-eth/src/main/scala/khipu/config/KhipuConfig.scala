@@ -207,7 +207,8 @@ object BlockchainConfig {
       val eip649BlockNumber = blockchainConfig.getLong("eip649-block-number")
       val byzantiumBlockNumber = blockchainConfig.getLong("byzantium-block-number")
       val constantinopleBlockNumber = blockchainConfig.getLong("constantinople-block-number")
-      val petersburgConfigBlockNumber = blockchainConfig.getLong("petersburg-block-number")
+      val petersburgBlockNumber = blockchainConfig.getLong("petersburg-block-number")
+      val istanbulBlockNumber = blockchainConfig.getLong("istanbul-block-number")
 
       val difficultyBombPauseBlockNumber = blockchainConfig.getLong("difficulty-bomb-pause-block-number")
       val difficultyBombContinueBlockNumber = blockchainConfig.getLong("difficulty-bomb-continue-block-number")
@@ -250,7 +251,8 @@ trait BlockchainConfig {
   def eip649BlockNumber: Long
   def byzantiumBlockNumber: Long
   def constantinopleBlockNumber: Long
-  def petersburgConfigBlockNumber: Long
+  def petersburgBlockNumber: Long
+  def istanbulBlockNumber: Long
 
   def difficultyBombPauseBlockNumber: Long
   def difficultyBombContinueBlockNumber: Long
