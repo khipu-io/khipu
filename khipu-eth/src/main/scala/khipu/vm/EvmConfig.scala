@@ -214,7 +214,8 @@ trait EvmConfig {
 
   // --- common methods etc
 
-  private val byteToOpCode = {
+  // lazy to wait for opCodes etc ready
+  private lazy val byteToOpCode = {
     val ops = Array.ofDim[OpCode[_]](256)
     opCodes foreach { op =>
       ops(op.code.toInt & 0xFF) = op
