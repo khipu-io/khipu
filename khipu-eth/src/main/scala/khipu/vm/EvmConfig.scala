@@ -172,7 +172,7 @@ object EvmConfig {
    */
   class IstanbulConfig(blockchainConfig: BlockchainConfig) extends PetersburgConfig(blockchainConfig) {
     override val opCodes = OpCodes.IstanbulCodes
-    override val feeSchedule = new FeeSchedule.PostEIP1108FeeSchedule()
+    override val feeSchedule = new FeeSchedule.PostEIP2200FeeSchedule()
     override val eip152 = true
     override val eip1108 = true
     override val eip1344 = true
@@ -310,9 +310,9 @@ object FeeSchedule {
     override val G_balance = 20
     override val G_sload = 50
     override val G_jumpdest = 1
+    override val G_ssentry = 0
     override val G_sset = 20000
     override val G_sreset = 5000
-    override val G_sreuse = 200
     override val R_sclear = 15000
     override val R_selfdestruct = 24000
     override val G_selfdestruct = 0
@@ -374,6 +374,14 @@ object FeeSchedule {
     override val G_balance = 700
     override val G_extcodehash = 700
   }
+
+  class PostEIP2028FeeSchedule extends PostEIP1884FeeSchedule {
+    override val G_txdatanonzero = 16
+  }
+
+  class PostEIP2200FeeSchedule extends PostEIP2028FeeSchedule {
+    override val G_ssentry = 2300
+  }
 }
 trait FeeSchedule {
   def G_zero: Long
@@ -385,9 +393,9 @@ trait FeeSchedule {
   def G_balance: Long
   def G_sload: Long
   def G_jumpdest: Long
+  def G_ssentry: Long // Minimum gas required to be present for an SSTORE call, not consumed
   def G_sset: Long
   def G_sreset: Long
-  def G_sreuse: Long
   def R_sclear: Long
   def R_selfdestruct: Long
   def G_selfdestruct: Long

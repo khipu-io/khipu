@@ -695,7 +695,7 @@ case object SELFBALANCE extends OpCode[Unit](0x47, 0, 1) with ConstGas[Unit] {
     val balance = state.ownBalance
     state.stack.push(balance)
     state.step()
-  } 
+  }
 }
 
 case object POP extends OpCode[Unit](0x50, 1, 0) with ConstGas[Unit] {
@@ -800,43 +800,51 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
-      val (key, value) = params
-      val oldValue = state.storage.load(key)
-      var refund = 0L
-      if (state.config.eip1283) {
-        val origValue = state.storage.getOriginalValue(key).getOrElse(DataWord.Zero)
-        if (oldValue == origValue) {
-          if (origValue.isZero) {
-            // no refund 
+      val (key, newValue) = params
+      val currValue = state.storage.load(key)
+      val refund =
+        if (state.config.eip2200) {
+          if (newValue == currValue) {
+            0L
           } else {
-            if (value.isZero) {
-              refund += state.config.feeSchedule.R_sclear
-            }
-          }
-        } else { // oldValue != origValue
-          if (origValue.nonZero) {
-            if (value.isZero) {
-              refund -= state.config.feeSchedule.R_sclear
+            val origValue = state.storage.getOriginalValue(key).getOrElse(DataWord.Zero)
+            if (origValue == currValue) {
+              if (origValue.isZero) {
+                0L
+              } else if (newValue.isZero) {
+                state.config.feeSchedule.R_sclear
+              } else {
+                0L
+              }
             } else {
-              refund += state.config.feeSchedule.R_sclear
-            }
-          }
+              var _refund = 0L
+              if (origValue.nonZero) {
+                if (currValue.isZero) {
+                  _refund -= state.config.feeSchedule.R_sclear
+                } else if (newValue.isZero) {
+                  _refund += state.config.feeSchedule.R_sclear
+                }
+              }
 
-          if (origValue == value) {
-            if (origValue.isZero) {
-              refund += (state.config.feeSchedule.G_sset - state.config.feeSchedule.R_sclear)
-            } else {
-              refund += (state.config.feeSchedule.G_sreset - state.config.feeSchedule.R_sclear)
+              if (origValue == newValue) {
+                if (origValue.isZero) {
+                  _refund += state.config.feeSchedule.G_sset
+                } else {
+                  _refund += state.config.feeSchedule.G_sreset
+                }
+              }
+              _refund
             }
+          }
+        } else {
+          if (currValue.nonZero && newValue.isZero) {
+            state.config.feeSchedule.R_sclear
+          } else {
+            0L
           }
         }
-      } else {
-        if (oldValue.nonZero && value.isZero) {
-          refund += state.config.feeSchedule.R_sclear
-        }
-      }
 
-      val updatedStorage = state.storage.store(key, value)
+      val updatedStorage = state.storage.store(key, newValue)
       val world = state.world.saveStorage(state.ownAddress, updatedStorage)
 
       state
@@ -847,28 +855,32 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
   }
 
   protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
-    val (key, value) = params
-    val oldValue = state.storage.load(key)
-    if (state.config.eip1283) {
-      if (value == oldValue) {
-        state.config.feeSchedule.G_sreuse
-      } else {
-        val origValue = state.storage.getOriginalValue(key).getOrElse(DataWord.Zero)
-        if (oldValue == origValue) {
-          if (origValue.isZero) {
-            state.config.feeSchedule.G_sset
-          } else {
-            state.config.feeSchedule.G_sreset
-          }
-        } else {
-          state.config.feeSchedule.G_sreuse
-        }
-      }
+    if (state.config.eip2200 && state.gas <= state.config.feeSchedule.G_ssentry) {
+      -1
     } else {
-      if (oldValue.isZero && value.nonZero) {
-        state.config.feeSchedule.G_sset
+      val (key, newValue) = params
+      val currValue = state.storage.load(key)
+      if (state.config.eip2200) {
+        if (newValue == currValue) {
+          state.config.feeSchedule.G_sload
+        } else {
+          val origValue = state.storage.getOriginalValue(key).getOrElse(DataWord.Zero)
+          if (currValue == origValue) {
+            if (origValue.isZero) {
+              state.config.feeSchedule.G_sset
+            } else {
+              state.config.feeSchedule.G_sreset
+            }
+          } else {
+            state.config.feeSchedule.G_sload
+          }
+        }
       } else {
-        state.config.feeSchedule.G_sreset
+        if (currValue.isZero && newValue.nonZero) {
+          state.config.feeSchedule.G_sset
+        } else {
+          state.config.feeSchedule.G_sreset
+        }
       }
     }
   }
