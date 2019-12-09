@@ -1,7 +1,7 @@
 ## Khipu: Enterprise Blockchain Platform
 
 Khipu is an enterprise blockchain platform based on Ethereum.
-It is built on earlier work on Mantis by [Grothendieck Team](https://iohk.io/projects/ethereum-classic/).
+It is built on earlier work on [Mantis](https://github.com/input-output-hk/mantis).
 
 The major researches of Khipu so far:
 
@@ -9,7 +9,7 @@ The major researches of Khipu so far:
   - Kafka based storage engine carefully designed for blockchain with high performance both on random/sequential reading and writing
   - The fastest Ethereum implemention
 
-### Status - Beta Release 0.3.x
+### Status - Beta Release 0.4.x
 
 This version of the code supports
 
