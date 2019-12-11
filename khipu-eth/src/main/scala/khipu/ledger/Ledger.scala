@@ -176,7 +176,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     }
 
     val (checkpoint, context) = prepareProgramContext(stx, blockHeader, evmCfg)(world2)
-    val result = runVM(stx, context, evmCfg)(checkpoint)
+    val result = runVM(stx, context, evmCfg, blockHeader.number == blockchainConfig.debugTraceAt)(checkpoint)
 
     val totalGasToRefund = calcTotalGasToRefund(gasLimit, result)
     val gasUsed = stx.tx.gasLimit - totalGasToRefund
@@ -228,7 +228,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
    */
   override def executeBlock(block: Block, validators: Validators)(implicit executor: ExecutionContext): Future[Either[BlockExecutionError, BlockResult]] = {
     val start1 = System.nanoTime
-    val parallelResult = executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = true && !blockchainConfig.isDebugTraceEnabled) map {
+    val parallelResult = executeBlockTransactions(block, validators.signedTransactionValidator, isParallel = true && block.header.number != blockchainConfig.debugTraceAt) map {
       case Right(blockResult) =>
         log.debug(s"${block.header.number} parallel-executed in ${(System.nanoTime - start1) / 1000000}ms")
 
@@ -487,7 +487,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
             logs = logs
           )
 
-          if (blockchainConfig.isDebugTraceEnabled) {
+          if (blockHeader.number == blockchainConfig.debugTraceAt) {
             println(s"\nTx ${stx.hash} ${receipt}")
           }
 
@@ -556,10 +556,10 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     // TODO catch prepareProgramContext's throwable (MPTException etc from mtp) here
     val (checkpoint, context) = prepareProgramContext(stx, blockHeader, evmCfg)(world)
 
-    if (blockchainConfig.isDebugTraceEnabled) {
+    if (blockHeader.number == blockchainConfig.debugTraceAt) {
       println(s"\nTx 0x${stx.hash} ========>\n${stx.tx}")
     }
-    val result = runVM(stx, context, evmCfg)(checkpoint)
+    val result = runVM(stx, context, evmCfg, blockHeader.number == blockchainConfig.debugTraceAt)(checkpoint)
 
     val gasLimit = stx.tx.gasLimit
     val totalGasToRefund = calcTotalGasToRefund(gasLimit, result)
@@ -568,7 +568,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val txFee = gasPrice * gasUsed
     val refund = gasPrice * totalGasToRefund
 
-    if (blockchainConfig.isDebugTraceEnabled) {
+    if (blockHeader.number == blockchainConfig.debugTraceAt) {
       println(s"\nTx 0x${stx.hash} gasLimit: ${stx.tx.gasLimit} gasUsed $gasUsed, isRevert: ${result.isRevert}, error: ${result.error}")
     }
 
@@ -707,15 +707,15 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
   /**
    * @param checkpoint - world will return checkpoint if result error or isRevert
    */
-  private def runVM(stx: SignedTransaction, context: PC, evmCfg: EvmConfig)(checkpoint: BlockWorldState): PR = {
+  private def runVM(stx: SignedTransaction, context: PC, evmCfg: EvmConfig, isDebugTraceEnabled: Boolean)(checkpoint: BlockWorldState): PR = {
     val r = if (stx.tx.isContractCreation) { // create
-      VM.run(context, blockchainConfig.isDebugTraceEnabled)
+      VM.run(context, isDebugTraceEnabled)
     } else { // call
       PrecompiledContracts.getContractForAddress(context.targetAddress, evmCfg) match {
         case Some(contract) =>
           contract.run(context)
         case None =>
-          VM.run(context, blockchainConfig.isDebugTraceEnabled)
+          VM.run(context, isDebugTraceEnabled)
       }
     }
 

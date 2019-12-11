@@ -223,7 +223,7 @@ object BlockchainConfig {
 
       val monetaryPolicyConfig = MonetaryPolicyConfig(blockchainConfig.getConfig("monetary-policy"))
 
-      val isDebugTraceEnabled = blockchainConfig.getBoolean("debug-trace-enabled")
+      val debugTraceAt = blockchainConfig.getLong("debug-trace-at")
 
       val powValidateMode: PoWValidator.Mode = PoWValidator.Mode.parse(blockchainConfig.getString("pow-validate-mode"), PoWValidator.Mixed)
     }
@@ -267,7 +267,7 @@ trait BlockchainConfig {
 
   def monetaryPolicyConfig: MonetaryPolicyConfig
 
-  def isDebugTraceEnabled: Boolean
+  def debugTraceAt: Long
 
   def powValidateMode: PoWValidator.Mode
 }
