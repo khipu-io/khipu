@@ -240,10 +240,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
 
         val start3 = System.nanoTime
         validateBlockAfterExecution(block, worldFlushed.rootHash, blockResult.receipts, blockResult.gasUsed, validators.blockValidator) match {
-          case Right(_) =>
-            log.debug(s"${block.header.number} post-validated in ${(System.nanoTime - start3) / 1000000}ms")
-            Right(blockResult, worldFlushed)
-
+          case Right(_)    => Right(blockResult, worldFlushed)
           case Left(error) => Left(error)
         }
 

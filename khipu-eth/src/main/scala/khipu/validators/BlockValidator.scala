@@ -66,8 +66,8 @@ object BlockValidator extends BlockValidator {
    */
   def validateBlockAndReceipts(block: Block, receipts: Seq[Receipt]): Either[BlockError, Block] = {
     for {
-      _ <- validateReceipts(block, receipts)
       _ <- validateLogBloom(block, receipts)
+      _ <- validateReceipts(block, receipts)
     } yield block
   }
 
