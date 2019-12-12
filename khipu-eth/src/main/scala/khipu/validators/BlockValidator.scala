@@ -2,6 +2,7 @@ package khipu.validators
 
 import akka.util.ByteString
 import java.util.Arrays
+import khipu.Hash
 import khipu.crypto
 import khipu.domain.{ Block, BlockHeader, Receipt, SignedTransaction }
 import khipu.ledger.BloomFilter
@@ -79,17 +80,15 @@ object BlockValidator extends BlockValidator {
    * @return Block if valid, a Some otherwise
    */
   private def validateTransactionRoot(block: Block): Either[BlockError, Block] = {
-    val isValid = MptListValidator.isValid[SignedTransaction](
+    val error = MptListValidator.isValid[SignedTransaction](
       block.header.transactionsRoot.bytes,
       block.body.transactionList,
       SignedTransaction.byteArraySerializable
     )
 
-    if (isValid) {
-      Right(block)
-    } else {
-      //println(s"====\n${block.header}\n${block.body.transactionList.map(x => (x, x.hashAsHexString))}\n====\n")
-      Left(BlockTransactionsHashError)
+    error match {
+      case None                          => Right(block)
+      case Some(HashError(wrong, right)) => Left(BlockTransactionsHashError(wrong, right))
     }
   }
 
@@ -103,10 +102,11 @@ object BlockValidator extends BlockValidator {
   private def validateOmmersHash(block: Block): Either[BlockError, Block] = {
     import khipu.network.p2p.messages.PV62.BlockHeaderImplicits._
     val encodedOmmers: Array[Byte] = block.body.uncleNodesList.toBytes
-    if (Arrays.equals(crypto.kec256(encodedOmmers), block.header.ommersHash.bytes)) {
+    val ommersHash = crypto.kec256(encodedOmmers)
+    if (Arrays.equals(ommersHash, block.header.ommersHash.bytes)) {
       Right(block)
     } else {
-      Left(BlockOmmersHashError)
+      Left(BlockOmmersHashError(Hash(ommersHash), block.header.ommersHash))
     }
   }
 
@@ -119,16 +119,15 @@ object BlockValidator extends BlockValidator {
    * @return
    */
   private def validateReceipts(block: Block, receipts: Seq[Receipt]): Either[BlockError, Block] = {
-    val isValid = MptListValidator.isValid[Receipt](
+    val error = MptListValidator.isValid[Receipt](
       block.header.receiptsRoot.bytes,
       receipts,
       Receipt.byteArraySerializable
     )
 
-    if (isValid) {
-      Right(block)
-    } else {
-      Left(BlockReceiptsHashError)
+    error match {
+      case None                          => Right(block)
+      case Some(HashError(wrong, right)) => Left(BlockReceiptsHashError(wrong, right))
     }
   }
 
@@ -150,14 +149,15 @@ object BlockValidator extends BlockValidator {
     if (logsBloomOr == block.header.logsBloom) {
       Right(block)
     } else {
-      Left(BlockLogBloomError)
+      Left(BlockLogBloomError(Hash(logsBloomOr.toArray), Hash(block.header.logsBloom.toArray)))
     }
   }
 
   sealed trait BlockError
-  case object BlockTransactionsHashError extends BlockError
-  case object BlockOmmersHashError extends BlockError
-  case object BlockReceiptsHashError extends BlockError
-  case object BlockLogBloomError extends BlockError
+  final case class BlockTransactionsHashError(wrong: Hash, right: Hash) extends BlockError
+  final case class BlockOmmersHashError(wrong: Hash, right: Hash) extends BlockError
+  final case class BlockLogBloomError(wrong: Hash, right: Hash) extends BlockError
+  final case class BlockReceiptsHashError(wrong: Hash, right: Hash) extends BlockError
+  final case class HashError(wrong: Hash, right: Hash)
 
 }

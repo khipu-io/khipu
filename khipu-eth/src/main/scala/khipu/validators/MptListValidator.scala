@@ -1,6 +1,7 @@
 package khipu.validators
 
 import java.util.Arrays
+import khipu.Hash
 import khipu.crypto
 import khipu.rlp
 import khipu.rlp.RLPImplicits._
@@ -26,7 +27,7 @@ object MptListValidator {
    * @tparam K Type of the items cointained within the Sequence
    * @return true if hash matches trie hash, false otherwise
    */
-  def isValid[K](hash: Array[Byte], toValidates: Seq[K], vSerializable: ByteArraySerializable[K]): Boolean = {
+  def isValid[K](hash: Array[Byte], toValidates: Seq[K], vSerializable: ByteArraySerializable[K]): Option[BlockValidator.HashError] = {
     val trie = MerklePatriciaTrie[Int, K](
       source = new ArchiveNodeStorage(new EphemNodeDataSource())
     )(intByteArraySerializable, vSerializable)
@@ -37,6 +38,10 @@ object MptListValidator {
     }
     val trieRoot = updatedTrie.rootHash
 
-    Arrays.equals(hash, trieRoot)
+    if (Arrays.equals(hash, trieRoot)) {
+      None
+    } else {
+      Some(BlockValidator.HashError(Hash(trieRoot), Hash(hash)))
+    }
   }
 }
