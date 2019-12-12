@@ -11,6 +11,8 @@ object ProgramState {
   case object OnError extends ParallelRace
 }
 /**
+ * Call depth scope state (vs transaction scope ProgramContext )
+ *
  * Intermediate state updated with execution of each opcode in the program
  *
  * @param context the context which initiates the program
@@ -48,11 +50,12 @@ final class ProgramState[W <: WorldState[W, S], S <: Storage[S]](val context: Pr
   val stack: Stack = Stack.empty()
   val memory: Memory = Memory.empty()
 
-  def config: EvmConfig = context.config
-  def env: ExecEnv = context.env
-  def program: Program = env.program
-  def input: ByteString = env.input
-  def ownAddress: Address = env.ownerAddr
+  val config: EvmConfig = context.config
+  val env: ExecEnv = context.env
+  val program: Program = env.program
+  val input: ByteString = env.input
+  val ownAddress: Address = env.ownerAddr
+
   def ownBalance: DataWord = world.getBalance(ownAddress)
   def storage: S = world.getStorage(ownAddress)
   def gasUsed = context.startGas - gas

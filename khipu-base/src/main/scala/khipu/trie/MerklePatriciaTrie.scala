@@ -557,4 +557,16 @@ final class MerklePatriciaTrie[K, V] private (
     new MerklePatriciaTrie[K, V](rootHashOpt, nodeStorage, nodeLogs)(kSerializer, vSerializer)
   }
 
+  override def toString() = {
+    val logs = nodeLogs.map {
+      case (k, v) =>
+        k -> (v match {
+          case Removed(x)  => Removed(khipu.toHexString(x))
+          case Updated(x)  => Updated(khipu.toHexString(x))
+          case Original(x) => Original(khipu.toHexString(x))
+        })
+
+    }
+    s"MerklePatriciaTrie logs ${logs.mkString("(", ",", ")")}"
+  }
 }

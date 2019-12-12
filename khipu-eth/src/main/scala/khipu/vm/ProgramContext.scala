@@ -1,9 +1,11 @@
 package khipu.vm
 
 import akka.util.ByteString
+import khipu.DataWord
 import khipu.domain.Address
 import khipu.domain.BlockHeader
 import khipu.domain.SignedTransaction
+import scala.collection.mutable
 
 object ProgramContext {
   def apply[W <: WorldState[W, S], S <: Storage[S]](
@@ -16,7 +18,8 @@ object ProgramContext {
     config:                   EvmConfig,
     initialAddressesToDelete: Set[Address],
     initialAddressesTouched:  Set[Address],
-    isStaticCall:             Boolean
+    isStaticCall:             Boolean,
+    originalStorageValues:    mutable.Map[Address, mutable.Map[DataWord, DataWord]]
   ): ProgramContext[W, S] = {
 
     val env = ExecEnv(
@@ -33,11 +36,13 @@ object ProgramContext {
 
     val startGas = stx.tx.gasLimit - config.calcTransactionIntrinsicGas(stx.tx.payload, stx.tx.isContractCreation)
 
-    ProgramContext(env, recipientAddress, startGas, world, config, initialAddressesToDelete, initialAddressesTouched, isStaticCall)
+    ProgramContext(env, recipientAddress, startGas, world, config, initialAddressesToDelete, initialAddressesTouched, isStaticCall, originalStorageValues)
   }
 }
 
 /**
+ * Transaction scope context (vs call depth scope ProgramState)
+ *
  * Input parameters to a program executed on the EVM. Apart from the code itself
  * it should have all (interfaces to) the data accessible from the EVM.
  *
@@ -57,5 +62,6 @@ final case class ProgramContext[W <: WorldState[W, S], S <: Storage[S]](
   config:                   EvmConfig,
   initialAddressesToDelete: Set[Address],
   initialAddressesTouched:  Set[Address],
-  isStaticCall:             Boolean
+  isStaticCall:             Boolean,
+  originalStorageValues:    mutable.Map[Address, mutable.Map[DataWord, DataWord]]
 )

@@ -8,5 +8,4 @@ import khipu.DataWord
 trait Storage[S <: Storage[S]] {
   def store(offset: DataWord, value: DataWord): S
   def load(offset: DataWord): DataWord
-  def getOriginalValue(address: DataWord): DataWord
 }

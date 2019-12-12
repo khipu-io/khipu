@@ -25,14 +25,12 @@ final class TrieStorage private (
 
   def underlying = underlyingTrie
 
-  def getOriginalValue(address: DataWord): DataWord = underlyingTrie.get(address).getOrElse(DataWord.Zero)
-
   def load(address: DataWord): DataWord = {
     logs.get(address) match {
       case None =>
         underlyingTrie.get(address) match {
           case Some(value) =>
-            logs += (address -> Original(value))
+            logs += (address -> Original(value)) // for cache
             value
           case None => DataWord.Zero
         }
@@ -52,11 +50,16 @@ final class TrieStorage private (
   }
 
   def flush(): TrieStorage = {
-    val flushed = this.logs.foldLeft(this.underlyingTrie) {
-      case (acc, (k, Removed(_))) => acc - k
-      case (acc, (k, Updated(v))) => acc + (k -> v)
-      case (acc, _)               => acc
+    // we'll keep cache logs (as Original logs)
+    val (flushedTrie, cacheLogs) = logs.foldLeft(this.underlyingTrie, Map[DataWord, Log[DataWord]]()) {
+      case ((acc, cache), (k, Removed(_)))  => (acc - k, cache + (k -> Original(DataWord.Zero)))
+      case ((acc, cache), (k, Updated(v)))  => (acc + (k -> v), cache + (k -> Original(v)))
+      case ((acc, cache), (k, Original(v))) => (acc, cache + (k -> Original(v)))
     }
-    new TrieStorage(flushed, Map())
+    new TrieStorage(flushedTrie, cacheLogs)
+  }
+
+  override def toString() = {
+    s"TrieStorage logs ${logs.mkString("(", ",", ")")}"
   }
 }

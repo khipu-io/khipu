@@ -241,7 +241,7 @@ final class BlockWorldState private (
   }
 
   def saveStorage(address: Address, storage: TrieStorage): BlockWorldState = {
-    val flushedStorage = storage.flush()
+    val flushedStorage = storage.flush() // flush to get proper rootHash
     trieStorages += (address -> flushedStorage)
     addRaceCondition(OnStorage, address)
 

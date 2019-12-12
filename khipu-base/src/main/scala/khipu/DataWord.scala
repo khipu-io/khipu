@@ -354,10 +354,13 @@ final class DataWord private (val n: BigInteger) extends Ordered[DataWord] {
   def toDecString: String = n.toString
   def toSignedDecString: String = signed.toString
   def toHexString: String = {
-    val hex = f"${n}%x"
+    val hex = n.toString(16)
     // add zero if odd number of digits
-    val extraZero = if (hex.length % 2 == 0) "" else "0"
-    s"0x$extraZero$hex"
+    if (hex.length % 2 == 0) {
+      s"0x$hex"
+    } else {
+      s"0x0$hex"
+    }
   }
 
   /**

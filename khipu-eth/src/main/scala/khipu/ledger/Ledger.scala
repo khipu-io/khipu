@@ -33,6 +33,7 @@ import khipu.vm.VM
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.collection.mutable
 import scala.util.Failure
 import scala.util.Success
 
@@ -687,6 +688,7 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
     val worldAfterTransfer = worldBeforeTransfer.transfer(senderAddress, recipientAddress, stx.tx.value)
     val initialAddressesToDelete = Set[Address]()
     val initialAddressesTouched = Set(recipientAddress)
+    val originalStorageValues = new mutable.HashMap[Address, mutable.Map[DataWord, DataWord]]()
 
     val context: PC = ProgramContext(
       stx,
@@ -698,7 +700,8 @@ final class Ledger(blockchain: Blockchain, blockchainConfig: BlockchainConfig)(i
       evmCfg,
       initialAddressesToDelete,
       initialAddressesTouched,
-      isStaticCall = false
+      isStaticCall = false,
+      originalStorageValues
     )
 
     (checkpoint, context)

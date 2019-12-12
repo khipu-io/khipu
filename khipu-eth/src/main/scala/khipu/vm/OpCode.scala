@@ -5,6 +5,7 @@ import khipu.DataWord
 import khipu.crypto
 import khipu.domain.Address
 import khipu.domain.TxLogEntry
+import scala.collection.mutable
 
 object OpCodes {
 
@@ -802,7 +803,7 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
     } else {
       val (key, newValue) = params
 
-      val refund = refundGas(state, params)
+      val refund = refundGas(state, params) // must calc before storage.store(key, newValue) to keep currValue
       val updatedStorage = state.storage.store(key, newValue)
       val world = state.world.saveStorage(state.ownAddress, updatedStorage)
 
@@ -813,6 +814,25 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
     }
   }
 
+  private def getOriginalValue[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], key: DataWord) = {
+    state.context.originalStorageValues.get(state.ownAddress) match {
+      case Some(kv) =>
+        kv.get(key) match {
+          case Some(ori) => ori
+          case None =>
+            val ori = state.storage.load(key)
+            kv += (key -> ori)
+            ori
+        }
+      case None =>
+        val kv = new mutable.HashMap[DataWord, DataWord]()
+        state.context.originalStorageValues += (state.ownAddress -> kv)
+        val ori = state.storage.load(key)
+        kv += (key -> ori)
+        ori
+    }
+  }
+
   private def refundGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
     val (key, newValue) = params
     val currValue = state.storage.load(key)
@@ -820,7 +840,7 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
       if (currValue == newValue) {
         0L
       } else { // currValue != newValue
-        val origValue = state.storage.getOriginalValue(key)
+        val origValue = getOriginalValue(state, key)
         if (currValue == origValue) {
           if (origValue.isZero) {
             0L
@@ -868,7 +888,7 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
         if (currValue == newValue) {
           state.config.feeSchedule.G_sload
         } else { // currValue != newValue
-          val origValue = state.storage.getOriginalValue(key)
+          val origValue = getOriginalValue(state, key)
           if (currValue == origValue) { // this storage slot has not been changed by the current execution context
             if (origValue.isZero) {
               state.config.feeSchedule.G_sset
@@ -1123,7 +1143,8 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
               state.config,
               state.addressesToDelete,
               state.addressesTouched + newAddress,
-              state.context.isStaticCall
+              state.context.isStaticCall,
+              state.context.originalStorageValues
             )
 
             val result = VM.run(context, state.isDebugTraceEnabled)
@@ -1353,7 +1374,8 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
             world = worldAfterTransfer,
             initialAddressesToDelete = state.addressesToDelete,
             initialAddressesTouched = if (isStateless) state.addressesTouched else state.addressesTouched + codeAddress,
-            isStaticCall = state.context.isStaticCall || this.isStatic
+            isStaticCall = state.context.isStaticCall || this.isStatic,
+            originalStorageValues = state.context.originalStorageValues
           )
         }
 
