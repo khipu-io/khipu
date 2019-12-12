@@ -217,9 +217,9 @@ sealed abstract class OpCode[P](val code: Byte, val delta: Int, val alpha: Int) 
     } else {
       val params = getParams(state)
       if (state.error.isEmpty) { // error is checked during getParams
-        val constGas = constGasFn(state.config.feeSchedule)
-        val moreGas = varGas(state, params)
-        val spendingGas = constGas + moreGas
+        val baseGas = constGas(state.config.feeSchedule)
+        val moreGas = variableGas(state, params)
+        val spendingGas = baseGas + moreGas
         //println(s"spendingGas: $spendingGas, state.gas ${state.gas}, OOG? ${spendingGas > state.gas}")
         // TODO since we use Long (signed number type) to calculate gas, how to 
         // make sure the value is always > 0 and < Long.MaxValue to avoid it becoming 
@@ -235,18 +235,18 @@ sealed abstract class OpCode[P](val code: Byte, val delta: Int, val alpha: Int) 
     }
   }
 
-  protected def constGasFn(s: FeeSchedule): Long
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: P): Long
+  protected def constGas(s: FeeSchedule): Long
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: P): Long
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: P): ProgramState[W, S]
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]): P
 }
 
 sealed trait ConstGas[P] { self: OpCode[P] =>
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: P): Long = 0
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: P): Long = 0
 }
 
 case object STOP extends OpCode[Unit](0x00, 0, 0) with ConstGas[Unit] {
-  protected def constGasFn(s: FeeSchedule) = s.G_zero
+  protected def constGas(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] =
@@ -269,76 +269,76 @@ sealed abstract class BinaryOp(code: Int) extends OpCode[(DataWord, DataWord)](c
   protected def f(x: DataWord, y: DataWord): DataWord
 }
 case object ADD extends BinaryOp(0x01) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = x + y
 }
 case object MUL extends BinaryOp(0x02) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_low
+  protected def constGas(s: FeeSchedule) = s.G_low
   protected def f(x: DataWord, y: DataWord) = x * y
 }
 case object SUB extends BinaryOp(0x03) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = x - y
 }
 case object DIV extends BinaryOp(0x04) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_low
+  protected def constGas(s: FeeSchedule) = s.G_low
   protected def f(x: DataWord, y: DataWord) = x div y
 }
 case object SDIV extends BinaryOp(0x05) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_low
+  protected def constGas(s: FeeSchedule) = s.G_low
   protected def f(x: DataWord, y: DataWord) = x sdiv y
 }
 case object MOD extends BinaryOp(0x06) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_low
+  protected def constGas(s: FeeSchedule) = s.G_low
   protected def f(x: DataWord, y: DataWord) = x mod y
 }
 case object SMOD extends BinaryOp(0x07) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_low
+  protected def constGas(s: FeeSchedule) = s.G_low
   protected def f(x: DataWord, y: DataWord) = x smod y
 }
 case object EXP extends BinaryOp(0x0a) {
-  protected def constGasFn(s: FeeSchedule) = s.G_exp
+  protected def constGas(s: FeeSchedule) = s.G_exp
   protected def f(x: DataWord, y: DataWord) = x ** y
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
     val (_, m) = params
     state.config.feeSchedule.G_expbyte * m.byteSize
   }
 }
 case object SIGNEXTEND extends BinaryOp(0x0b) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_low
+  protected def constGas(s: FeeSchedule) = s.G_low
   protected def f(x: DataWord, y: DataWord) = y signExtend x
 }
 case object LT extends BinaryOp(0x10) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = DataWord(x < y)
 }
 case object GT extends BinaryOp(0x11) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = DataWord(x > y)
 }
 case object SLT extends BinaryOp(0x12) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = DataWord(x slt y)
 }
 case object SGT extends BinaryOp(0x13) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = DataWord(x sgt y)
 }
 case object EQ extends BinaryOp(0x14) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = DataWord(x.n.compareTo(y.n) == 0)
 }
 case object AND extends BinaryOp(0x16) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = x & y
 }
 case object OR extends BinaryOp(0x17) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = x | y
 }
 case object XOR extends BinaryOp(0x18) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = x ^ y
 }
 case object BYTE extends BinaryOp(0x1a) with ConstGas[(DataWord, DataWord)] {
@@ -350,19 +350,19 @@ case object BYTE extends BinaryOp(0x1a) with ConstGas[(DataWord, DataWord)] {
     (a, b)
   }
 
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = y getByte x
 }
 case object SHL extends BinaryOp(0x1b) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = y shiftLeft x
 }
 case object SHR extends BinaryOp(0x1c) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = y shiftRight x
 }
 case object SAR extends BinaryOp(0x1d) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord, y: DataWord) = y shiftRightSigned x
 }
 
@@ -382,11 +382,11 @@ sealed abstract class UnaryOp(code: Int) extends OpCode[DataWord](code, 1, 1) wi
   protected def f(x: DataWord): DataWord
 }
 case object ISZERO extends UnaryOp(0x15) {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord) = DataWord(x.isZero)
 }
 case object NOT extends UnaryOp(0x19) {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def f(x: DataWord) = ~x
 }
 
@@ -406,16 +406,16 @@ sealed abstract class TernaryOp(code: Int) extends OpCode[(DataWord, DataWord, D
   protected def f(x: DataWord, y: DataWord, z: DataWord): DataWord
 }
 case object ADDMOD extends TernaryOp(0x08) with ConstGas[(DataWord, DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_mid
+  protected def constGas(s: FeeSchedule) = s.G_mid
   protected def f(x: DataWord, y: DataWord, z: DataWord) = x.addmod(y, z)
 }
 case object MULMOD extends TernaryOp(0x09) with ConstGas[(DataWord, DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_mid
+  protected def constGas(s: FeeSchedule) = s.G_mid
   protected def f(x: DataWord, y: DataWord, z: DataWord) = x.mulmod(y, z)
 }
 
 case object SHA3 extends OpCode[(DataWord, DataWord)](0x20, 2, 1) {
-  protected def constGasFn(s: FeeSchedule) = s.G_sha3
+  protected def constGas(s: FeeSchedule) = s.G_sha3
 
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bounds, just use safe int value
@@ -431,7 +431,7 @@ case object SHA3 extends OpCode[(DataWord, DataWord)](0x20, 2, 1) {
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
     val (offset, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
     val shaCost = state.config.feeSchedule.G_sha3word * DataWord.wordsForBytes(size.longValueSafe)
@@ -440,7 +440,7 @@ case object SHA3 extends OpCode[(DataWord, DataWord)](0x20, 2, 1) {
 }
 
 sealed abstract class ConstOp(code: Int) extends OpCode[Unit](code, 0, 1) with ConstGas[Unit] {
-  final protected def constGasFn(s: FeeSchedule) = s.G_base
+  final protected def constGas(s: FeeSchedule) = s.G_base
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = Nil
 
   final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -497,7 +497,7 @@ case object GAS extends ConstOp(0x5a) {
 }
 
 case object BALANCE extends OpCode[DataWord](0x31, 1, 1) with ConstGas[DataWord] {
-  protected def constGasFn(s: FeeSchedule) = s.G_balance
+  protected def constGas(s: FeeSchedule) = s.G_balance
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(accountAddress) = state.stack.pop()
     accountAddress
@@ -512,7 +512,7 @@ case object BALANCE extends OpCode[DataWord](0x31, 1, 1) with ConstGas[DataWord]
 }
 
 case object CALLDATALOAD extends OpCode[Int](0x35, 1, 1) with ConstGas[Int] {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use int value, possible overflow is processed in sliceBytes
     val List(offset) = state.stack.pop()
@@ -528,7 +528,7 @@ case object CALLDATALOAD extends OpCode[Int](0x35, 1, 1) with ConstGas[Int] {
 }
 
 case object CALLDATACOPY extends OpCode[(DataWord, DataWord, DataWord)](0x37, 3, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use save int value
     val List(memOffset, dataOffset, size) = state.stack.pop(3)
@@ -542,7 +542,7 @@ case object CALLDATACOPY extends OpCode[(DataWord, DataWord, DataWord)](0x37, 3,
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord)): Long = {
     val (memOffset, _, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
     val copyCost = state.config.feeSchedule.G_copy * DataWord.wordsForBytes(size.longValueSafe)
@@ -551,7 +551,7 @@ case object CALLDATACOPY extends OpCode[(DataWord, DataWord, DataWord)](0x37, 3,
 }
 
 case object CODECOPY extends OpCode[(DataWord, DataWord, DataWord)](0x39, 3, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
     val List(memOffset, codeOffset, size) = state.stack.pop(3)
@@ -565,7 +565,7 @@ case object CODECOPY extends OpCode[(DataWord, DataWord, DataWord)](0x39, 3, 0) 
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord)): Long = {
     val (memOffset, _, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
     val copyCost = state.config.feeSchedule.G_copy * DataWord.wordsForBytes(size.longValueSafe)
@@ -574,7 +574,7 @@ case object CODECOPY extends OpCode[(DataWord, DataWord, DataWord)](0x39, 3, 0) 
 }
 
 case object EXTCODESIZE extends OpCode[DataWord](0x3b, 1, 1) with ConstGas[DataWord] {
-  protected def constGasFn(s: FeeSchedule) = s.G_extcodesize
+  protected def constGas(s: FeeSchedule) = s.G_extcodesize
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(addr) = state.stack.pop()
     addr
@@ -589,7 +589,7 @@ case object EXTCODESIZE extends OpCode[DataWord](0x3b, 1, 1) with ConstGas[DataW
 }
 
 case object EXTCODECOPY extends OpCode[(DataWord, DataWord, DataWord, DataWord)](0x3c, 4, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_extcodecopy
+  protected def constGas(s: FeeSchedule) = s.G_extcodecopy
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
     val List(address, memOffset, codeOffset, size) = state.stack.pop(4)
@@ -603,7 +603,7 @@ case object EXTCODECOPY extends OpCode[(DataWord, DataWord, DataWord, DataWord)]
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord, DataWord)): Long = {
     val (_, memOffset, _, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
     val copyCost = state.config.feeSchedule.G_copy * DataWord.wordsForBytes(size.longValueSafe)
@@ -612,7 +612,7 @@ case object EXTCODECOPY extends OpCode[(DataWord, DataWord, DataWord, DataWord)]
 }
 
 case object EXTCODEHASH extends OpCode[DataWord](0x3f, 1, 1) with ConstGas[DataWord] {
-  protected def constGasFn(s: FeeSchedule) = s.G_extcodehash
+  protected def constGas(s: FeeSchedule) = s.G_extcodehash
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(addr) = state.stack.pop()
     addr
@@ -627,7 +627,7 @@ case object EXTCODEHASH extends OpCode[DataWord](0x3f, 1, 1) with ConstGas[DataW
 }
 
 case object RETURNDATASIZE extends OpCode[Unit](0x3d, 0, 1) with ConstGas[Unit] {
-  protected def constGasFn(s: FeeSchedule) = s.G_base
+  protected def constGas(s: FeeSchedule) = s.G_base
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -638,7 +638,7 @@ case object RETURNDATASIZE extends OpCode[Unit](0x3d, 0, 1) with ConstGas[Unit] 
 }
 
 case object RETURNDATACOPY extends OpCode[(DataWord, DataWord, DataWord)](0x3e, 3, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
     val List(memOffset, dataOffset, size) = state.stack.pop(3)
@@ -652,7 +652,7 @@ case object RETURNDATACOPY extends OpCode[(DataWord, DataWord, DataWord)](0x3e, 
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord)): Long = {
     val (memOffset, _, size) = params
     val memCost = state.config.calcMemCost(state.memory.size, memOffset.longValueSafe, size.longValueSafe)
     val copyCost = state.config.feeSchedule.G_copy * DataWord.wordsForBytes(size.longValueSafe)
@@ -661,7 +661,7 @@ case object RETURNDATACOPY extends OpCode[(DataWord, DataWord, DataWord)](0x3e, 
 }
 
 case object BLOCKHASH extends OpCode[Int](0x40, 1, 1) with ConstGas[Int] {
-  protected def constGasFn(s: FeeSchedule) = s.G_blockhash
+  protected def constGas(s: FeeSchedule) = s.G_blockhash
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(blockNumber) = state.stack.pop()
     blockNumber.intValueSafe
@@ -677,7 +677,7 @@ case object BLOCKHASH extends OpCode[Int](0x40, 1, 1) with ConstGas[Int] {
 }
 
 case object CHAINID extends OpCode[Unit](0x46, 0, 1) with ConstGas[Unit] {
-  protected def constGasFn(s: FeeSchedule) = s.G_base
+  protected def constGas(s: FeeSchedule) = s.G_base
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -688,7 +688,7 @@ case object CHAINID extends OpCode[Unit](0x46, 0, 1) with ConstGas[Unit] {
 }
 
 case object SELFBALANCE extends OpCode[Unit](0x47, 0, 1) with ConstGas[Unit] {
-  protected def constGasFn(s: FeeSchedule) = s.G_low
+  protected def constGas(s: FeeSchedule) = s.G_low
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -699,7 +699,7 @@ case object SELFBALANCE extends OpCode[Unit](0x47, 0, 1) with ConstGas[Unit] {
 }
 
 case object POP extends OpCode[Unit](0x50, 1, 0) with ConstGas[Unit] {
-  protected def constGasFn(s: FeeSchedule) = s.G_base
+  protected def constGas(s: FeeSchedule) = s.G_base
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -709,7 +709,7 @@ case object POP extends OpCode[Unit](0x50, 1, 0) with ConstGas[Unit] {
 }
 
 case object MLOAD extends OpCode[DataWord](0x51, 1, 1) {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset) = state.stack.pop()
     if (offset.compareTo(DataWord.MaxInt) > 0) {
@@ -725,14 +725,14 @@ case object MLOAD extends OpCode[DataWord](0x51, 1, 1) {
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: DataWord): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: DataWord): Long = {
     val offset = params
     state.config.calcMemCost(state.memory.size, offset.longValueSafe, DataWord.SIZE)
   }
 }
 
 case object MSTORE extends OpCode[(DataWord, DataWord)](0x52, 2, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, value) = state.stack.pop(2)
     if (offset.compareTo(DataWord.MaxInt) > 0) {
@@ -747,29 +747,14 @@ case object MSTORE extends OpCode[(DataWord, DataWord)](0x52, 2, 0) {
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
     val (offset, _) = params
     state.config.calcMemCost(state.memory.size, offset.longValueSafe, DataWord.SIZE)
   }
 }
 
-case object SLOAD extends OpCode[DataWord](0x54, 1, 1) with ConstGas[DataWord] {
-  protected def constGasFn(s: FeeSchedule) = s.G_sload
-  protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
-    val List(key) = state.stack.pop()
-    key
-  }
-
-  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: DataWord): ProgramState[W, S] = {
-    val key = params
-    val value = state.storage.load(key)
-    state.stack.push(value)
-    state.step()
-  }
-}
-
 case object MSTORE8 extends OpCode[(DataWord, DataWord)](0x53, 2, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  protected def constGas(s: FeeSchedule) = s.G_verylow
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use safe int value
     val List(offset, value) = state.stack.pop(2)
@@ -783,14 +768,29 @@ case object MSTORE8 extends OpCode[(DataWord, DataWord)](0x53, 2, 0) {
     state.step()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
     val (offset, _) = params
     state.config.calcMemCost(state.memory.size, offset.longValueSafe, 1)
   }
 }
 
+case object SLOAD extends OpCode[DataWord](0x54, 1, 1) with ConstGas[DataWord] {
+  protected def constGas(s: FeeSchedule) = s.G_sload
+  protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
+    val List(key) = state.stack.pop()
+    key
+  }
+
+  protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: DataWord): ProgramState[W, S] = {
+    val key = params
+    val value = state.storage.load(key)
+    state.stack.push(value)
+    state.step()
+  }
+}
+
 case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_zero
+  protected def constGas(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(key, value) = state.stack.pop(2)
     (key, value)
@@ -801,49 +801,8 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
       state.withError(StaticCallModification)
     } else {
       val (key, newValue) = params
-      val currValue = state.storage.load(key)
-      val refund =
-        if (state.config.eip2200) {
-          if (newValue == currValue) {
-            0L
-          } else {
-            val origValue = state.storage.getOriginalValue(key).getOrElse(DataWord.Zero)
-            if (origValue == currValue) {
-              if (origValue.isZero) {
-                0L
-              } else if (newValue.isZero) {
-                state.config.feeSchedule.R_sclear
-              } else {
-                0L
-              }
-            } else {
-              var _refund = 0L
-              if (origValue.nonZero) {
-                if (currValue.isZero) {
-                  _refund -= state.config.feeSchedule.R_sclear
-                } else if (newValue.isZero) {
-                  _refund += state.config.feeSchedule.R_sclear
-                }
-              }
 
-              if (origValue == newValue) {
-                if (origValue.isZero) {
-                  _refund += state.config.feeSchedule.G_sset
-                } else {
-                  _refund += state.config.feeSchedule.G_sreset
-                }
-              }
-              _refund
-            }
-          }
-        } else {
-          if (currValue.nonZero && newValue.isZero) {
-            state.config.feeSchedule.R_sclear
-          } else {
-            0L
-          }
-        }
-
+      val refund = refundGas(state, params)
       val updatedStorage = state.storage.store(key, newValue)
       val world = state.world.saveStorage(state.ownAddress, updatedStorage)
 
@@ -854,24 +813,69 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
     }
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
+  private def refundGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
+    val (key, newValue) = params
+    val currValue = state.storage.load(key)
+    if (state.config.eip2200) { // https://eips.ethereum.org/EIPS/eip-2200
+      if (currValue == newValue) {
+        0L
+      } else { // currValue != newValue
+        val origValue = state.storage.getOriginalValue(key)
+        if (currValue == origValue) {
+          if (origValue.isZero) {
+            0L
+          } else if (newValue.isZero) {
+            state.config.feeSchedule.R_sclear
+          } else {
+            0L
+          }
+        } else { // currValue != origValue and currValue != newValue
+          var _refund = 0L
+          if (origValue.nonZero) {
+            if (currValue.isZero) {
+              _refund -= state.config.feeSchedule.R_sclear
+            } else if (newValue.isZero) {
+              _refund += state.config.feeSchedule.R_sclear
+            }
+          }
+
+          if (origValue == newValue) { // this storage slot is reset
+            if (origValue.isZero) {
+              _refund += (state.config.feeSchedule.G_sset - state.config.feeSchedule.G_sload)
+            } else {
+              _refund += (state.config.feeSchedule.G_sreset - state.config.feeSchedule.G_sload)
+            }
+          }
+          _refund
+        }
+      }
+    } else {
+      if (currValue.nonZero && newValue.isZero) {
+        state.config.feeSchedule.R_sclear
+      } else {
+        0L
+      }
+    }
+  }
+
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
     if (state.config.eip2200 && state.gas <= state.config.feeSchedule.G_ssentry) {
-      -1
+      -1 // OutOfGas
     } else {
       val (key, newValue) = params
       val currValue = state.storage.load(key)
-      if (state.config.eip2200) {
-        if (newValue == currValue) {
+      if (state.config.eip2200) { // https://eips.ethereum.org/EIPS/eip-2200
+        if (currValue == newValue) {
           state.config.feeSchedule.G_sload
-        } else {
-          val origValue = state.storage.getOriginalValue(key).getOrElse(DataWord.Zero)
-          if (currValue == origValue) {
+        } else { // currValue != newValue
+          val origValue = state.storage.getOriginalValue(key)
+          if (currValue == origValue) { // this storage slot has not been changed by the current execution context
             if (origValue.isZero) {
               state.config.feeSchedule.G_sset
             } else {
               state.config.feeSchedule.G_sreset
             }
-          } else {
+          } else { // currValue != origValue and currValue != newValue, this storage slot is dirty
             state.config.feeSchedule.G_sload
           }
         }
@@ -887,7 +891,7 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
 }
 
 case object JUMP extends OpCode[DataWord](0x56, 1, 0) with ConstGas[DataWord] {
-  protected def constGasFn(s: FeeSchedule) = s.G_mid
+  protected def constGas(s: FeeSchedule) = s.G_mid
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(pos) = state.stack.pop()
     pos
@@ -906,7 +910,7 @@ case object JUMP extends OpCode[DataWord](0x56, 1, 0) with ConstGas[DataWord] {
 }
 
 case object JUMPI extends OpCode[(DataWord, DataWord)](0x57, 2, 0) with ConstGas[(DataWord, DataWord)] {
-  protected def constGasFn(s: FeeSchedule) = s.G_high
+  protected def constGas(s: FeeSchedule) = s.G_high
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(pos, cond) = state.stack.pop(2)
     (pos, cond)
@@ -927,7 +931,7 @@ case object JUMPI extends OpCode[(DataWord, DataWord)](0x57, 2, 0) with ConstGas
 }
 
 case object JUMPDEST extends OpCode[Unit](0x5b, 0, 0) with ConstGas[Unit] {
-  protected def constGasFn(s: FeeSchedule) = s.G_jumpdest
+  protected def constGas(s: FeeSchedule) = s.G_jumpdest
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -938,7 +942,7 @@ case object JUMPDEST extends OpCode[Unit](0x5b, 0, 0) with ConstGas[Unit] {
 sealed abstract class PushOp private (code: Int, val i: Int) extends OpCode[Unit](code, 0, 1) with ConstGas[Unit] {
   def this(code: Int) = this(code, code - 0x60)
 
-  final protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  final protected def constGas(s: FeeSchedule) = s.G_verylow
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -984,7 +988,7 @@ case object PUSH32 extends PushOp(0x7f)
 sealed abstract class DupOp private (code: Int, val i: Int) extends OpCode[Unit](code, i + 1, i + 2) with ConstGas[Unit] {
   def this(code: Int) = this(code, code - 0x80)
 
-  final protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  final protected def constGas(s: FeeSchedule) = s.G_verylow
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -1012,7 +1016,7 @@ case object DUP16 extends DupOp(0x8f)
 sealed abstract class SwapOp private (code: Int, val i: Int) extends OpCode[Unit](code, i + 2, i + 2) with ConstGas[Unit] {
   def this(code: Int) = this(code, code - 0x90)
 
-  final protected def constGasFn(s: FeeSchedule) = s.G_verylow
+  final protected def constGas(s: FeeSchedule) = s.G_verylow
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
   final protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: Unit): ProgramState[W, S] = {
@@ -1040,7 +1044,7 @@ case object SWAP16 extends SwapOp(0x9f)
 sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(DataWord, DataWord, List[DataWord])](code, i + 2, 0) {
   def this(code: Int) = this(code, code - 0xa0)
 
-  final protected def constGasFn(s: FeeSchedule) = s.G_log
+  final protected def constGas(s: FeeSchedule) = s.G_log
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     // do not need to check params bound, just use save int value
     val offset :: size :: topics = state.stack.pop(delta)
@@ -1058,7 +1062,7 @@ sealed abstract class LogOp private (code: Int, val i: Int) extends OpCode[(Data
     }
   }
 
-  final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, List[DataWord])): Long = {
+  final protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, List[DataWord])): Long = {
     val (offset, size, _) = params
     val memCost = state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
     val logCost = state.config.feeSchedule.G_logdata * size.toMaxLong + i * state.config.feeSchedule.G_logtopic
@@ -1085,7 +1089,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
 
         //FIXME: to avoid calculating this twice, we could adjust state.gas prior to execution in OpCode#execute
         //not sure how this would affect other opcodes [EC-243]
-        val availableGas = state.gas - (constGasFn(state.config.feeSchedule) + varGas(state, params))
+        val availableGas = state.gas - (constGas(state.config.feeSchedule) + variableGas(state, params))
         val startGas = state.config.gasCap(availableGas)
 
         val initCode = state.memory.load(inOffset.intValueSafe, inSize.intValueSafe).toArray
@@ -1206,7 +1210,7 @@ sealed abstract class CreatOp[P](code: Int, delta: Int, alpha: Int) extends OpCo
   protected def createContactAddress[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], initCode: Array[Byte], salt: Array[Byte]): Either[WorldState.AddressCollisions, (Address, W)]
 }
 case object CREATE extends CreatOp[(DataWord, DataWord, DataWord)](0xf0, 3, 1) {
-  protected def constGasFn(s: FeeSchedule) = s.G_create
+  protected def constGas(s: FeeSchedule) = s.G_create
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(endowment, inOffset, inSize) = state.stack.pop(3)
     if (inOffset.compareTo(DataWord.MaxInt) > 0 || inSize.compareTo(DataWord.MaxInt) > 0) {
@@ -1224,7 +1228,7 @@ case object CREATE extends CreatOp[(DataWord, DataWord, DataWord)](0xf0, 3, 1) {
     state.world.createContractAddress(state.env.ownerAddr)
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord)): Long = {
     val (_, inOffset, inSize) = params
     val memCost = state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
     memCost
@@ -1232,7 +1236,7 @@ case object CREATE extends CreatOp[(DataWord, DataWord, DataWord)](0xf0, 3, 1) {
 }
 
 case object CREATE2 extends CreatOp[(DataWord, DataWord, DataWord, DataWord)](0xf5, 4, 1) {
-  protected def constGasFn(s: FeeSchedule) = s.G_create
+  protected def constGas(s: FeeSchedule) = s.G_create
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(endowment, inOffset, inSize, salt) = state.stack.pop(4)
     if (inOffset.compareTo(DataWord.MaxInt) > 0 || inSize.compareTo(DataWord.MaxInt) > 0) {
@@ -1250,7 +1254,7 @@ case object CREATE2 extends CreatOp[(DataWord, DataWord, DataWord, DataWord)](0x
     state.world.createContractAddress(state.env.ownerAddr, initCode, salt)
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord, DataWord)): Long = {
     val (_, inOffset, inSize, _) = params
     val memCost = state.config.calcMemCost(state.memory.size, inOffset.longValueSafe, inSize.longValueSafe)
     val shaCost = state.config.feeSchedule.G_sha3word * DataWord.wordsForBytes(inSize.longValueSafe)
@@ -1259,7 +1263,7 @@ case object CREATE2 extends CreatOp[(DataWord, DataWord, DataWord, DataWord)](0x
 }
 
 sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolean, isStateless: Boolean, isStatic: Boolean) extends OpCode[(DataWord, DataWord, DataWord, DataWord, DataWord, DataWord, DataWord)](code.toByte, delta, alpha) {
-  final protected def constGasFn(s: FeeSchedule) = s.G_zero
+  final protected def constGas(s: FeeSchedule) = s.G_zero
   final protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(gas, target, callValue, inOffset, inSize, outOffset, outSize) = if (hasValue) {
       state.stack.pop(7)
@@ -1434,7 +1438,7 @@ sealed abstract class CallOp(code: Int, delta: Int, alpha: Int, hasValue: Boolea
     }
   }
 
-  final protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord, DataWord, DataWord, DataWord, DataWord)): Long = {
+  final protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord, DataWord, DataWord, DataWord, DataWord, DataWord)): Long = {
     val (gas, target, callValue, inOffset, inSize, outOffset, outSize) = params
 
     // TODO how about gas < 0? return a Long.MaxValue?
@@ -1509,7 +1513,7 @@ case object DELEGATECALL extends CallOp(0xf4, 6, 1, hasValue = false, isStateles
 case object STATICCALL extends CallOp(0xfa, 6, 1, hasValue = false, isStateless = false, isStatic = true)
 
 case object RETURN extends OpCode[(DataWord, DataWord)](0xf3, 2, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_zero
+  protected def constGas(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, size) = state.stack.pop(2)
     if (offset.compareTo(DataWord.MaxInt) > 0 || size.compareTo(DataWord.MaxInt) > 0) {
@@ -1524,14 +1528,14 @@ case object RETURN extends OpCode[(DataWord, DataWord)](0xf3, 2, 0) {
     state.withReturnData(data).halt()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
     val (offset, size) = params
     state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
   }
 }
 
 case object REVERT extends OpCode[(DataWord, DataWord)](0xfd, 2, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_zero
+  protected def constGas(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(offset, size) = state.stack.pop(2)
     if (offset.compareTo(DataWord.MaxInt) > 0 || size.compareTo(DataWord.MaxInt) > 0) {
@@ -1546,14 +1550,14 @@ case object REVERT extends OpCode[(DataWord, DataWord)](0xfd, 2, 0) {
     state.withReturnData(ret).halt().revert()
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
     val (offset, size) = params
     state.config.calcMemCost(state.memory.size, offset.longValueSafe, size.longValueSafe)
   }
 }
 
 case object INVALID extends OpCode[Unit](0xfe, 0, 0) with ConstGas[Unit] {
-  protected def constGasFn(s: FeeSchedule) = s.G_zero
+  protected def constGas(s: FeeSchedule) = s.G_zero
 
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = ()
 
@@ -1566,7 +1570,7 @@ case object INVALID extends OpCode[Unit](0xfe, 0, 0) with ConstGas[Unit] {
  * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-6.md
  */
 case object SELFDESTRUCT extends OpCode[DataWord](0xff, 1, 0) {
-  protected def constGasFn(s: FeeSchedule) = s.G_selfdestruct
+  protected def constGas(s: FeeSchedule) = s.G_selfdestruct
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
     val List(refundAddr) = state.stack.pop()
     refundAddr
@@ -1598,7 +1602,7 @@ case object SELFDESTRUCT extends OpCode[DataWord](0xff, 1, 0) {
     }
   }
 
-  protected def varGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: DataWord): Long = {
+  protected def variableGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: DataWord): Long = {
     val refundAddr = params
     val refundAddress = Address(refundAddr)
 

@@ -25,19 +25,13 @@ final class TrieStorage private (
 
   def underlying = underlyingTrie
 
-  private var originalValues = Map[DataWord, DataWord]()
-
-  def getOriginalValue(address: DataWord): Option[DataWord] =
-    originalValues.get(address) orElse underlyingTrie.get(address)
+  def getOriginalValue(address: DataWord): DataWord = underlyingTrie.get(address).getOrElse(DataWord.Zero)
 
   def load(address: DataWord): DataWord = {
     logs.get(address) match {
       case None =>
         underlyingTrie.get(address) match {
           case Some(value) =>
-            if (!originalValues.contains(address)) {
-              originalValues += (address -> value)
-            }
             logs += (address -> Original(value))
             value
           case None => DataWord.Zero

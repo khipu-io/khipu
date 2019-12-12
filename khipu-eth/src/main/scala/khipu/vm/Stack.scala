@@ -156,5 +156,5 @@ final class Stack private (val maxSize: Int) {
 
   override def hashCode(): Int = underlying.hashCode
 
-  override def toString: String = toSeq.mkString("Stack(", ",", ")")
+  override def toString: String = toSeq.map(_.toHexString).mkString("Stack(", ",", ")")
 }
