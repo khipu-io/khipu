@@ -180,6 +180,7 @@ object OpCodes {
   )
 
   val IstanbulCodes: List[OpCode[_]] = ConstantinopleCodes ++ List(
+    SELFBALANCE,
     CHAINID
   )
 }
