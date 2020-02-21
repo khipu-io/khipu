@@ -9,6 +9,10 @@ object DifficultyCalculator {
   private val ExpDifficultyPeriod = 100000
   private val DifficultyBoundDivision = 2048
   private val MinimumDifficulty = DataWord(131072)
+
+  private val BYZANTIUM_FAKE_BLOCK_OFFSET = 3000000L
+  private val CONSTANTINOPLE_FAKE_BLOCK_OFFSET = 5000000L
+  private val MUIR_GLACIER_FAKE_BLOCK_OFFSET = 9000000L
 }
 final class DifficultyCalculator(blockchainConfig: BlockchainConfig) {
   import DifficultyCalculator._
@@ -68,12 +72,18 @@ final class DifficultyCalculator(blockchainConfig: BlockchainConfig) {
   }
 
   private def getBombExponent_eth(blockNumber: Long): Long = {
+    fakeBlockNumber(blockNumber) / ExpDifficultyPeriod - 2
+  }
+
+  private def fakeBlockNumber(blockNumber: Long): Long = {
     if (blockNumber < blockchainConfig.byzantiumBlockNumber) {
-      blockNumber / ExpDifficultyPeriod - 2
-    } else if (blockNumber < blockchainConfig.constantinopleBlockNumber) { // eip649
-      math.max(blockNumber - 3000000, 0) / ExpDifficultyPeriod - 2
-    } else { // eip1234
-      math.max(blockNumber - 5000000, 0) / ExpDifficultyPeriod - 2
+      blockNumber
+    } else if (blockNumber < blockchainConfig.constantinopleBlockNumber) {
+      math.max(blockNumber - BYZANTIUM_FAKE_BLOCK_OFFSET, 0) // eip649
+    } else if (blockNumber < blockchainConfig.muirGlacierBlockNumber) {
+      math.max(blockNumber - CONSTANTINOPLE_FAKE_BLOCK_OFFSET, 0) // eip1234
+    } else {
+      math.max(blockNumber - MUIR_GLACIER_FAKE_BLOCK_OFFSET, 0) // eip2384
     }
   }
 }
