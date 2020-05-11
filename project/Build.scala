@@ -110,8 +110,8 @@ object Build extends sbt.Build {
 
 object Dependencies {
 
-  private val AKKA_VERSION = "2.6.4"
-  private val AKKA_HTTP_VERSION = "10.1.11"
+  private val AKKA_VERSION = "2.6.5"
+  private val AKKA_HTTP_VERSION = "10.1.12"
   private val SLF4J_VERSION = "1.7.24"
   private val CIRCE_VERSION = "0.7.0"
 
