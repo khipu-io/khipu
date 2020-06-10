@@ -19,12 +19,17 @@ import khipu.vm.Storage
 import khipu.vm.WorldState
 
 object Blockchain {
+  val GENESIS_BLOCK_NUMBER = 0
+
   /**
    * Entity to be used to persist and query  Blockchain related objects (blocks, transactions, ommers)
    */
   trait I[S <: Storage[S], W <: WorldState[W, S]] {
-    lazy val genesisHeader: BlockHeader = getBlockHeaderByNumber(0).get
-    lazy val genesisBlock: Block = getBlockByNumber(0).get
+    lazy val genesisHeader: BlockHeader = getBlockHeaderByNumber(GENESIS_BLOCK_NUMBER).get
+    lazy val genesisBlock: Block = getBlockByNumber(GENESIS_BLOCK_NUMBER).get
+
+    def getBestBlockNumber: Long
+    def getBestBlockHeader: BlockHeader
 
     /**
      * Allows to query a blockHeader by block hash
@@ -94,8 +99,8 @@ object Blockchain {
      * @param blockhash
      * @return Receipts if found
      */
-    def getReceiptsByHash(blockhash: Hash): Option[Seq[Receipt]]
-    def getReceiptsByNumber(blockNumber: Long): Option[Seq[Receipt]]
+    def getReceiptsByHash(hash: Hash): Option[Seq[Receipt]]
+    def getReceiptsByNumber(number: Long): Option[Seq[Receipt]]
 
     /**
      * Returns EVM code searched by it's hash
@@ -116,7 +121,7 @@ object Blockchain {
      * @param blockhash
      * @return total difficulty if found
      */
-    def getTotalDifficultyByHash(blockhash: Hash): Option[DataWord]
+    def getTotalDifficultyByHash(hash: Hash): Option[DataWord]
 
     def getTransactionLocation(txHash: Hash): Option[TxLocation]
 
@@ -185,23 +190,30 @@ final class Blockchain(val storages: Storages) extends Blockchain.I[TrieStorage,
 
   private val blockNumbers = storages.blockNumbers
 
+  def getBestBlockNumber: Long = storages.bestBlockNumber
+
+  def getBestBlockHeader: BlockHeader = {
+    val bestBlockNumber = getBestBlockNumber
+    getBlockHeaderByNumber(bestBlockNumber).getOrElse(genesisHeader)
+  }
+
   def getHashByBlockNumber(number: Long): Option[Hash] =
     blockNumbers.getHashByBlockNumber(number)
 
-  def getNumberByBlockHash(blockHash: Hash): Option[Long] =
-    blockNumbers.get(blockHash)
+  def getNumberByBlockHash(hash: Hash): Option[Long] =
+    blockNumbers.get(hash)
 
-  def getBlockHeaderByHash(blockHash: Hash): Option[BlockHeader] =
-    blockNumbers.get(blockHash) flatMap blockHeaderStorage.get
+  def getBlockHeaderByHash(hash: Hash): Option[BlockHeader] =
+    blockNumbers.get(hash) flatMap blockHeaderStorage.get
 
-  def getBlockBodyByHash(blockHash: Hash): Option[BlockBody] =
-    blockNumbers.get(blockHash) flatMap blockBodyStorage.get
+  def getBlockBodyByHash(hash: Hash): Option[BlockBody] =
+    blockNumbers.get(hash) flatMap blockBodyStorage.get
 
-  def getReceiptsByHash(blockHash: Hash): Option[Seq[Receipt]] =
-    blockNumbers.get(blockHash) flatMap receiptsStorage.get
+  def getReceiptsByHash(hash: Hash): Option[Seq[Receipt]] =
+    blockNumbers.get(hash) flatMap receiptsStorage.get
 
-  def getReceiptsByNumber(blockNumber: Long): Option[Seq[Receipt]] =
-    receiptsStorage.get(blockNumber)
+  def getReceiptsByNumber(number: Long): Option[Seq[Receipt]] =
+    receiptsStorage.get(number)
 
   def getEvmcodeByHash(hash: Hash): Option[ByteString] =
     evmcodeNodeStorage.get(hash).map(ByteString(_))
