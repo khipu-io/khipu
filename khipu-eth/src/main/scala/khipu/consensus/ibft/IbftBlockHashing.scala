@@ -54,8 +54,8 @@ object IbftBlockHashing {
   def recoverCommitterAddresses(header: BlockHeader, ibftExtraData: IbftExtraData): List[Address] = {
     val committerHash = IbftBlockHashing.calculateDataHashForCommittedSeal(header, ibftExtraData)
 
-    ibftExtraData.seals.stream()
-      .map(p -> Util.signatureToAddress(p, committerHash))
+    ibftExtraData.seals
+      .map(p => Util.signatureToAddress(p, committerHash))
       .collect(Collectors.toList());
   }
 

@@ -78,7 +78,7 @@ object IbftExtraData {
  */
 final case class IbftExtraData(
       vanityData:ByteString ,
-       seals:Collection[Signature],
+      seals:Seq[Signature],
       vote: Option[Vote],
       round:Int,
       validators:Collection[Address] ) /* extends ParsedExtraData */ {
