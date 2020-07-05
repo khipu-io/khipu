@@ -779,13 +779,13 @@ case object MSTORE8 extends OpCode[(DataWord, DataWord)](0x53, 2, 0) {
 case object SLOAD extends OpCode[DataWord](0x54, 1, 1) with ConstGas[DataWord] {
   protected def constGas(s: FeeSchedule) = s.G_sload
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
-    val List(key) = state.stack.pop()
-    key
+    val List(offset) = state.stack.pop()
+    offset
   }
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: DataWord): ProgramState[W, S] = {
-    val key = params
-    val value = state.storage.load(key)
+    val offset = params
+    val value = state.storage.load(offset)
     state.stack.push(value)
     state.step()
   }
@@ -794,18 +794,18 @@ case object SLOAD extends OpCode[DataWord](0x54, 1, 1) with ConstGas[DataWord] {
 case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
   protected def constGas(s: FeeSchedule) = s.G_zero
   protected def getParams[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S]) = {
-    val List(key, value) = state.stack.pop(2)
-    (key, value)
+    val List(offset, value) = state.stack.pop(2)
+    (offset, value)
   }
 
   protected def exec[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): ProgramState[W, S] = {
     if (state.context.isStaticCall) {
       state.withError(StaticCallModification)
     } else {
-      val (key, newValue) = params
+      val (offset, newValue) = params
 
       val refund = refundGas(state, params) // must calc before storage.store(key, newValue) to keep currValue
-      val updatedStorage = state.storage.store(key, newValue)
+      val updatedStorage = state.storage.store(offset, newValue)
       val world = state.world.saveStorage(state.ownAddress, updatedStorage)
 
       state
@@ -815,33 +815,33 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
     }
   }
 
-  private def getOriginalValue[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], key: DataWord) = {
+  private def getOriginalValue[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], offset: DataWord) = {
     state.context.originalStorageValues.get(state.ownAddress) match {
-      case Some(kv) =>
-        kv.get(key) match {
+      case Some(map) =>
+        map.get(offset) match {
           case Some(ori) => ori
           case None =>
-            val ori = state.storage.load(key)
-            kv += (key -> ori)
+            val ori = state.storage.load(offset)
+            map += (offset -> ori)
             ori
         }
       case None =>
-        val kv = new mutable.HashMap[DataWord, DataWord]()
-        state.context.originalStorageValues += (state.ownAddress -> kv)
-        val ori = state.storage.load(key)
-        kv += (key -> ori)
+        val map = new mutable.HashMap[DataWord, DataWord]()
+        state.context.originalStorageValues += (state.ownAddress -> map)
+        val ori = state.storage.load(offset)
+        map += (offset -> ori)
         ori
     }
   }
 
   private def refundGas[W <: WorldState[W, S], S <: Storage[S]](state: ProgramState[W, S], params: (DataWord, DataWord)): Long = {
-    val (key, newValue) = params
-    val currValue = state.storage.load(key)
+    val (offset, newValue) = params
+    val currValue = state.storage.load(offset)
     if (state.config.eip2200) { // https://eips.ethereum.org/EIPS/eip-2200
       if (currValue == newValue) {
         0L
       } else { // currValue != newValue
-        val origValue = getOriginalValue(state, key)
+        val origValue = getOriginalValue(state, offset)
         if (currValue == origValue) {
           if (origValue.isZero) {
             0L
@@ -883,13 +883,13 @@ case object SSTORE extends OpCode[(DataWord, DataWord)](0x55, 2, 0) {
     if (state.config.eip2200 && state.gas <= state.config.feeSchedule.G_ssentry) {
       -1 // OutOfGas
     } else {
-      val (key, newValue) = params
-      val currValue = state.storage.load(key)
+      val (offset, newValue) = params
+      val currValue = state.storage.load(offset)
       if (state.config.eip2200) { // https://eips.ethereum.org/EIPS/eip-2200
         if (currValue == newValue) {
           state.config.feeSchedule.G_sload
         } else { // currValue != newValue
-          val origValue = getOriginalValue(state, key)
+          val origValue = getOriginalValue(state, offset)
           if (currValue == origValue) { // this storage slot has not been changed by the current execution context
             if (origValue.isZero) {
               state.config.feeSchedule.G_sset

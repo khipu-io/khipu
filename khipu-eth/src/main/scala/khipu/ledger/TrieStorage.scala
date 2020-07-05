@@ -25,12 +25,12 @@ final class TrieStorage private (
 
   def underlying = underlyingTrie
 
-  def load(address: DataWord): DataWord = {
-    logs.get(address) match {
+  def load(offset: DataWord): DataWord = {
+    logs.get(offset) match {
       case None =>
-        underlyingTrie.get(address) match {
+        underlyingTrie.get(offset) match {
           case Some(value) =>
-            logs += (address -> Original(value)) // for cache
+            logs += (offset -> Original(value)) // for cache
             value
           case None => DataWord.Zero
         }
@@ -40,11 +40,11 @@ final class TrieStorage private (
     }
   }
 
-  def store(address: DataWord, value: DataWord): TrieStorage = {
+  def store(offset: DataWord, value: DataWord): TrieStorage = {
     val updatedLogs = if (value.isZero) {
-      logs + (address -> REMOVED_VALUE)
+      logs + (offset -> REMOVED_VALUE)
     } else {
-      logs + (address -> Updated(value))
+      logs + (offset -> Updated(value))
     }
     new TrieStorage(underlyingTrie, updatedLogs)
   }
